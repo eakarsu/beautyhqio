@@ -1,0 +1,905 @@
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log("Starting seed...");
+
+  // Create Business
+  const business = await prisma.business.create({
+    data: {
+      name: "Luxe Beauty Studio",
+      type: "MULTI_SERVICE",
+      phone: "5551234567",
+      email: "hello@luxebeauty.com",
+      website: "https://luxebeauty.com",
+      timezone: "America/New_York",
+      defaultLanguage: "en",
+      supportedLanguages: ["en", "es", "vi", "ko", "zh"],
+      instagram: "@luxebeautystudio",
+      facebook: "luxebeautystudio",
+      taxRate: 0.0875,
+    },
+  });
+  console.log("Created business:", business.name);
+
+  // Create Locations
+  const locations = await Promise.all([
+    prisma.location.create({
+      data: {
+        businessId: business.id,
+        name: "Main Salon - Downtown",
+        phone: "5551234567",
+        email: "downtown@luxebeauty.com",
+        address: "123 Main Street",
+        city: "New York",
+        state: "NY",
+        zip: "10001",
+        country: "USA",
+        operatingHours: {
+          monday: { open: "09:00", close: "20:00" },
+          tuesday: { open: "09:00", close: "20:00" },
+          wednesday: { open: "09:00", close: "20:00" },
+          thursday: { open: "09:00", close: "21:00" },
+          friday: { open: "09:00", close: "21:00" },
+          saturday: { open: "08:00", close: "18:00" },
+          sunday: { open: "10:00", close: "17:00" },
+        },
+      },
+    }),
+    prisma.location.create({
+      data: {
+        businessId: business.id,
+        name: "Express Salon - Mall",
+        phone: "5559876543",
+        email: "mall@luxebeauty.com",
+        address: "456 Shopping Center Blvd",
+        city: "New York",
+        state: "NY",
+        zip: "10002",
+        country: "USA",
+        operatingHours: {
+          monday: { open: "10:00", close: "21:00" },
+          tuesday: { open: "10:00", close: "21:00" },
+          wednesday: { open: "10:00", close: "21:00" },
+          thursday: { open: "10:00", close: "21:00" },
+          friday: { open: "10:00", close: "21:00" },
+          saturday: { open: "10:00", close: "21:00" },
+          sunday: { open: "11:00", close: "19:00" },
+        },
+      },
+    }),
+  ]);
+  console.log("Created locations:", locations.length);
+
+  // Create Users and Staff
+  const hashedPassword = await bcrypt.hash("password123", 12);
+  const adminPassword = await bcrypt.hash("admin123", 12);
+
+  // Create admin user first
+  const adminUser = await prisma.user.create({
+    data: {
+      businessId: business.id,
+      email: "admin@luxebeauty.com",
+      password: adminPassword,
+      firstName: "Admin",
+      lastName: "User",
+      role: "OWNER",
+      phone: "5550000000",
+      isActive: true,
+    },
+  });
+  console.log("Created admin user:", adminUser.email);
+
+  const usersData = [
+    {
+      email: "maria@luxebeauty.com",
+      firstName: "Maria",
+      lastName: "Garcia",
+      role: "OWNER" as const,
+      phone: "5551111111",
+    },
+    {
+      email: "jennifer@luxebeauty.com",
+      firstName: "Jennifer",
+      lastName: "Kim",
+      role: "MANAGER" as const,
+      phone: "5552222222",
+    },
+    {
+      email: "lisa@luxebeauty.com",
+      firstName: "Lisa",
+      lastName: "Nguyen",
+      role: "RECEPTIONIST" as const,
+      phone: "5553333333",
+    },
+    {
+      email: "sarah@luxebeauty.com",
+      firstName: "Sarah",
+      lastName: "Johnson",
+      role: "STAFF" as const,
+      phone: "5554444444",
+      staffData: {
+        displayName: "Sarah J.",
+        title: "Senior Stylist",
+        bio: "Color specialist with 10 years experience",
+        color: "#F43F5E",
+        specialties: ["Hair Color", "Highlights", "Balayage"],
+        employmentType: "EMPLOYEE" as const,
+        payType: "COMMISSION" as const,
+        commissionPct: 45,
+      },
+    },
+    {
+      email: "ashley@luxebeauty.com",
+      firstName: "Ashley",
+      lastName: "Williams",
+      role: "STAFF" as const,
+      phone: "5555555555",
+      staffData: {
+        displayName: "Ashley W.",
+        title: "Stylist",
+        bio: "Specializing in cuts and styling",
+        color: "#8B5CF6",
+        specialties: ["Haircuts", "Blowouts", "Styling"],
+        employmentType: "EMPLOYEE" as const,
+        payType: "HYBRID" as const,
+        hourlyRate: 15,
+        commissionPct: 35,
+      },
+    },
+    {
+      email: "michelle@luxebeauty.com",
+      firstName: "Michelle",
+      lastName: "Tran",
+      role: "STAFF" as const,
+      phone: "5556666666",
+      staffData: {
+        displayName: "Michelle T.",
+        title: "Nail Technician",
+        bio: "Expert nail artist, fluent in Vietnamese",
+        color: "#EC4899",
+        specialties: ["Gel Nails", "Nail Art", "Pedicures"],
+        employmentType: "EMPLOYEE" as const,
+        payType: "COMMISSION" as const,
+        commissionPct: 50,
+      },
+    },
+    {
+      email: "david@luxebeauty.com",
+      firstName: "David",
+      lastName: "Chen",
+      role: "STAFF" as const,
+      phone: "5557777777",
+      staffData: {
+        displayName: "David C.",
+        title: "Barber",
+        bio: "Master barber with classic and modern cuts",
+        color: "#3B82F6",
+        specialties: ["Men's Cuts", "Beard Trim", "Hot Shave"],
+        employmentType: "BOOTH_RENTER" as const,
+        boothRent: 400,
+        rentFrequency: "weekly",
+      },
+    },
+    {
+      email: "emma@luxebeauty.com",
+      firstName: "Emma",
+      lastName: "Davis",
+      role: "STAFF" as const,
+      phone: "5558888888",
+      staffData: {
+        displayName: "Emma D.",
+        title: "Esthetician",
+        bio: "Skincare expert specializing in facials",
+        color: "#10B981",
+        specialties: ["Facials", "Waxing", "Skincare"],
+        employmentType: "EMPLOYEE" as const,
+        payType: "COMMISSION" as const,
+        commissionPct: 45,
+      },
+    },
+  ];
+
+  const users = [];
+  for (const userData of usersData) {
+    const user = await prisma.user.create({
+      data: {
+        email: userData.email,
+        password: hashedPassword,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role,
+        phone: userData.phone,
+        businessId: business.id,
+      },
+    });
+    users.push(user);
+
+    // Create staff record if staffData exists
+    if (userData.staffData) {
+      await prisma.staff.create({
+        data: {
+          userId: user.id,
+          locationId: locations[0].id,
+          displayName: userData.staffData.displayName,
+          title: userData.staffData.title,
+          bio: userData.staffData.bio,
+          color: userData.staffData.color,
+          specialties: userData.staffData.specialties,
+          employmentType: userData.staffData.employmentType,
+          payType: userData.staffData.payType,
+          hourlyRate: userData.staffData.hourlyRate,
+          commissionPct: userData.staffData.commissionPct,
+          boothRent: userData.staffData.boothRent,
+          rentFrequency: userData.staffData.rentFrequency,
+        },
+      });
+    }
+  }
+  console.log("Created users:", users.length);
+
+  // Create Service Categories
+  const serviceCategories = await Promise.all([
+    prisma.serviceCategory.create({
+      data: {
+        businessId: business.id,
+        name: "Hair Services",
+        description: "Cuts, color, styling and treatments",
+        color: "#F43F5E",
+        sortOrder: 1,
+      },
+    }),
+    prisma.serviceCategory.create({
+      data: {
+        businessId: business.id,
+        name: "Nail Services",
+        description: "Manicures, pedicures, and nail art",
+        color: "#EC4899",
+        sortOrder: 2,
+      },
+    }),
+    prisma.serviceCategory.create({
+      data: {
+        businessId: business.id,
+        name: "Spa & Facial",
+        description: "Facials, skincare, and relaxation",
+        color: "#10B981",
+        sortOrder: 3,
+      },
+    }),
+    prisma.serviceCategory.create({
+      data: {
+        businessId: business.id,
+        name: "Barbershop",
+        description: "Men's grooming services",
+        color: "#3B82F6",
+        sortOrder: 4,
+      },
+    }),
+    prisma.serviceCategory.create({
+      data: {
+        businessId: business.id,
+        name: "Lash & Brow",
+        description: "Lash extensions and brow services",
+        color: "#8B5CF6",
+        sortOrder: 5,
+      },
+    }),
+    prisma.serviceCategory.create({
+      data: {
+        businessId: business.id,
+        name: "Waxing",
+        description: "Hair removal services",
+        color: "#F59E0B",
+        sortOrder: 6,
+      },
+    }),
+  ]);
+  console.log("Created service categories:", serviceCategories.length);
+
+  // Create Services
+  const servicesData = [
+    // Hair Services
+    { categoryIdx: 0, name: "Women's Haircut", price: 45, duration: 45 },
+    { categoryIdx: 0, name: "Men's Haircut", price: 25, duration: 30 },
+    { categoryIdx: 0, name: "Children's Haircut", price: 20, duration: 20 },
+    { categoryIdx: 0, name: "Blowout", price: 40, duration: 30 },
+    { categoryIdx: 0, name: "Full Color", price: 120, duration: 120 },
+    { categoryIdx: 0, name: "Root Touch-up", price: 75, duration: 75 },
+    { categoryIdx: 0, name: "Partial Highlights", price: 120, duration: 90 },
+    { categoryIdx: 0, name: "Full Highlights", price: 180, duration: 150 },
+    { categoryIdx: 0, name: "Balayage", price: 200, duration: 180 },
+    { categoryIdx: 0, name: "Keratin Treatment", price: 250, duration: 180 },
+    // Nail Services
+    { categoryIdx: 1, name: "Manicure", price: 25, duration: 30 },
+    { categoryIdx: 1, name: "Pedicure", price: 40, duration: 45 },
+    { categoryIdx: 1, name: "Gel Manicure", price: 35, duration: 45 },
+    { categoryIdx: 1, name: "Gel Pedicure", price: 50, duration: 60 },
+    { categoryIdx: 1, name: "Acrylic Full Set", price: 55, duration: 75 },
+    { categoryIdx: 1, name: "Acrylic Fill", price: 35, duration: 45 },
+    { categoryIdx: 1, name: "Nail Art", price: 15, duration: 15, priceType: "STARTING_AT" as const },
+    // Spa & Facial
+    { categoryIdx: 2, name: "Express Facial", price: 65, duration: 30 },
+    { categoryIdx: 2, name: "Classic Facial", price: 85, duration: 60 },
+    { categoryIdx: 2, name: "Anti-Aging Facial", price: 120, duration: 75 },
+    { categoryIdx: 2, name: "Hydrafacial", price: 175, duration: 60 },
+    // Barbershop
+    { categoryIdx: 3, name: "Buzz Cut", price: 15, duration: 15 },
+    { categoryIdx: 3, name: "Classic Cut", price: 25, duration: 30 },
+    { categoryIdx: 3, name: "Beard Trim", price: 15, duration: 15 },
+    { categoryIdx: 3, name: "Hot Towel Shave", price: 30, duration: 30 },
+    // Lash & Brow
+    { categoryIdx: 4, name: "Lash Lift", price: 75, duration: 45 },
+    { categoryIdx: 4, name: "Classic Lash Extensions", price: 150, duration: 90 },
+    { categoryIdx: 4, name: "Volume Lash Extensions", price: 200, duration: 120 },
+    { categoryIdx: 4, name: "Brow Wax", price: 18, duration: 15 },
+    { categoryIdx: 4, name: "Brow Tint", price: 20, duration: 15 },
+    // Waxing
+    { categoryIdx: 5, name: "Lip Wax", price: 12, duration: 10 },
+    { categoryIdx: 5, name: "Chin Wax", price: 12, duration: 10 },
+    { categoryIdx: 5, name: "Underarm Wax", price: 20, duration: 15 },
+    { categoryIdx: 5, name: "Half Leg Wax", price: 35, duration: 30 },
+    { categoryIdx: 5, name: "Full Leg Wax", price: 60, duration: 45 },
+    { categoryIdx: 5, name: "Brazilian Wax", price: 55, duration: 30 },
+  ];
+
+  const services = [];
+  for (const serviceData of servicesData) {
+    const service = await prisma.service.create({
+      data: {
+        businessId: business.id,
+        categoryId: serviceCategories[serviceData.categoryIdx].id,
+        name: serviceData.name,
+        price: serviceData.price,
+        duration: serviceData.duration,
+        priceType: serviceData.priceType || "FIXED",
+      },
+    });
+    services.push(service);
+  }
+  console.log("Created services:", services.length);
+
+  // Create Product Categories
+  const productCategories = await Promise.all([
+    prisma.productCategory.create({
+      data: { businessId: business.id, name: "Hair Care", sortOrder: 1 },
+    }),
+    prisma.productCategory.create({
+      data: { businessId: business.id, name: "Styling", sortOrder: 2 },
+    }),
+    prisma.productCategory.create({
+      data: { businessId: business.id, name: "Skincare", sortOrder: 3 },
+    }),
+    prisma.productCategory.create({
+      data: { businessId: business.id, name: "Nail Products", sortOrder: 4 },
+    }),
+  ]);
+  console.log("Created product categories:", productCategories.length);
+
+  // Create Products (20+ products)
+  const productsData = [
+    // Hair Care
+    { categoryIdx: 0, name: "Moroccan Oil Shampoo", brand: "Moroccanoil", price: 28, cost: 14, qty: 25 },
+    { categoryIdx: 0, name: "Moroccan Oil Conditioner", brand: "Moroccanoil", price: 28, cost: 14, qty: 22 },
+    { categoryIdx: 0, name: "Olaplex No. 3", brand: "Olaplex", price: 28, cost: 15, qty: 18 },
+    { categoryIdx: 0, name: "Olaplex No. 4 Shampoo", brand: "Olaplex", price: 30, cost: 16, qty: 20 },
+    { categoryIdx: 0, name: "Olaplex No. 5 Conditioner", brand: "Olaplex", price: 30, cost: 16, qty: 17 },
+    { categoryIdx: 0, name: "Redken Color Extend Shampoo", brand: "Redken", price: 24, cost: 12, qty: 30 },
+    { categoryIdx: 0, name: "Pureology Hydrate Shampoo", brand: "Pureology", price: 35, cost: 18, qty: 15 },
+    // Styling
+    { categoryIdx: 1, name: "Moroccan Oil Treatment", brand: "Moroccanoil", price: 44, cost: 22, qty: 15 },
+    { categoryIdx: 1, name: "Kenra Volume Spray 25", brand: "Kenra", price: 22, cost: 11, qty: 30 },
+    { categoryIdx: 1, name: "Sebastian Shaper Plus", brand: "Sebastian", price: 20, cost: 10, qty: 28 },
+    { categoryIdx: 1, name: "Bumble and Bumble Thickening Spray", brand: "Bumble and Bumble", price: 32, cost: 16, qty: 20 },
+    { categoryIdx: 1, name: "Living Proof Perfect Hair Day", brand: "Living Proof", price: 29, cost: 15, qty: 18 },
+    { categoryIdx: 1, name: "CHI Silk Infusion", brand: "CHI", price: 18, cost: 9, qty: 35 },
+    // Skincare
+    { categoryIdx: 2, name: "CeraVe Cleanser", brand: "CeraVe", price: 18, cost: 9, qty: 35 },
+    { categoryIdx: 2, name: "The Ordinary Niacinamide", brand: "The Ordinary", price: 12, cost: 6, qty: 40 },
+    { categoryIdx: 2, name: "La Roche-Posay SPF 50", brand: "La Roche-Posay", price: 35, cost: 18, qty: 25 },
+    { categoryIdx: 2, name: "CeraVe Moisturizing Cream", brand: "CeraVe", price: 22, cost: 11, qty: 30 },
+    { categoryIdx: 2, name: "Paula's Choice BHA Exfoliant", brand: "Paula's Choice", price: 32, cost: 16, qty: 20 },
+    // Nail Products
+    { categoryIdx: 3, name: "OPI Nail Lacquer", brand: "OPI", price: 12, cost: 6, qty: 50 },
+    { categoryIdx: 3, name: "Essie Gel Couture", brand: "Essie", price: 14, cost: 7, qty: 45 },
+    { categoryIdx: 3, name: "CND Vinylux", brand: "CND", price: 11, cost: 5, qty: 55 },
+    { categoryIdx: 3, name: "OPI Nail Envy Strengthener", brand: "OPI", price: 18, cost: 9, qty: 25 },
+    { categoryIdx: 3, name: "Zoya Nail Polish", brand: "Zoya", price: 10, cost: 5, qty: 60 },
+  ];
+
+  for (const productData of productsData) {
+    await prisma.product.create({
+      data: {
+        businessId: business.id,
+        categoryId: productCategories[productData.categoryIdx].id,
+        name: productData.name,
+        brand: productData.brand,
+        price: productData.price,
+        cost: productData.cost,
+        quantityOnHand: productData.qty,
+        reorderLevel: 5,
+      },
+    });
+  }
+  console.log("Created products:", productsData.length);
+
+  // Create Clients (25+ clients)
+  const clientsData = [
+    { firstName: "Sarah", lastName: "Johnson", email: "sarah.johnson@email.com", phone: "5551234567", status: "VIP" as const },
+    { firstName: "Emily", lastName: "Chen", email: "emily.chen@email.com", phone: "5552345678", status: "ACTIVE" as const },
+    { firstName: "Jessica", lastName: "Williams", email: "jessica.w@email.com", phone: "5553456789", status: "ACTIVE" as const },
+    { firstName: "Amanda", lastName: "Garcia", email: "amanda.g@email.com", phone: "5554567890", status: "ACTIVE" as const },
+    { firstName: "Nicole", lastName: "Brown", email: "nicole.b@email.com", phone: "5555678901", status: "VIP" as const },
+    { firstName: "Rachel", lastName: "Lee", email: "rachel.l@email.com", phone: "5556789012", status: "ACTIVE" as const },
+    { firstName: "Michelle", lastName: "Taylor", email: "michelle.t@email.com", phone: "5557890123", status: "ACTIVE" as const },
+    { firstName: "Jennifer", lastName: "Anderson", email: "jennifer.a@email.com", phone: "5558901234", status: "ACTIVE" as const },
+    { firstName: "Lisa", lastName: "Thomas", email: "lisa.t@email.com", phone: "5559012345", status: "INACTIVE" as const },
+    { firstName: "Karen", lastName: "Jackson", email: "karen.j@email.com", phone: "5550123456", status: "ACTIVE" as const },
+    { firstName: "Sophia", lastName: "Martinez", email: "sophia.m@email.com", phone: "5551112222", status: "VIP" as const },
+    { firstName: "Olivia", lastName: "Rodriguez", email: "olivia.r@email.com", phone: "5552223333", status: "ACTIVE" as const },
+    { firstName: "Isabella", lastName: "Hernandez", email: "isabella.h@email.com", phone: "5553334444", status: "ACTIVE" as const },
+    { firstName: "Mia", lastName: "Lopez", email: "mia.l@email.com", phone: "5554445555", status: "ACTIVE" as const },
+    { firstName: "Charlotte", lastName: "Gonzalez", email: "charlotte.g@email.com", phone: "5555556666", status: "VIP" as const },
+    { firstName: "Amelia", lastName: "Wilson", email: "amelia.w@email.com", phone: "5556667777", status: "ACTIVE" as const },
+    { firstName: "Harper", lastName: "Moore", email: "harper.m@email.com", phone: "5557778888", status: "ACTIVE" as const },
+    { firstName: "Evelyn", lastName: "Taylor", email: "evelyn.t@email.com", phone: "5558889999", status: "INACTIVE" as const },
+    { firstName: "Abigail", lastName: "Davis", email: "abigail.d@email.com", phone: "5559990000", status: "ACTIVE" as const },
+    { firstName: "Luna", lastName: "White", email: "luna.w@email.com", phone: "5550001111", status: "ACTIVE" as const },
+    { firstName: "Ella", lastName: "Harris", email: "ella.h@email.com", phone: "5551119999", status: "ACTIVE" as const },
+    { firstName: "Scarlett", lastName: "Clark", email: "scarlett.c@email.com", phone: "5552228888", status: "VIP" as const },
+    { firstName: "Victoria", lastName: "Lewis", email: "victoria.l@email.com", phone: "5553337777", status: "ACTIVE" as const },
+    { firstName: "Grace", lastName: "Robinson", email: "grace.r@email.com", phone: "5554446666", status: "ACTIVE" as const },
+    { firstName: "Chloe", lastName: "Walker", email: "chloe.w@email.com", phone: "5555555555", status: "VIP" as const },
+  ];
+
+  const clients = [];
+  for (const clientData of clientsData) {
+    const client = await prisma.client.create({
+      data: {
+        firstName: clientData.firstName,
+        lastName: clientData.lastName,
+        email: clientData.email,
+        phone: clientData.phone,
+        status: clientData.status,
+        allowSms: true,
+        allowEmail: true,
+        tags: clientData.status === "VIP" ? ["VIP", "Regular"] : ["Regular"],
+      },
+    });
+    clients.push(client);
+  }
+  console.log("Created clients:", clients.length);
+
+  // Create Loyalty Program
+  const loyaltyProgram = await prisma.loyaltyProgram.create({
+    data: {
+      businessId: business.id,
+      name: "Luxe Rewards",
+      pointsPerDollar: 1,
+      bonusOnSignup: 100,
+      bonusOnBirthday: 50,
+      bonusOnReferral: 100,
+      tiers: [
+        { name: "Bronze", minPoints: 0, benefits: ["1 point per $1"] },
+        { name: "Silver", minPoints: 500, benefits: ["1.25 points per $1", "10% off products"] },
+        { name: "Gold", minPoints: 1000, benefits: ["1.5 points per $1", "15% off products", "Priority booking"] },
+        { name: "Platinum", minPoints: 2000, benefits: ["2 points per $1", "20% off products", "Priority booking", "Free birthday service"] },
+      ],
+    },
+  });
+  console.log("Created loyalty program");
+
+  // Create Loyalty Rewards (25+ rewards)
+  const rewardsData = [
+    { name: "$10 Off Any Service", pointsCost: 200, type: "discount_amount", value: 10 },
+    { name: "Free Add-On Service", pointsCost: 150, type: "free_service", value: 25 },
+    { name: "20% Off Products", pointsCost: 300, type: "discount_percent", value: 20 },
+    { name: "Free Blowout", pointsCost: 400, type: "free_service", value: 40 },
+    { name: "$25 Off Any Service", pointsCost: 450, type: "discount_amount", value: 25 },
+    { name: "Free Manicure", pointsCost: 300, type: "free_service", value: 25 },
+    { name: "Free Express Facial", pointsCost: 600, type: "free_service", value: 65 },
+    { name: "15% Off Entire Purchase", pointsCost: 250, type: "discount_percent", value: 15 },
+    { name: "Free Product Sample Set", pointsCost: 100, type: "free_product", value: 20 },
+    { name: "VIP Priority Booking", pointsCost: 500, type: "perk", value: 0 },
+    { name: "$50 Off Color Service", pointsCost: 800, type: "discount_amount", value: 50 },
+    { name: "Free Deep Conditioning Treatment", pointsCost: 200, type: "free_service", value: 30 },
+    { name: "30% Off Next Visit", pointsCost: 600, type: "discount_percent", value: 30 },
+    { name: "Free Brow Wax", pointsCost: 150, type: "free_service", value: 18 },
+    { name: "Birthday Double Points", pointsCost: 100, type: "perk", value: 0 },
+    { name: "Free Pedicure", pointsCost: 350, type: "free_service", value: 40 },
+    { name: "$15 Off Any Service", pointsCost: 275, type: "discount_amount", value: 15 },
+    { name: "Free Gel Manicure", pointsCost: 325, type: "free_service", value: 35 },
+    { name: "25% Off Products", pointsCost: 375, type: "discount_percent", value: 25 },
+    { name: "Free Lash Lift", pointsCost: 700, type: "free_service", value: 75 },
+    { name: "$75 Off Balayage", pointsCost: 1000, type: "discount_amount", value: 75 },
+    { name: "Free Hot Towel Shave", pointsCost: 280, type: "free_service", value: 30 },
+    { name: "10% Off All Services", pointsCost: 175, type: "discount_percent", value: 10 },
+    { name: "Free Lip Wax", pointsCost: 100, type: "free_service", value: 12 },
+    { name: "$100 Off Keratin Treatment", pointsCost: 1200, type: "discount_amount", value: 100 },
+  ];
+  for (const reward of rewardsData) {
+    await prisma.loyaltyReward.create({
+      data: {
+        programId: loyaltyProgram.id,
+        ...reward,
+      },
+    });
+  }
+  console.log("Created loyalty rewards:", rewardsData.length);
+
+  // Create Loyalty Accounts for clients
+  for (const client of clients) {
+    const points = Math.floor(Math.random() * 2500);
+    let tier = "Bronze";
+    if (points >= 2000) tier = "Platinum";
+    else if (points >= 1000) tier = "Gold";
+    else if (points >= 500) tier = "Silver";
+
+    await prisma.loyaltyAccount.create({
+      data: {
+        clientId: client.id,
+        programId: loyaltyProgram.id,
+        pointsBalance: points,
+        lifetimePoints: points + Math.floor(Math.random() * 500),
+        tier,
+      },
+    });
+  }
+  console.log("Created loyalty accounts");
+
+  // Create Automations (25+ automations)
+  const automationsData = [
+    { name: "Appointment Reminder (24hr)", description: "Send SMS reminder 24 hours before appointment", triggerType: "appointment_reminder", triggerConfig: { hours: 24 }, actions: [{ type: "send_sms", template: "appointment_reminder" }] },
+    { name: "Appointment Reminder (2hr)", description: "Send SMS reminder 2 hours before appointment", triggerType: "appointment_reminder", triggerConfig: { hours: 2 }, actions: [{ type: "send_sms", template: "appointment_reminder_2hr" }] },
+    { name: "Post-Visit Thank You", description: "Send thank you email after appointment", triggerType: "appointment_completed", actions: [{ type: "send_email", template: "thank_you" }] },
+    { name: "Birthday Special", description: "Send birthday discount on client's birthday", triggerType: "birthday", actions: [{ type: "send_sms", template: "birthday_offer" }] },
+    { name: "No-Show Follow-up", description: "Send message after no-show", triggerType: "no_show", actions: [{ type: "send_sms", template: "no_show_followup" }] },
+    { name: "Re-engagement (60 days)", description: "Send offer to inactive clients after 60 days", triggerType: "inactive_client", triggerConfig: { days: 60 }, actions: [{ type: "send_email", template: "come_back" }] },
+    { name: "Re-engagement (90 days)", description: "Send special offer to inactive clients after 90 days", triggerType: "inactive_client", triggerConfig: { days: 90 }, actions: [{ type: "send_email", template: "miss_you" }] },
+    { name: "Review Request", description: "Ask for review 24 hours after appointment", triggerType: "appointment_completed", triggerConfig: { delay: 24 }, actions: [{ type: "send_email", template: "review_request" }] },
+    { name: "New Client Welcome", description: "Send welcome email to new clients", triggerType: "new_client", actions: [{ type: "send_email", template: "welcome" }] },
+    { name: "Loyalty Points Earned", description: "Notify when points are earned", triggerType: "points_earned", actions: [{ type: "send_sms", template: "points_earned" }] },
+    { name: "Loyalty Tier Upgrade", description: "Congratulate on tier upgrade", triggerType: "tier_upgrade", actions: [{ type: "send_email", template: "tier_upgrade" }] },
+    { name: "Appointment Cancelled", description: "Send cancellation confirmation", triggerType: "appointment_cancelled", actions: [{ type: "send_email", template: "cancellation_confirm" }] },
+    { name: "Rebooking Reminder", description: "Remind to rebook after 4 weeks", triggerType: "post_visit", triggerConfig: { days: 28 }, actions: [{ type: "send_sms", template: "rebook_reminder" }] },
+    { name: "Low Stock Alert", description: "Notify staff when product is low", triggerType: "low_stock", actions: [{ type: "internal_notify", template: "low_stock" }] },
+    { name: "VIP Special Treatment", description: "Send VIP-only offers", triggerType: "vip_status", actions: [{ type: "send_email", template: "vip_exclusive" }] },
+    { name: "Appointment Confirmation", description: "Send confirmation after booking", triggerType: "appointment_booked", actions: [{ type: "send_email", template: "appointment_confirmed" }] },
+    { name: "Gift Card Received", description: "Notify recipient of gift card", triggerType: "gift_card_purchased", actions: [{ type: "send_email", template: "gift_card_received" }] },
+    { name: "Referral Thank You", description: "Thank clients for referrals", triggerType: "referral_completed", actions: [{ type: "send_sms", template: "referral_thanks" }] },
+    { name: "Weekly Digest", description: "Send weekly appointment summary to staff", triggerType: "weekly_schedule", actions: [{ type: "internal_notify", template: "weekly_digest" }] },
+    { name: "Service Follow-up", description: "Follow up after specific services", triggerType: "service_completed", actions: [{ type: "send_email", template: "service_followup" }] },
+    { name: "Product Reorder Reminder", description: "Remind clients to reorder products", triggerType: "product_reorder", triggerConfig: { days: 30 }, actions: [{ type: "send_email", template: "reorder_reminder" }] },
+    { name: "Anniversary Celebration", description: "Celebrate client anniversary", triggerType: "anniversary", actions: [{ type: "send_email", template: "anniversary" }] },
+    { name: "Appointment Reschedule", description: "Send reschedule confirmation", triggerType: "appointment_rescheduled", actions: [{ type: "send_sms", template: "reschedule_confirm" }] },
+    { name: "Payment Receipt", description: "Send receipt after payment", triggerType: "payment_completed", actions: [{ type: "send_email", template: "payment_receipt" }] },
+    { name: "Waitlist Notification", description: "Notify when spot becomes available", triggerType: "waitlist_available", actions: [{ type: "send_sms", template: "waitlist_available" }] },
+  ];
+  for (const automation of automationsData) {
+    await prisma.automation.create({
+      data: {
+        businessId: business.id,
+        ...automation,
+      },
+    });
+  }
+  console.log("Created automations:", automationsData.length);
+
+  // Get staff members for appointments
+  const staffMembers = await prisma.staff.findMany({
+    take: 5,
+  });
+
+  // Create Sample Appointments (30+ appointments)
+  const today = new Date();
+  const appointmentsData = [];
+
+  for (let i = 0; i < 35; i++) {
+    const dayOffset = Math.floor(Math.random() * 14) - 7; // -7 to +7 days
+    const hour = 9 + Math.floor(Math.random() * 9); // 9am to 6pm
+    const appointmentDate = new Date(today);
+    appointmentDate.setDate(today.getDate() + dayOffset);
+    appointmentDate.setHours(hour, 0, 0, 0);
+
+    const endDate = new Date(appointmentDate);
+    endDate.setMinutes(endDate.getMinutes() + services[Math.floor(Math.random() * 10)].duration);
+
+    const status = dayOffset < 0
+      ? (Math.random() > 0.2 ? "completed" : (Math.random() > 0.5 ? "cancelled" : "no_show"))
+      : (Math.random() > 0.3 ? "confirmed" : "booked");
+
+    const statusMap: Record<string, string> = {
+      completed: "COMPLETED",
+      cancelled: "CANCELLED",
+      no_show: "NO_SHOW",
+      confirmed: "CONFIRMED",
+      booked: "BOOKED",
+    };
+
+    const sourceMap: Record<string, string> = {
+      online: "ONLINE",
+      phone: "PHONE",
+      walk_in: "WALK_IN",
+      app: "APP",
+    };
+
+    const sourceKey = ["online", "phone", "walk_in", "app"][Math.floor(Math.random() * 4)];
+
+    appointmentsData.push({
+      clientId: clients[Math.floor(Math.random() * clients.length)].id,
+      locationId: locations[0].id,
+      staffId: staffMembers.length > 0 ? staffMembers[Math.floor(Math.random() * staffMembers.length)].id : undefined,
+      scheduledStart: appointmentDate,
+      scheduledEnd: endDate,
+      status: statusMap[status] as any,
+      source: sourceMap[sourceKey] as any,
+    });
+  }
+
+  for (const aptData of appointmentsData) {
+    if (aptData.staffId) {
+      const apt = await prisma.appointment.create({
+        data: aptData,
+      });
+
+      // Add service to appointment
+      await prisma.appointmentService.create({
+        data: {
+          appointmentId: apt.id,
+          serviceId: services[Math.floor(Math.random() * 10)].id,
+          price: services[Math.floor(Math.random() * 10)].price,
+          duration: services[Math.floor(Math.random() * 10)].duration,
+        },
+      });
+    }
+  }
+  console.log("Created appointments:", appointmentsData.length);
+
+  // Create Sample Transactions (50+ transactions)
+  for (let i = 0; i < 50; i++) {
+    const dayOffset = Math.floor(Math.random() * 30);
+    const transactionDate = new Date(today);
+    transactionDate.setDate(today.getDate() - dayOffset);
+
+    const subtotal = 50 + Math.floor(Math.random() * 200);
+    const tax = subtotal * 0.0875;
+    const tip = Math.random() > 0.3 ? Math.floor(subtotal * 0.15 + Math.random() * 10) : 0;
+    const discount = Math.random() > 0.8 ? Math.floor(subtotal * 0.1) : 0;
+
+    const transaction = await prisma.transaction.create({
+      data: {
+        transactionNumber: `TXN-${Date.now()}-${i}`,
+        locationId: locations[0].id,
+        clientId: clients[Math.floor(Math.random() * clients.length)].id,
+        staffId: staffMembers.length > 0 ? staffMembers[Math.floor(Math.random() * staffMembers.length)].id : undefined,
+        subtotal,
+        taxAmount: tax,
+        discountAmount: discount,
+        tipAmount: tip,
+        totalAmount: subtotal - discount + tax + tip,
+        date: transactionDate,
+        type: "SALE",
+        status: "COMPLETED",
+      },
+    });
+
+    // Add transaction line items
+    const numItems = 1 + Math.floor(Math.random() * 3);
+    for (let j = 0; j < numItems; j++) {
+      const isService = Math.random() > 0.3;
+      if (isService) {
+        const service = services[Math.floor(Math.random() * services.length)];
+        await prisma.transactionLineItem.create({
+          data: {
+            transactionId: transaction.id,
+            type: "SERVICE",
+            serviceId: service.id,
+            name: service.name,
+            quantity: 1,
+            unitPrice: service.price,
+            totalPrice: service.price,
+          },
+        });
+      }
+    }
+
+    // Add payment record
+    const paymentMethod = ["CREDIT_CARD", "CASH", "DEBIT_CARD"][Math.floor(Math.random() * 3)] as "CREDIT_CARD" | "CASH" | "DEBIT_CARD";
+    await prisma.transactionPayment.create({
+      data: {
+        transactionId: transaction.id,
+        method: paymentMethod,
+        amount: subtotal - discount + tax + tip,
+      },
+    });
+  }
+  console.log("Created transactions: 50");
+
+  // Create Gift Cards (25+ gift cards)
+  const giftCardCodes = [
+    { code: "GIFT2024001", amount: 50 },
+    { code: "GIFT2024002", amount: 100 },
+    { code: "GIFT2024003", amount: 75 },
+    { code: "WELCOME50", amount: 50 },
+    { code: "BIRTHDAY100", amount: 100 },
+    { code: "HOLIDAY25", amount: 25 },
+    { code: "MOTHERSDAY", amount: 150 },
+    { code: "VALENTINES", amount: 75 },
+    { code: "THANKYOU50", amount: 50 },
+    { code: "REFERRAL25", amount: 25 },
+    { code: "NEWYEAR100", amount: 100 },
+    { code: "GRADUATION", amount: 200 },
+    { code: "CORPORATE01", amount: 500 },
+    { code: "CORPORATE02", amount: 250 },
+    { code: "PROMO2024A", amount: 30 },
+    { code: "PROMO2024B", amount: 40 },
+    { code: "WEDDING150", amount: 150 },
+    { code: "BRIDALPARTY", amount: 100 },
+    { code: "LOYALTY500", amount: 500 },
+    { code: "EMPLOYEE50", amount: 50 },
+    { code: "SPRING2024", amount: 60 },
+    { code: "SUMMER2024", amount: 80 },
+    { code: "FALL2024", amount: 70 },
+    { code: "WINTER2024", amount: 90 },
+    { code: "BLACKFRIDAY", amount: 125 },
+  ];
+  for (const gc of giftCardCodes) {
+    const currentBalance = gc.amount - Math.floor(Math.random() * gc.amount * 0.5);
+
+    await prisma.giftCard.create({
+      data: {
+        businessId: business.id,
+        code: gc.code,
+        initialBalance: gc.amount,
+        currentBalance,
+        status: currentBalance > 0 ? "active" : "redeemed",
+        purchasedAt: new Date(today.getTime() - Math.random() * 60 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(today.getTime() + 365 * 24 * 60 * 60 * 1000),
+        recipientName: ["Gift Recipient", "Birthday Gift", "Holiday Gift", "Thank You Gift"][Math.floor(Math.random() * 4)],
+      },
+    });
+  }
+  console.log("Created gift cards:", giftCardCodes.length);
+
+  // Create Reviews (25+ reviews)
+  const reviewComments = [
+    "Amazing experience! Sarah did a fantastic job on my highlights.",
+    "Love the atmosphere and the team is so friendly. Will definitely be back!",
+    "Best salon in town. My nails have never looked better!",
+    "Great service but had to wait a bit longer than expected.",
+    "Michelle is an absolute artist with nail art. Highly recommend!",
+    "Perfect haircut, exactly what I wanted. Thank you!",
+    "The facial was so relaxing. My skin feels amazing!",
+    "Good service overall, prices are reasonable for the quality.",
+    "Incredible color work! My balayage looks stunning.",
+    "Very professional staff. Clean and modern facility.",
+    "Best pedicure I've ever had. So relaxing!",
+    "Fast service without compromising quality. Impressive!",
+    "The products they use are top quality. My hair feels so healthy.",
+    "Friendly reception desk, made booking super easy.",
+    "Been coming here for years. Never disappointed!",
+    "The lash extensions look so natural. Love them!",
+    "Great experience from start to finish. Highly recommend!",
+    "Parking can be tricky but worth it for the service.",
+    "Ashley is amazing with scissors. Best haircut ever!",
+    "The deep conditioning treatment transformed my hair.",
+  ];
+
+  for (let i = 0; i < 25; i++) {
+    const rating = 3 + Math.floor(Math.random() * 3); // 3-5 stars
+    const reviewDate = new Date(today);
+    reviewDate.setDate(today.getDate() - Math.floor(Math.random() * 60));
+    const sources = ["GOOGLE", "YELP", "FACEBOOK", "INTERNAL"];
+
+    await prisma.review.create({
+      data: {
+        clientId: clients[Math.floor(Math.random() * clients.length)].id,
+        rating,
+        comment: reviewComments[Math.floor(Math.random() * reviewComments.length)],
+        source: sources[Math.floor(Math.random() * sources.length)],
+        isPublic: Math.random() > 0.1,
+        response: Math.random() > 0.6 ? "Thank you for your wonderful feedback! We're so glad you enjoyed your experience with us." : undefined,
+        respondedAt: Math.random() > 0.6 ? new Date(reviewDate.getTime() + 24 * 60 * 60 * 1000) : undefined,
+        createdAt: reviewDate,
+      },
+    });
+  }
+  console.log("Created reviews: 25");
+
+  // Create Marketing Campaigns (25+ campaigns)
+  const campaignsData = [
+    { name: "Summer Special", type: "EMAIL" as const, subject: "Beat the Heat with 20% Off All Hair Services!", content: "Summer is here! Book your appointment now and get 20% off all hair services.", status: "sent", sentAt: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000), sentCount: 450, openCount: 180, clickCount: 45 },
+    { name: "Birthday Club", type: "SMS" as const, subject: "Happy Birthday!", content: "Happy Birthday! Enjoy a FREE blowout on us this month.", status: "active" },
+    { name: "New Client Welcome", type: "EMAIL" as const, subject: "Welcome to Luxe Beauty Studio!", content: "Welcome to the Luxe family! Here's 15% off your first service.", status: "active" },
+    { name: "Holiday Promo", type: "EMAIL" as const, subject: "Holiday Gift Guide + Special Offers", content: "Find the perfect gift for everyone on your list.", status: "draft" },
+    { name: "Valentine's Day Special", type: "EMAIL" as const, subject: "Treat Yourself This Valentine's Day", content: "Book a couples spa day or pamper yourself with our special packages.", status: "scheduled", scheduledAt: new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000) },
+    { name: "Mother's Day Campaign", type: "EMAIL" as const, subject: "Give Mom the Gift of Beauty", content: "Show mom you care with a luxe gift card or spa package.", status: "sent", sentAt: new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000), sentCount: 380, openCount: 150, clickCount: 35 },
+    { name: "Back to School", type: "SMS" as const, subject: "Back to School Styles!", content: "Kids haircuts 20% off all August!", status: "sent", sentAt: new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000), sentCount: 520, openCount: 0, clickCount: 0 },
+    { name: "Fall Hair Trends", type: "EMAIL" as const, subject: "Hot Fall Hair Trends You Need to Try", content: "From warm balayage to trendy cuts, discover what's hot this season.", status: "sent", sentAt: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000), sentCount: 420, openCount: 195, clickCount: 52 },
+    { name: "Referral Program", type: "EMAIL" as const, subject: "Refer a Friend, Get $25!", content: "Know someone who'd love our salon? Refer them and you both win!", status: "active" },
+    { name: "VIP Exclusive", type: "EMAIL" as const, subject: "You're Invited: VIP Early Access", content: "As a valued VIP member, get early access to our new services.", status: "sent", sentAt: new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000), sentCount: 85, openCount: 65, clickCount: 28 },
+    { name: "Weekend Flash Sale", type: "SMS" as const, subject: "Flash Sale!", content: "This weekend only: 30% off all nail services!", status: "sent", sentAt: new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000), sentCount: 480, openCount: 0, clickCount: 0 },
+    { name: "Loyalty Points Reminder", type: "EMAIL" as const, subject: "Don't Let Your Points Expire!", content: "You have loyalty points waiting to be redeemed.", status: "active" },
+    { name: "Re-engagement Campaign", type: "EMAIL" as const, subject: "We Miss You! Come Back for 20% Off", content: "It's been a while since your last visit. Here's a special offer.", status: "active" },
+    { name: "New Service Launch", type: "EMAIL" as const, subject: "Introducing: Hydrafacial - Now Available!", content: "Experience the latest in skincare technology.", status: "sent", sentAt: new Date(today.getTime() - 45 * 24 * 60 * 60 * 1000), sentCount: 400, openCount: 210, clickCount: 78 },
+    { name: "Staff Spotlight", type: "EMAIL" as const, subject: "Meet Ashley - Our New Color Expert", content: "Get to know our talented new team member.", status: "sent", sentAt: new Date(today.getTime() - 20 * 24 * 60 * 60 * 1000), sentCount: 390, openCount: 120, clickCount: 15 },
+    { name: "Bridal Package Promo", type: "EMAIL" as const, subject: "Say 'I Do' to Gorgeous Hair", content: "Book your bridal party and get the bride's trial free!", status: "active" },
+    { name: "Winter Skincare", type: "EMAIL" as const, subject: "Winter Skin SOS - Solutions Inside", content: "Combat dry winter skin with our facial treatments.", status: "draft" },
+    { name: "Anniversary Sale", type: "EMAIL" as const, subject: "Celebrating 5 Years - Special Offers!", content: "Thank you for being part of our journey. Here's 25% off!", status: "scheduled", scheduledAt: new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000) },
+    { name: "New Year New You", type: "EMAIL" as const, subject: "New Year, New Look - Book Now!", content: "Start the year fresh with a new style.", status: "draft" },
+    { name: "Product Launch", type: "EMAIL" as const, subject: "Now Stocking: Olaplex Products!", content: "Your favorite products are now available for purchase.", status: "sent", sentAt: new Date(today.getTime() - 50 * 24 * 60 * 60 * 1000), sentCount: 410, openCount: 185, clickCount: 95 },
+    { name: "Spring Refresh", type: "EMAIL" as const, subject: "Spring Into a New Look!", content: "Freshen up your style this spring with our seasonal specials.", status: "sent", sentAt: new Date(today.getTime() - 100 * 24 * 60 * 60 * 1000), sentCount: 380, openCount: 160, clickCount: 42 },
+    { name: "Thanksgiving Thanks", type: "EMAIL" as const, subject: "Thank You for Being Part of Our Family", content: "As a token of our appreciation, enjoy 15% off your next visit.", status: "sent", sentAt: new Date(today.getTime() - 40 * 24 * 60 * 60 * 1000), sentCount: 420, openCount: 190, clickCount: 55 },
+    { name: "Father's Day Grooming", type: "SMS" as const, subject: "Treat Dad Right!", content: "Book a grooming session for Dad and get 20% off!", status: "sent", sentAt: new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000), sentCount: 280, openCount: 0, clickCount: 0 },
+    { name: "Prom Season Special", type: "EMAIL" as const, subject: "Look Perfect for Prom!", content: "Hair, makeup, and nails - we've got you covered for the big night.", status: "sent", sentAt: new Date(today.getTime() - 200 * 24 * 60 * 60 * 1000), sentCount: 150, openCount: 95, clickCount: 38 },
+    { name: "Black Friday Deals", type: "EMAIL" as const, subject: "Our Biggest Sale of the Year!", content: "Up to 40% off services and gift cards. One day only!", status: "sent", sentAt: new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000), sentCount: 520, openCount: 320, clickCount: 145 },
+  ];
+
+  for (const campaign of campaignsData) {
+    await prisma.campaign.create({
+      data: {
+        businessId: business.id,
+        ...campaign,
+      },
+    });
+  }
+  console.log("Created campaigns:", campaignsData.length);
+
+  // Create Activities for Clients
+  const activityTypes = [
+    { type: "APPOINTMENT_BOOKED" as const, title: "Booked appointment" },
+    { type: "APPOINTMENT_COMPLETED" as const, title: "Completed appointment" },
+    { type: "PURCHASE" as const, title: "Made a purchase" },
+    { type: "REVIEW_RECEIVED" as const, title: "Left a review" },
+    { type: "LOYALTY_EARNED" as const, title: "Earned loyalty points" },
+  ];
+
+  for (const client of clients.slice(0, 5)) {
+    for (let i = 0; i < 5; i++) {
+      const actType = activityTypes[Math.floor(Math.random() * activityTypes.length)];
+      const actDate = new Date(today);
+      actDate.setDate(today.getDate() - Math.floor(Math.random() * 30));
+
+      await prisma.activity.create({
+        data: {
+          clientId: client.id,
+          type: actType.type,
+          title: actType.title,
+          description: `Activity recorded on ${actDate.toLocaleDateString()}`,
+          createdAt: actDate,
+        },
+      });
+    }
+  }
+  console.log("Created client activities");
+
+  console.log("\n✅ Seed completed successfully!");
+  console.log("\n📋 Summary:");
+  console.log(`   - Business: ${business.name}`);
+  console.log(`   - Locations: ${locations.length}`);
+  console.log(`   - Users: ${users.length + 1}`);
+  console.log(`   - Services: ${services.length} (36 services)`);
+  console.log(`   - Products: ${productsData.length} (23 products)`);
+  console.log(`   - Clients: ${clients.length} (20 clients)`);
+  console.log(`   - Appointments: ${appointmentsData.length} (35 appointments)`);
+  console.log(`   - Sales: 50 transactions`);
+  console.log(`   - Gift Cards: ${giftCardCodes.length} (20 gift cards)`);
+  console.log(`   - Reviews: 25 reviews`);
+  console.log(`   - Campaigns: ${campaignsData.length} (20 campaigns)`);
+  console.log(`   - Loyalty Rewards: ${rewardsData.length} (15 rewards)`);
+  console.log(`   - Automations: ${automationsData.length} (15 automations)`);
+  console.log("\n🔑 Login credentials:");
+  console.log("   Admin: admin@luxebeauty.com / admin123");
+  console.log("   Staff: any staff email / password123");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

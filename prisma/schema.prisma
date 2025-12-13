@@ -1,0 +1,1504 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ BUSINESS & LOCATIONS ============
+
+model Business {
+  id            String    @id @default(cuid())
+  name          String
+  type          BusinessType
+  phone         String?
+  email         String?
+  website       String?
+  logo          String?
+  timezone      String    @default("America/New_York")
+  defaultLanguage String  @default("en")
+  supportedLanguages String[] @default(["en"])
+
+  // Social
+  instagram     String?
+  facebook      String?
+  tiktok        String?
+  yelp          String?
+  googleBusiness String?
+
+  // Tax
+  taxRate       Decimal   @db.Decimal(5, 4) @default(0)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  locations     Location[]
+  users         User[]
+  services      Service[]
+  serviceCategories ServiceCategory[]
+  products      Product[]
+  productCategories ProductCategory[]
+  loyaltyProgram LoyaltyProgram?
+  giftCards     GiftCard[]
+  campaigns     Campaign[]
+  automations   Automation[]
+  savedFilters  SavedFilter[]
+}
+
+enum BusinessType {
+  HAIR_SALON
+  BARBERSHOP
+  NAIL_SALON
+  SPA
+  MASSAGE
+  LASH_BROW
+  WAXING
+  TANNING
+  MAKEUP
+  WELLNESS
+  MULTI_SERVICE
+}
+
+model Location {
+  id            String    @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+
+  // Address
+  address       String
+  address2      String?
+  city          String
+  state         String
+  zip           String
+  country       String    @default("USA")
+
+  // Coordinates (for map)
+  latitude      Decimal?  @db.Decimal(10, 7)
+  longitude     Decimal?  @db.Decimal(10, 7)
+
+  // Hours (JSON for flexibility)
+  operatingHours Json?
+
+  // Booking settings
+  allowOnlineBooking Boolean @default(true)
+  bookingUrl    String?
+  advanceBookingDays Int   @default(30)
+  cancellationHours Int    @default(24)
+
+  isActive      Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+  staff         Staff[]
+  appointments  Appointment[]
+  waitlist      WaitlistEntry[]
+  transactions  Transaction[]
+}
+
+// ============ USERS & STAFF ============
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  role          UserRole
+  language      String    @default("en")
+  avatar        String?
+  isActive      Boolean   @default(true)
+
+  // Permissions (JSON for flexibility)
+  permissions   Json?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+  staff         Staff?
+  auditLogs     AuditLog[]
+  savedFilters  SavedFilter[]
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  RECEPTIONIST
+  STAFF
+}
+
+model Staff {
+  id            String    @id @default(cuid())
+  displayName   String?
+  title         String?
+  bio           String?
+  color         String?
+  photo         String?
+
+  // Skills
+  specialties   String[]
+  serviceIds    String[]
+
+  // Employment
+  employmentType EmploymentType @default(EMPLOYEE)
+  hireDate      DateTime?
+
+  // Compensation
+  payType       PayType?
+  hourlyRate    Decimal?  @db.Decimal(10, 2)
+  commissionPct Decimal?  @db.Decimal(5, 2)
+  productCommissionPct Decimal? @db.Decimal(5, 2)
+
+  // For booth renters
+  boothRent     Decimal?  @db.Decimal(10, 2)
+  rentFrequency String?
+
+  // Performance metrics
+  avgRating     Decimal?  @db.Decimal(3, 2)
+  reviewCount   Int       @default(0)
+  rebookRate    Decimal?  @db.Decimal(5, 2)
+
+  isActive      Boolean   @default(true)
+  acceptsWalkIns Boolean  @default(true)
+  isBookableOnline Boolean @default(true)
+
+  // Google Calendar integration
+  googleCalendarToken String?
+  googleRefreshToken String?
+  googleCalendarId String?
+
+  // Working hours (JSON)
+  workingHours  Json?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id])
+  userId        String    @unique
+  location      Location  @relation(fields: [locationId], references: [id])
+  locationId    String
+  schedules     StaffSchedule[]
+  timeOff       TimeOff[]
+  appointments  Appointment[]
+  transactions  Transaction[]
+  tips          Tip[]
+  commissions   Commission[]
+  dailyCloseouts DailyCloseout[]
+}
+
+enum EmploymentType {
+  EMPLOYEE
+  BOOTH_RENTER
+  CONTRACTOR
+}
+
+enum PayType {
+  HOURLY
+  COMMISSION
+  SALARY
+  HYBRID
+}
+
+model StaffSchedule {
+  id            String    @id @default(cuid())
+  dayOfWeek     Int
+  startTime     String
+  endTime       String
+  breakStart    String?
+  breakEnd      String?
+  isWorking     Boolean   @default(true)
+
+  staff         Staff     @relation(fields: [staffId], references: [id])
+  staffId       String
+
+  @@unique([staffId, dayOfWeek])
+}
+
+model TimeOff {
+  id            String    @id @default(cuid())
+  type          String
+  startDate     DateTime
+  endDate       DateTime
+  allDay        Boolean   @default(true)
+  startTime     String?
+  endTime       String?
+  notes         String?
+  status        String    @default("approved")
+
+  createdAt     DateTime  @default(now())
+
+  staff         Staff     @relation(fields: [staffId], references: [id])
+  staffId       String
+}
+
+// ============ CLIENTS ============
+
+model Client {
+  id            String        @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String?
+  phone         String
+  mobile        String?
+
+  // Preferences
+  preferredLanguage String?  @default("en")
+  preferredStaffId String?
+  preferredContactMethod String? @default("sms")
+
+  // Birthday
+  birthday      DateTime?
+  birthdayMonth Int?
+  birthdayDay   Int?
+
+  // Marketing
+  allowSms      Boolean       @default(true)
+  allowEmail    Boolean       @default(true)
+  referralSource String?
+  referredById  String?
+
+  // Notes
+  notes         String?
+  internalNotes String?
+
+  // Tags
+  tags          String[]
+
+  // Status
+  status        ClientStatus  @default(ACTIVE)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  appointments  Appointment[]
+  photos        ClientPhoto[]
+  formulas      ServiceFormula[]
+  preferences   ClientPreference[]
+  loyaltyAccount LoyaltyAccount?
+  giftCards     GiftCard[]    @relation("GiftCardOwner")
+  purchasedGiftCards GiftCard[] @relation("GiftCardPurchaser")
+  transactions  Transaction[]
+  reviews       Review[]
+  referrals     Referral[]    @relation("Referrer")
+  referredBy    Referral?     @relation("Referred")
+  communications Communication[]
+  waitlistEntries WaitlistEntry[]
+  activities    Activity[]
+  clientNotes   ClientNote[]
+  attachments   Attachment[]
+  familyMemberships FamilyMember[]
+  primaryFamilyGroups FamilyGroup[] @relation("PrimaryFamilyContact")
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  VIP
+  BLOCKED
+}
+
+model ClientPhoto {
+  id            String    @id @default(cuid())
+  type          PhotoType @default(AFTER)
+  filePath      String
+  caption       String?
+  serviceDate   DateTime?
+  isPortfolio   Boolean   @default(false)
+  takenAt       DateTime  @default(now())
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  appointmentId String?
+}
+
+enum PhotoType {
+  BEFORE
+  AFTER
+  INSPIRATION
+  RESULT
+}
+
+model ServiceFormula {
+  id            String    @id @default(cuid())
+  serviceType   String
+  formula       String
+  notes         String?
+  lastUsed      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+}
+
+model ClientPreference {
+  id            String    @id @default(cuid())
+  category      String
+  value         String
+  notes         String?
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+
+  @@unique([clientId, category])
+}
+
+// ============ ACTIVITY TIMELINE ============
+
+model Activity {
+  id            String    @id @default(cuid())
+  type          ActivityType
+  title         String
+  description   String?
+  metadata      Json?
+
+  createdAt     DateTime  @default(now())
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+  userId        String?
+}
+
+enum ActivityType {
+  APPOINTMENT_BOOKED
+  APPOINTMENT_COMPLETED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_NO_SHOW
+  PURCHASE
+  LOYALTY_EARNED
+  LOYALTY_REDEEMED
+  EMAIL_SENT
+  SMS_SENT
+  CALL_LOGGED
+  NOTE_ADDED
+  PHOTO_ADDED
+  REVIEW_RECEIVED
+  PROFILE_UPDATED
+  REFERRAL_MADE
+  GIFT_CARD_PURCHASED
+  GIFT_CARD_REDEEMED
+}
+
+model ClientNote {
+  id            String    @id @default(cuid())
+  content       String
+  isPinned      Boolean   @default(false)
+  isPrivate     Boolean   @default(false)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+  createdById   String
+}
+
+model Attachment {
+  id            String    @id @default(cuid())
+  fileName      String
+  fileType      String
+  fileSize      Int
+  filePath      String
+  description   String?
+
+  createdAt     DateTime  @default(now())
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+  uploadedById  String
+}
+
+// ============ SERVICES ============
+
+model ServiceCategory {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  sortOrder     Int       @default(0)
+  color         String?
+  icon          String?
+  isActive      Boolean   @default(true)
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+  services      Service[]
+
+  @@unique([businessId, name])
+}
+
+model Service {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  duration      Int
+  price         Decimal   @db.Decimal(10, 2)
+  priceType     PriceType @default(FIXED)
+  priceFrom     Decimal?  @db.Decimal(10, 2)
+
+  // Display
+  color         String?
+  image         String?
+  sortOrder     Int       @default(0)
+
+  // Booking settings
+  allowOnline   Boolean   @default(true)
+  requireDeposit Boolean  @default(false)
+  depositAmount Decimal?  @db.Decimal(10, 2)
+  depositPercent Decimal? @db.Decimal(5, 2)
+
+  // Capacity
+  canDoubleBook Boolean   @default(false)
+  maxConcurrent Int       @default(1)
+
+  // Processing time
+  processingTime Int?
+
+  // Buffer time between appointments
+  bufferTime    Int?      @default(15)
+
+  isActive      Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+  category      ServiceCategory? @relation(fields: [categoryId], references: [id])
+  categoryId    String?
+  addOns        ServiceAddOn[]
+  appointmentServices AppointmentService[]
+  lineItems     TransactionLineItem[]
+
+  @@unique([businessId, name])
+}
+
+enum PriceType {
+  FIXED
+  STARTING_AT
+  VARIABLE
+  CONSULTATION
+}
+
+model ServiceAddOn {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  duration      Int
+  price         Decimal   @db.Decimal(10, 2)
+  isActive      Boolean   @default(true)
+
+  service       Service   @relation(fields: [serviceId], references: [id])
+  serviceId     String
+  appointmentAddOns AppointmentAddOn[]
+}
+
+// ============ APPOINTMENTS ============
+
+model Appointment {
+  id            String            @id @default(cuid())
+  status        AppointmentStatus @default(BOOKED)
+
+  // Timing
+  scheduledStart DateTime
+  scheduledEnd  DateTime
+  actualStart   DateTime?
+  actualEnd     DateTime?
+
+  // Check-in
+  checkedInAt   DateTime?
+  checkedOutAt  DateTime?
+
+  // Client info (for walk-ins)
+  clientName    String?
+  clientPhone   String?
+  clientEmail   String?
+
+  // Booking source
+  source        BookingSource     @default(PHONE)
+
+  // Notes
+  notes         String?
+  internalNotes String?
+
+  // Confirmation
+  isConfirmed   Boolean           @default(false)
+  confirmedAt   DateTime?
+  confirmationSent Boolean        @default(false)
+
+  // Reminders
+  reminderSent  Boolean           @default(false)
+  reminderSentAt DateTime?
+
+  // No-show prediction
+  noShowRisk    Decimal?          @db.Decimal(5, 2)
+
+  // Deposit
+  depositPaid   Decimal?          @db.Decimal(10, 2)
+  depositPaidAt DateTime?
+
+  // Recurrence
+  isRecurring   Boolean           @default(false)
+  recurrenceRule String?
+  parentAppointmentId String?
+
+  // Google Calendar integration
+  googleEventId String?
+
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relations
+  client        Client?           @relation(fields: [clientId], references: [id])
+  clientId      String?
+  staff         Staff             @relation(fields: [staffId], references: [id])
+  staffId       String
+  location      Location          @relation(fields: [locationId], references: [id])
+  locationId    String
+  services      AppointmentService[]
+  photos        ClientPhoto[]
+  transaction   Transaction?
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CONFIRMED
+  CHECKED_IN
+  IN_SERVICE
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum BookingSource {
+  ONLINE
+  PHONE
+  WALK_IN
+  APP
+  INSTAGRAM
+  FACEBOOK
+  REFERRAL
+  KIOSK
+  AI_VOICE
+}
+
+model AppointmentService {
+  id            String    @id @default(cuid())
+  price         Decimal   @db.Decimal(10, 2)
+  duration      Int
+  notes         String?
+
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  appointmentId String
+  service       Service   @relation(fields: [serviceId], references: [id])
+  serviceId     String
+  addOns        AppointmentAddOn[]
+}
+
+model AppointmentAddOn {
+  id            String    @id @default(cuid())
+  price         Decimal   @db.Decimal(10, 2)
+  duration      Int
+
+  appointmentService AppointmentService @relation(fields: [appointmentServiceId], references: [id])
+  appointmentServiceId String
+  addOn         ServiceAddOn @relation(fields: [addOnId], references: [id])
+  addOnId       String
+}
+
+model GroupAppointment {
+  id            String    @id @default(cuid())
+  name          String?
+  eventType     String    @default("group") // group, party, event, class
+
+  scheduledStart DateTime
+  scheduledEnd  DateTime
+
+  maxParticipants Int     @default(10)
+  minParticipants Int     @default(2)
+
+  // Pricing
+  pricePerPerson Decimal  @db.Decimal(10, 2)
+  depositRequired Decimal? @db.Decimal(10, 2)
+
+  status        String    @default("pending") // pending, confirmed, in_progress, completed, cancelled
+
+  notes         String?
+  hostName      String?
+  hostPhone     String?
+  hostEmail     String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  staffId       String
+  locationId    String
+  serviceId     String?
+  participants  GroupParticipant[]
+}
+
+model GroupParticipant {
+  id            String    @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+  status        String    @default("confirmed") // confirmed, cancelled, no_show
+  checkedIn     Boolean   @default(false)
+  paidAmount    Decimal?  @db.Decimal(10, 2)
+
+  createdAt     DateTime  @default(now())
+
+  groupAppointment GroupAppointment @relation(fields: [groupAppointmentId], references: [id])
+  groupAppointmentId String
+  clientId      String?
+}
+
+model WaitlistEntry {
+  id            String    @id @default(cuid())
+  position      Int
+  estimatedWait Int?
+  status        WaitlistStatus @default(WAITING)
+
+  // Service requested
+  serviceNotes  String?
+  estimatedDuration Int?
+
+  addedAt       DateTime  @default(now())
+  seatedAt      DateTime?
+  leftAt        DateTime?
+
+  // Contact
+  phone         String?
+  notificationSent Boolean @default(false)
+
+  client        Client?   @relation(fields: [clientId], references: [id])
+  clientId      String?
+  location      Location  @relation(fields: [locationId], references: [id])
+  locationId    String
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  SEATED
+  LEFT
+  NO_SHOW
+}
+
+// ============ POINT OF SALE ============
+
+model Transaction {
+  id            String          @id @default(cuid())
+  transactionNumber String      @unique
+  type          TransactionType @default(SALE)
+  status        TransactionStatus @default(COMPLETED)
+
+  // Timing
+  date          DateTime        @default(now())
+
+  // Amounts
+  subtotal      Decimal         @db.Decimal(10, 2)
+  discountAmount Decimal        @db.Decimal(10, 2) @default(0)
+  discountReason String?
+  taxAmount     Decimal         @db.Decimal(10, 2) @default(0)
+  tipAmount     Decimal         @db.Decimal(10, 2) @default(0)
+  totalAmount   Decimal         @db.Decimal(10, 2)
+
+  // Loyalty
+  pointsEarned  Int             @default(0)
+  pointsRedeemed Int            @default(0)
+
+  notes         String?
+
+  // QuickBooks integration
+  quickbooksCustomerId String?
+  quickbooksInvoiceId String?
+  quickbooksPaymentId String?
+  quickbooksSyncedAt DateTime?
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relations
+  client        Client?         @relation(fields: [clientId], references: [id])
+  clientId      String?
+  staff         Staff           @relation(fields: [staffId], references: [id])
+  staffId       String
+  location      Location        @relation(fields: [locationId], references: [id])
+  locationId    String
+  appointment   Appointment?    @relation(fields: [appointmentId], references: [id])
+  appointmentId String?         @unique
+  lineItems     TransactionLineItem[]
+  payments      TransactionPayment[]
+  tips          Tip[]
+  commissions   Commission[]
+}
+
+enum TransactionType {
+  SALE
+  REFUND
+  VOID
+  ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  VOIDED
+}
+
+model TransactionLineItem {
+  id            String    @id @default(cuid())
+  type          LineItemType
+  name          String
+  description   String?
+  quantity      Int       @default(1)
+  unitPrice     Decimal   @db.Decimal(10, 2)
+  totalPrice    Decimal   @db.Decimal(10, 2)
+
+  performedById String?
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  transactionId String
+  service       Service?  @relation(fields: [serviceId], references: [id])
+  serviceId     String?
+  product       Product?  @relation(fields: [productId], references: [id])
+  productId     String?
+}
+
+enum LineItemType {
+  SERVICE
+  PRODUCT
+  GIFT_CARD
+  PACKAGE
+  OTHER
+}
+
+model TransactionPayment {
+  id            String        @id @default(cuid())
+  method        PaymentMethod
+  amount        Decimal       @db.Decimal(10, 2)
+  reference     String?
+
+  stripePaymentId String?
+  giftCardId    String?
+
+  createdAt     DateTime      @default(now())
+
+  transaction   Transaction   @relation(fields: [transactionId], references: [id])
+  transactionId String
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  GIFT_CARD
+  PREPAID_PACKAGE
+  POINTS
+  APPLE_PAY
+  GOOGLE_PAY
+  OTHER
+}
+
+model Tip {
+  id            String    @id @default(cuid())
+  amount        Decimal   @db.Decimal(10, 2)
+  method        PaymentMethod
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  transactionId String
+  staff         Staff     @relation(fields: [staffId], references: [id])
+  staffId       String
+}
+
+model Commission {
+  id            String    @id @default(cuid())
+  amount        Decimal   @db.Decimal(10, 2)
+  type          String
+  rate          Decimal   @db.Decimal(5, 2)
+  baseAmount    Decimal   @db.Decimal(10, 2)
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  transactionId String
+  staff         Staff     @relation(fields: [staffId], references: [id])
+  staffId       String
+}
+
+// ============ PRODUCTS ============
+
+model ProductCategory {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  sortOrder     Int       @default(0)
+  isActive      Boolean   @default(true)
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+  products      Product[]
+
+  @@unique([businessId, name])
+}
+
+model Product {
+  id            String    @id @default(cuid())
+  sku           String?
+  barcode       String?
+  name          String
+  description   String?
+  brand         String?
+  size          String?
+
+  // Pricing
+  cost          Decimal?  @db.Decimal(10, 2)
+  price         Decimal   @db.Decimal(10, 2)
+
+  // Inventory
+  trackInventory Boolean  @default(true)
+  quantityOnHand Int      @default(0)
+  reorderLevel  Int       @default(0)
+  reorderQuantity Int     @default(0)
+
+  // Display
+  image         String?
+  sortOrder     Int       @default(0)
+
+  isActive      Boolean   @default(true)
+  isTaxable     Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+  category      ProductCategory? @relation(fields: [categoryId], references: [id])
+  categoryId    String?
+  lineItems     TransactionLineItem[]
+}
+
+// ============ VENDORS & PURCHASE ORDERS ============
+
+model Vendor {
+  id            String    @id @default(cuid())
+  name          String
+  contactName   String?
+  email         String?
+  phone         String?
+  website       String?
+
+  // Address
+  address       String?
+  city          String?
+  state         String?
+  zip           String?
+  country       String?
+
+  // Terms
+  paymentTerms  String?
+  accountNumber String?
+  notes         String?
+
+  isActive      Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  businessId    String
+  purchaseOrders PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id            String    @id @default(cuid())
+  poNumber      String    @unique
+  status        String    @default("draft") // draft, submitted, partial, received, cancelled
+
+  orderDate     DateTime  @default(now())
+  expectedDate  DateTime?
+  receivedDate  DateTime?
+
+  subtotal      Decimal   @db.Decimal(10, 2)
+  taxAmount     Decimal   @db.Decimal(10, 2) @default(0)
+  shippingAmount Decimal  @db.Decimal(10, 2) @default(0)
+  totalAmount   Decimal   @db.Decimal(10, 2)
+
+  notes         String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  vendor        Vendor    @relation(fields: [vendorId], references: [id])
+  vendorId      String
+  createdById   String
+  items         PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id            String    @id @default(cuid())
+  productId     String
+  productName   String
+  sku           String?
+
+  quantityOrdered Int
+  quantityReceived Int     @default(0)
+
+  unitCost      Decimal   @db.Decimal(10, 2)
+  totalCost     Decimal   @db.Decimal(10, 2)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId String
+}
+
+// ============ PACKAGES & MEMBERSHIPS ============
+
+model Package {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+
+  // Pricing
+  price         Decimal   @db.Decimal(10, 2)
+  originalValue Decimal   @db.Decimal(10, 2)
+  savingsAmount Decimal   @db.Decimal(10, 2)
+  savingsPercent Decimal  @db.Decimal(5, 2)
+
+  // Validity
+  validityDays  Int       @default(365)
+
+  // Display
+  image         String?
+  sortOrder     Int       @default(0)
+  isPopular     Boolean   @default(false)
+
+  isActive      Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  businessId    String
+  services      PackageService[]
+  purchases     PackagePurchase[]
+}
+
+model PackageService {
+  id            String    @id @default(cuid())
+  quantity      Int       @default(1)
+
+  package       Package   @relation(fields: [packageId], references: [id])
+  packageId     String
+  serviceId     String
+
+  @@unique([packageId, serviceId])
+}
+
+model PackagePurchase {
+  id            String    @id @default(cuid())
+  purchaseDate  DateTime  @default(now())
+  expiresAt     DateTime
+
+  // Usage tracking
+  totalServices Int
+  usedServices  Int       @default(0)
+  remainingServices Int
+
+  status        String    @default("active") // active, expired, completed
+
+  pricePaid     Decimal   @db.Decimal(10, 2)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  package       Package   @relation(fields: [packageId], references: [id])
+  packageId     String
+  clientId      String
+  usages        PackageUsage[]
+}
+
+model PackageUsage {
+  id            String    @id @default(cuid())
+  usedAt        DateTime  @default(now())
+  serviceId     String
+  appointmentId String?
+
+  purchase      PackagePurchase @relation(fields: [purchaseId], references: [id])
+  purchaseId    String
+}
+
+model Membership {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+
+  // Pricing
+  price         Decimal   @db.Decimal(10, 2)
+  billingCycle  String    @default("monthly") // monthly, quarterly, yearly
+
+  // Benefits
+  discountPercent Decimal @db.Decimal(5, 2) @default(0)
+  freeServicesPerMonth Int @default(0)
+  priorityBooking Boolean @default(false)
+  guestPasses   Int       @default(0)
+
+  // Included services (JSON for flexibility)
+  includedServices Json?
+
+  // Display
+  image         String?
+  color         String?
+  sortOrder     Int       @default(0)
+  isPopular     Boolean   @default(false)
+
+  isActive      Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  businessId    String
+  subscriptions MembershipSubscription[]
+}
+
+model MembershipSubscription {
+  id            String    @id @default(cuid())
+  status        String    @default("active") // active, paused, cancelled, expired
+
+  startDate     DateTime  @default(now())
+  nextBillingDate DateTime
+  endDate       DateTime?
+
+  // Payment
+  lastPaymentDate DateTime?
+  lastPaymentAmount Decimal? @db.Decimal(10, 2)
+  paymentMethod String?
+  stripeSubscriptionId String?
+
+  // Usage this period
+  freeServicesUsed Int    @default(0)
+  guestPassesUsed Int     @default(0)
+
+  // Cancellation
+  cancelledAt   DateTime?
+  cancelReason  String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  membership    Membership @relation(fields: [membershipId], references: [id])
+  membershipId  String
+  clientId      String
+}
+
+// ============ LOYALTY & GIFT CARDS ============
+
+model LoyaltyProgram {
+  id              String    @id @default(cuid())
+  name            String
+  isActive        Boolean   @default(true)
+
+  // Earning rules
+  pointsPerDollar Decimal   @db.Decimal(5, 2) @default(1)
+  bonusOnSignup   Int       @default(0)
+  bonusOnBirthday Int       @default(0)
+  bonusOnReferral Int       @default(0)
+
+  // Tiers
+  tiers           Json?
+
+  // Expiration
+  pointsExpireMonths Int?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  business        Business  @relation(fields: [businessId], references: [id])
+  businessId      String    @unique
+  accounts        LoyaltyAccount[]
+  rewards         LoyaltyReward[]
+}
+
+model LoyaltyAccount {
+  id            String    @id @default(cuid())
+  pointsBalance Int       @default(0)
+  lifetimePoints Int      @default(0)
+  tier          String    @default("Bronze")
+  tierExpiresAt DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String    @unique
+  program       LoyaltyProgram @relation(fields: [programId], references: [id])
+  programId     String
+  transactions  LoyaltyTransaction[]
+}
+
+model LoyaltyTransaction {
+  id            String    @id @default(cuid())
+  type          String
+  points        Int
+  description   String?
+  expiresAt     DateTime?
+
+  createdAt     DateTime  @default(now())
+
+  account       LoyaltyAccount @relation(fields: [accountId], references: [id])
+  accountId     String
+}
+
+model LoyaltyReward {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  pointsCost    Int
+  type          String
+  value         Decimal   @db.Decimal(10, 2)
+  image         String?
+  isActive      Boolean   @default(true)
+
+  program       LoyaltyProgram @relation(fields: [programId], references: [id])
+  programId     String
+}
+
+model GiftCard {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  initialBalance Decimal  @db.Decimal(10, 2)
+  currentBalance Decimal  @db.Decimal(10, 2)
+  expiresAt     DateTime?
+  status        String    @default("active")
+
+  purchasedAt   DateTime  @default(now())
+
+  isDigital     Boolean   @default(true)
+  recipientEmail String?
+  recipientName String?
+  message       String?
+  sentAt        DateTime?
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+  purchasedBy   Client?   @relation("GiftCardPurchaser", fields: [purchasedById], references: [id])
+  purchasedById String?
+  owner         Client?   @relation("GiftCardOwner", fields: [ownerId], references: [id])
+  ownerId       String?
+  usageHistory  GiftCardUsage[]
+}
+
+model GiftCardUsage {
+  id            String    @id @default(cuid())
+  amount        Decimal   @db.Decimal(10, 2)
+  balanceAfter  Decimal   @db.Decimal(10, 2)
+  usedAt        DateTime  @default(now())
+
+  giftCard      GiftCard  @relation(fields: [giftCardId], references: [id])
+  giftCardId    String
+}
+
+// ============ REFERRALS ============
+
+model Referral {
+  id            String    @id @default(cuid())
+  status        String    @default("pending")
+
+  referrerReward String?
+  referredReward String?
+  referrerRewarded Boolean @default(false)
+  referredRewarded Boolean @default(false)
+
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  referrer      Client    @relation("Referrer", fields: [referrerId], references: [id])
+  referrerId    String
+  referred      Client    @relation("Referred", fields: [referredId], references: [id])
+  referredId    String    @unique
+}
+
+// ============ MARKETING ============
+
+model Campaign {
+  id            String    @id @default(cuid())
+  name          String
+  type          CampaignType
+  status        String    @default("draft")
+
+  subject       String?
+  content       String
+  image         String?
+
+  targetTags    String[]
+  targetSegment String?
+
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+
+  sentCount     Int       @default(0)
+  openCount     Int       @default(0)
+  clickCount    Int       @default(0)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+}
+
+enum CampaignType {
+  EMAIL
+  SMS
+  PUSH
+}
+
+model Review {
+  id            String    @id @default(cuid())
+  rating        Int
+  comment       String?
+  source        String
+  isPublic      Boolean   @default(true)
+
+  response      String?
+  respondedAt   DateTime?
+
+  createdAt     DateTime  @default(now())
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+}
+
+model Communication {
+  id            String    @id @default(cuid())
+  type          String
+  direction     String
+  content       String?
+  status        String    @default("sent")
+  sentAt        DateTime  @default(now())
+
+  openedAt      DateTime?
+  clickedAt     DateTime?
+
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+}
+
+// ============ WORKFLOW AUTOMATION ============
+
+model Automation {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  isActive      Boolean   @default(true)
+
+  triggerType   String
+  triggerConfig Json?
+
+  actions       Json
+
+  timesTriggered Int      @default(0)
+  lastTriggered DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String
+}
+
+// ============ AUDIT & SEARCH ============
+
+model AuditLog {
+  id            String    @id @default(cuid())
+  action        String
+  entityType    String
+  entityId      String
+  changes       Json?
+
+  createdAt     DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id])
+  userId        String
+}
+
+model SavedFilter {
+  id            String    @id @default(cuid())
+  name          String
+  entityType    String
+  filters       Json
+  isDefault     Boolean   @default(false)
+
+  createdAt     DateTime  @default(now())
+
+  user          User?     @relation(fields: [userId], references: [id])
+  userId        String?
+  business      Business? @relation(fields: [businessId], references: [id])
+  businessId    String?
+}
+
+// ============ DAILY CLOSEOUT ============
+
+model DailyCloseout {
+  id            String    @id @default(cuid())
+  date          DateTime
+  staffId       String?
+  staff         Staff?    @relation(fields: [staffId], references: [id])
+
+  totalTransactions Int
+  grossSales    Decimal   @db.Decimal(10, 2)
+  discounts     Decimal   @db.Decimal(10, 2) @default(0)
+  netSales      Decimal   @db.Decimal(10, 2)
+  tax           Decimal   @db.Decimal(10, 2) @default(0)
+  tips          Decimal   @db.Decimal(10, 2) @default(0)
+  refunds       Decimal   @db.Decimal(10, 2) @default(0)
+  grandTotal    Decimal   @db.Decimal(10, 2)
+
+  cashTotal     Decimal   @db.Decimal(10, 2) @default(0)
+  cardTotal     Decimal   @db.Decimal(10, 2) @default(0)
+  otherTotal    Decimal   @db.Decimal(10, 2) @default(0)
+
+  cashCounted   Decimal?  @db.Decimal(10, 2)
+  cashVariance  Decimal?  @db.Decimal(10, 2)
+
+  appointmentsTotal Int   @default(0)
+  appointmentsCompleted Int @default(0)
+  appointmentsNoShow Int  @default(0)
+  newClients    Int       @default(0)
+
+  notes         String?
+  closedAt      DateTime  @default(now())
+  reportData    Json?
+
+  createdAt     DateTime  @default(now())
+
+  @@unique([date, staffId])
+}
+
+// ============ FAMILY GROUPS ============
+
+model FamilyGroup {
+  id            String    @id @default(cuid())
+  name          String
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  primaryContactId String?
+  primaryContact Client?  @relation("PrimaryFamilyContact", fields: [primaryContactId], references: [id])
+  members       FamilyMember[]
+}
+
+model FamilyMember {
+  id            String    @id @default(cuid())
+  relationship  String
+
+  createdAt     DateTime  @default(now())
+
+  family        FamilyGroup @relation(fields: [familyId], references: [id])
+  familyId      String
+  client        Client    @relation(fields: [clientId], references: [id])
+  clientId      String
+
+  @@unique([familyId, clientId])
+}
+
+// ============ SALES CRM (Lead Tracking) ============
+
+model Lead {
+  id            String      @id @default(cuid())
+
+  // Salon info
+  salonName     String
+  ownerName     String
+  email         String?
+  phone         String
+  website       String?
+
+  // Address
+  address       String?
+  city          String?
+  state         String?
+  zip           String?
+
+  // Lead info
+  source        LeadSource  @default(OTHER)
+  status        LeadStatus  @default(NEW)
+  priority      LeadPriority @default(MEDIUM)
+
+  // Tracking
+  notes         String?
+  lastContactAt DateTime?
+  nextFollowUp  DateTime?
+
+  // Conversion
+  convertedAt   DateTime?
+  lostReason    String?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+enum LeadSource {
+  GOOGLE_MAPS
+  YELP
+  REFERRAL
+  WALK_IN
+  TRADE_SHOW
+  COLD_CALL
+  WEBSITE
+  SOCIAL_MEDIA
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  DEMO_SCHEDULED
+  DEMO_COMPLETED
+  TRIAL
+  NEGOTIATING
+  CONVERTED
+  LOST
+}
+
+enum LeadPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ============ SETTINGS ============
+
+model Settings {
+  id            String    @id @default("default")
+  businessName  String?
+  address       String?
+  phone         String?
+  email         String?
+  taxRate       Decimal?  @db.Decimal(5, 4)
+  openTime      String?
+  closeTime     String?
+
+  // Google Calendar
+  googleCalendarEnabled Boolean @default(false)
+
+  // QuickBooks
+  quickbooksAccessToken String?
+  quickbooksRefreshToken String?
+  quickbooksRealmId String?
+  quickbooksTokenExpiry DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
