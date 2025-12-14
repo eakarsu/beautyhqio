@@ -537,9 +537,17 @@ model Appointment {
   confirmedAt   DateTime?
   confirmationSent Boolean        @default(false)
 
-  // Reminders
+  // SMS Reminders
   reminderSent  Boolean           @default(false)
   reminderSentAt DateTime?
+
+  // Email Reminders
+  emailReminderSent Boolean       @default(false)
+  emailReminderSentAt DateTime?
+
+  // Voice Call Reminders
+  callReminderSent Boolean        @default(false)
+  callReminderSentAt DateTime?
 
   // No-show prediction
   noShowRisk    Decimal?          @db.Decimal(5, 2)

@@ -230,4 +230,72 @@ export const voiceGreetings = {
   zh: "感谢您的来电。今天我能为您做什么？预约请按1，查询预约请按2，人工服务请按3。",
 };
 
+// Voice reminder templates for appointment reminder calls
+export const voiceReminderTemplates = {
+  en: (clientName: string, date: string, time: string, serviceName: string) =>
+    `Hello ${clientName}. This is an automated reminder for your ${serviceName} appointment on ${date} at ${time}. Press 1 to confirm your appointment, or press 2 if you need to reschedule. Thank you.`,
+  es: (clientName: string, date: string, time: string, serviceName: string) =>
+    `Hola ${clientName}. Este es un recordatorio automático para su cita de ${serviceName} el ${date} a las ${time}. Presione 1 para confirmar su cita, o presione 2 si necesita reprogramar. Gracias.`,
+  vi: (clientName: string, date: string, time: string, serviceName: string) =>
+    `Xin chào ${clientName}. Đây là lời nhắc tự động cho lịch hẹn ${serviceName} của bạn vào ${date} lúc ${time}. Nhấn 1 để xác nhận, hoặc nhấn 2 nếu bạn cần đổi lịch. Cảm ơn bạn.`,
+  ko: (clientName: string, date: string, time: string, serviceName: string) =>
+    `안녕하세요 ${clientName}님. ${date} ${time}에 예약된 ${serviceName} 예약 알림입니다. 예약 확인은 1번, 일정 변경은 2번을 눌러주세요. 감사합니다.`,
+  zh: (clientName: string, date: string, time: string, serviceName: string) =>
+    `您好${clientName}。这是您${date} ${time} ${serviceName}预约的自动提醒。按1确认预约，按2改期。谢谢。`,
+};
+
+// Language to voice mapping for Twilio Polly voices
+const languageVoices: Record<string, { voice: string; language: string }> = {
+  en: { voice: "Polly.Joanna", language: "en-US" },
+  es: { voice: "Polly.Lupe", language: "es-US" },
+  vi: { voice: "Polly.Joanna", language: "en-US" }, // Vietnamese not supported, fallback to English voice
+  ko: { voice: "Polly.Seoyeon", language: "ko-KR" },
+  zh: { voice: "Polly.Zhiyu", language: "cmn-CN" },
+};
+
+// Send appointment reminder via voice call
+export async function sendAppointmentReminderCall(
+  phone: string,
+  clientName: string,
+  date: string,
+  time: string,
+  serviceName: string,
+  language: string = "en"
+) {
+  const template =
+    voiceReminderTemplates[language as keyof typeof voiceReminderTemplates] ||
+    voiceReminderTemplates.en;
+  const message = template(clientName, date, time, serviceName);
+
+  const voiceConfig = languageVoices[language] || languageVoices.en;
+
+  // Generate TwiML for the reminder call
+  const VoiceResponse = twilio.twiml.VoiceResponse;
+  const response = new VoiceResponse();
+
+  response.say(
+    {
+      voice: voiceConfig.voice as "Polly.Joanna",
+      language: voiceConfig.language as "en-US",
+    },
+    message
+  );
+
+  // Add pause and repeat
+  response.pause({ length: 1 });
+  response.say(
+    {
+      voice: voiceConfig.voice as "Polly.Joanna",
+      language: voiceConfig.language as "en-US",
+    },
+    message
+  );
+
+  response.hangup();
+
+  const twiml = response.toString();
+
+  return makeCall({ to: phone, twiml });
+}
+
 export { client as twilioClient };
