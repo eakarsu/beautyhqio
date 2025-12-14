@@ -1,8 +1,17 @@
+import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Heart, Zap, Users, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { createMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = createMetadata({
+  title: "About Us - Our Mission to Empower Beauty Professionals",
+  description:
+    "Learn about BeautyHQ's mission to empower beauty and wellness professionals with cutting-edge AI technology. Founded in 2024, we help 1,000+ businesses grow.",
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

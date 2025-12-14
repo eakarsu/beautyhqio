@@ -96,8 +96,18 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(product, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating product:", error);
+
+    // Handle unique constraint error
+    if (error.code === "P2002") {
+      const field = error.meta?.target?.[1] || "name";
+      return NextResponse.json(
+        { error: `A product with this ${field} already exists. Please use a different ${field}.` },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to create product" },
       { status: 500 }

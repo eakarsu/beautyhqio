@@ -92,9 +92,13 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await prisma.staff.update({
+    // Delete related records first
+    await prisma.staffSchedule.deleteMany({ where: { staffId: id } });
+    await prisma.timeOff.deleteMany({ where: { staffId: id } });
+
+    // Delete the staff member
+    await prisma.staff.delete({
       where: { id },
-      data: { isActive: false },
     });
 
     return NextResponse.json({ success: true });

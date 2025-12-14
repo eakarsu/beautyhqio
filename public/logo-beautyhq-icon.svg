@@ -1,0 +1,26 @@
+<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="150" cy="150" r="145" fill="#FFF1F2"/>
+
+  <!-- Main diamond/gem -->
+  <path d="M150 50 L210 130 L150 240 L90 130 Z" fill="#E11D48"/>
+
+  <!-- Diamond shine effect -->
+  <path d="M150 50 L170 130 L150 180 L130 130 Z" fill="#F43F5E" opacity="0.6"/>
+
+  <!-- Sparkle lines -->
+  <line x1="150" y1="30" x2="150" y2="45" stroke="#E11D48" stroke-width="6" stroke-linecap="round"/>
+  <line x1="150" y1="245" x2="150" y2="260" stroke="#E11D48" stroke-width="6" stroke-linecap="round"/>
+  <line x1="60" y1="130" x2="75" y2="130" stroke="#E11D48" stroke-width="6" stroke-linecap="round"/>
+  <line x1="225" y1="130" x2="240" y2="130" stroke="#E11D48" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Corner sparkles -->
+  <circle cx="70" cy="70" r="8" fill="#F43F5E"/>
+  <circle cx="230" cy="70" r="8" fill="#F43F5E"/>
+  <circle cx="70" cy="200" r="6" fill="#F43F5E"/>
+  <circle cx="230" cy="200" r="6" fill="#F43F5E"/>
+
+  <!-- Small accent sparkles -->
+  <circle cx="100" cy="50" r="4" fill="#FDA4AF"/>
+  <circle cx="200" cy="50" r="4" fill="#FDA4AF"/>
+</svg>

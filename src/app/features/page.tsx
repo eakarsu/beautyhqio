@@ -1,5 +1,7 @@
+import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { createMetadata } from "@/lib/seo";
 import {
   Calendar,
   Users,
@@ -21,6 +23,13 @@ import {
 import Link from "next/link";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+
+export const metadata: Metadata = createMetadata({
+  title: "Features - Complete Salon & Spa Management Tools",
+  description:
+    "Discover BeautyHQ's powerful features: AI scheduling, client management, POS, marketing automation, inventory tracking, and more. Everything you need to run your beauty business.",
+  path: "/features",
+});
 
 export default function FeaturesPage() {
   return (

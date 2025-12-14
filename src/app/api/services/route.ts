@@ -83,8 +83,17 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(service, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating service:", error);
+
+    // Handle unique constraint error
+    if (error.code === "P2002") {
+      return NextResponse.json(
+        { error: "A service with this name already exists. Please use a different name." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to create service" },
       { status: 500 }

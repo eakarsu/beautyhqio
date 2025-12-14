@@ -163,8 +163,18 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(client, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating client:", error);
+
+    // Handle unique constraint error (e.g., duplicate email)
+    if (error.code === "P2002") {
+      const field = error.meta?.target?.[0] || "email";
+      return NextResponse.json(
+        { error: `A client with this ${field} already exists.` },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to create client" },
       { status: 500 }

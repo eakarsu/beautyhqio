@@ -43,10 +43,26 @@ export async function POST(request: NextRequest) {
       phone,
     } = body;
 
+    // Get locationId - use provided or get default location
+    let finalLocationId = locationId;
+    if (!finalLocationId) {
+      const defaultLocation = await prisma.location.findFirst({
+        orderBy: { createdAt: "asc" },
+      });
+      if (defaultLocation) {
+        finalLocationId = defaultLocation.id;
+      } else {
+        return NextResponse.json(
+          { error: "No location found. Please create a location first." },
+          { status: 400 }
+        );
+      }
+    }
+
     // Get next position
     const lastEntry = await prisma.waitlistEntry.findFirst({
       where: {
-        locationId,
+        locationId: finalLocationId,
         status: { in: ["WAITING", "NOTIFIED"] },
       },
       orderBy: { position: "desc" },
@@ -59,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const entry = await prisma.waitlistEntry.create({
       data: {
-        locationId,
+        locationId: finalLocationId,
         clientId,
         position,
         estimatedWait,

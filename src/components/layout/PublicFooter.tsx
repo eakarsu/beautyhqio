@@ -18,7 +18,7 @@ export function PublicFooter() {
             </p>
             <div className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4" />
-              <a href="mailto:hello@beautyhq.io" className="hover:text-white">hello@beautyhq.io</a>
+              <a href="mailto:support@beautyhq.io" className="hover:text-white">support@beautyhq.io</a>
             </div>
             <div className="flex items-center gap-2 text-sm mt-2">
               <MapPin className="h-4 w-4" />

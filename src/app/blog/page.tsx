@@ -1,8 +1,17 @@
+import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar, Clock } from "lucide-react";
 import Link from "next/link";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { createMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = createMetadata({
+  title: "Blog - Beauty Industry Tips, Trends & Insights",
+  description:
+    "Expert insights, tips, and strategies to help you grow your beauty business. Learn about salon marketing, client retention, AI technology, and more.",
+  path: "/blog",
+});
 
 export default function BlogPage() {
   const featuredPost = {

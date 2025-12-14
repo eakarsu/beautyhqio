@@ -22,6 +22,22 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
+    // Get locationId - use provided or get default location
+    let finalLocationId = locationId;
+    if (!finalLocationId) {
+      const defaultLocation = await prisma.location.findFirst({
+        orderBy: { createdAt: "asc" },
+      });
+      if (defaultLocation) {
+        finalLocationId = defaultLocation.id;
+      } else {
+        return NextResponse.json(
+          { error: "No location found. Please create a location first." },
+          { status: 400 }
+        );
+      }
+    }
+
     // Generate transaction number
     const transactionNumber = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
@@ -34,7 +50,7 @@ export async function POST(request: NextRequest) {
           type: "SALE",
           status: "COMPLETED",
           date: new Date(),
-          locationId,
+          locationId: finalLocationId,
           clientId,
           staffId,
           subtotal: new Decimal(subtotal),

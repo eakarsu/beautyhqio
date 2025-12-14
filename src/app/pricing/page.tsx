@@ -1,9 +1,25 @@
+import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, ArrowRight, X } from "lucide-react";
 import Link from "next/link";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { createMetadata, generateFAQSchema } from "@/lib/seo";
+
+export const metadata: Metadata = createMetadata({
+  title: "Pricing - Affordable Plans for Every Salon Size",
+  description:
+    "Simple, transparent pricing for BeautyHQ. Starting at $29/month. 14-day free trial, no credit card required. Compare plans and find the perfect fit for your salon or spa.",
+  path: "/pricing",
+});
+
+const pricingFaqs = [
+  { question: "Can I change plans later?", answer: "Yes, you can upgrade or downgrade your plan at any time. Changes take effect on your next billing cycle." },
+  { question: "What payment methods do you accept?", answer: "We accept all major credit cards (Visa, MasterCard, American Express) through our secure Stripe integration." },
+  { question: "Is there a contract?", answer: "No long-term contracts. All plans are month-to-month and you can cancel anytime." },
+  { question: "Do you offer discounts for annual billing?", answer: "Yes! Pay annually and get 2 months free (17% savings)." },
+];
 
 export default function PricingPage() {
   return (

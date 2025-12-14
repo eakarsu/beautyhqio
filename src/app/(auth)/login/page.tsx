@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -87,16 +88,19 @@ export default function LoginPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full bg-rose-600 hover:bg-rose-700" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
-
-          <div className="mt-6 text-center text-sm text-slate-500">
-            <p>Demo credentials:</p>
-            <p className="font-mono text-xs mt-1">maria@luxebeauty.com / password123</p>
-          </div>
         </CardContent>
+        <CardFooter className="flex flex-col gap-4 border-t pt-4">
+          <p className="text-sm text-center text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link href="/register" className="text-rose-600 hover:underline font-medium">
+              Register
+            </Link>
+          </p>
+        </CardFooter>
       </Card>
     </div>
   );

@@ -1,15 +1,73 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Phone, MapPin, MessageSquare } from "lucide-react";
+import { Mail, Phone, MapPin, MessageSquare, CheckCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 
 export default function ContactPage() {
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    subject: "",
+    message: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.id]: e.target.value,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitStatus("idle");
+    setErrorMessage("");
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send message");
+      }
+
+      setSubmitStatus("success");
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        subject: "",
+        message: "",
+      });
+    } catch (error) {
+      setSubmitStatus("error");
+      setErrorMessage(error instanceof Error ? error.message : "Something went wrong");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <PublicHeader />
@@ -31,42 +89,118 @@ export default function ContactPage() {
           {/* Contact Form */}
           <Card className="p-8">
             <h2 className="text-2xl font-bold mb-6">Send us a message</h2>
-            <form className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" placeholder="John" className="mt-1" />
+
+            {submitStatus === "success" ? (
+              <div className="text-center py-8">
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Message Sent!</h3>
+                <p className="text-gray-600 mb-6">
+                  Thank you for reaching out. We&apos;ll get back to you within 24-48 hours.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setSubmitStatus("idle")}
+                >
+                  Send Another Message
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      className="mt-1"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      className="mt-1"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" placeholder="Doe" className="mt-1" />
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="john@example.com"
+                    className="mt-1"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                  />
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="john@example.com" className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone (optional)</Label>
-                <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="subject">Subject</Label>
-                <Input id="subject" placeholder="How can we help?" className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="message">Message</Label>
-                <textarea
-                  id="message"
-                  rows={4}
-                  placeholder="Tell us more about your inquiry..."
-                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                />
-              </div>
-              <Button type="submit" className="w-full bg-rose-600 hover:bg-rose-700">
-                Send Message
-              </Button>
-            </form>
+                <div>
+                  <Label htmlFor="phone">Phone (optional)</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+1 (555) 000-0000"
+                    className="mt-1"
+                    value={formData.phone}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="subject">Subject</Label>
+                  <Input
+                    id="subject"
+                    placeholder="How can we help?"
+                    className="mt-1"
+                    value={formData.subject}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="message">Message</Label>
+                  <textarea
+                    id="message"
+                    rows={4}
+                    placeholder="Tell us more about your inquiry..."
+                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={formData.message}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                {submitStatus === "error" && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    {errorMessage || "Failed to send message. Please try again."}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full bg-rose-600 hover:bg-rose-700"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Message"
+                  )}
+                </Button>
+              </form>
+            )}
           </Card>
 
           {/* Contact Info */}
@@ -80,8 +214,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold">Email</h3>
-                    <a href="mailto:hello@beautyhq.io" className="text-gray-600 hover:text-rose-600">
-                      hello@beautyhq.io
+                    <a href="mailto:support@beautyhq.io" className="text-gray-600 hover:text-rose-600">
+                      support@beautyhq.io
                     </a>
                   </div>
                 </div>
@@ -92,8 +226,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold">Phone</h3>
-                    <a href="tel:+18001234567" className="text-gray-600 hover:text-rose-600">
-                      +1 (800) 123-4567
+                    <a href="tel:+18043601129" className="text-gray-600 hover:text-rose-600">
+                      (804) 360-1129
                     </a>
                   </div>
                 </div>
@@ -105,8 +239,8 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-semibold">Office</h3>
                     <p className="text-gray-600">
-                      123 Beauty Street<br />
-                      San Francisco, CA 94105
+                      2807 Hampton Woods Dr<br />
+                      Richmond, VA 23233
                     </p>
                   </div>
                 </div>

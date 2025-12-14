@@ -1502,3 +1502,17 @@ model Settings {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
+
+// ============ CONTACT MESSAGES ============
+
+model ContactMessage {
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String
+  phone         String?
+  subject       String
+  message       String
+  isRead        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+}

@@ -60,3 +60,29 @@ export async function PUT(
     );
   }
 }
+
+// DELETE /api/gift-cards/[id] - Delete gift card
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    // Delete usage history first
+    await prisma.giftCardUsage.deleteMany({ where: { giftCardId: id } });
+
+    // Delete the gift card
+    await prisma.giftCard.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting gift card:", error);
+    return NextResponse.json(
+      { error: "Failed to delete gift card" },
+      { status: 500 }
+    );
+  }
+}

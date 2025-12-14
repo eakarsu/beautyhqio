@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getInitials } from "@/lib/utils";
+import Link from "next/link";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -55,10 +56,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-              <Avatar>
+            <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hover:ring-2 hover:ring-rose-100">
+              <Avatar className="h-10 w-10">
                 <AvatarImage src={session?.user?.image || ""} />
-                <AvatarFallback className="bg-rose-100 text-rose-600">
+                <AvatarFallback className="bg-rose-100 text-rose-600 font-semibold">
                   {session?.user?.firstName && session?.user?.lastName
                     ? getInitials(session.user.firstName, session.user.lastName)
                     : "U"}
@@ -66,28 +67,53 @@ export default function Header({ onMenuClick }: HeaderProps) {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end">
-            <DropdownMenuLabel>
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">
-                  {session?.user?.firstName} {session?.user?.lastName}
-                </p>
-                <p className="text-xs text-slate-500">{session?.user?.email}</p>
+          <DropdownMenuContent
+            className="w-64 bg-white border border-gray-200 shadow-lg rounded-xl p-2"
+            align="end"
+            sideOffset={8}
+          >
+            {/* User Info Header */}
+            <div className="px-3 py-3 bg-gray-50 rounded-lg mb-2">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={session?.user?.image || ""} />
+                  <AvatarFallback className="bg-rose-100 text-rose-600 font-semibold">
+                    {session?.user?.firstName && session?.user?.lastName
+                      ? getInitials(session.user.firstName, session.user.lastName)
+                      : "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {session?.user?.firstName} {session?.user?.lastName}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">{session?.user?.email}</p>
+                </div>
               </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => signOut()}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Log out
+            </div>
+
+            {/* Menu Items */}
+            <Link href="/settings">
+              <DropdownMenuItem className="px-3 py-2.5 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100">
+                <User className="mr-3 h-4 w-4 text-gray-500" />
+                <span>My Profile</span>
+              </DropdownMenuItem>
+            </Link>
+            <Link href="/settings">
+              <DropdownMenuItem className="px-3 py-2.5 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100">
+                <Settings className="mr-3 h-4 w-4 text-gray-500" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+            </Link>
+
+            <DropdownMenuSeparator className="my-2 bg-gray-200" />
+
+            <DropdownMenuItem
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="px-3 py-2.5 rounded-lg cursor-pointer text-red-600 hover:bg-red-50 hover:text-red-700 focus:bg-red-50"
+            >
+              <LogOut className="mr-3 h-4 w-4" />
+              <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

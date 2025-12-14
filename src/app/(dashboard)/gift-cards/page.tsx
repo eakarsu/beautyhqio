@@ -21,6 +21,7 @@ import {
   DollarSign,
   CreditCard,
   TrendingUp,
+  Trash2,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -47,6 +48,28 @@ export default function GiftCardsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [giftCards, setGiftCards] = useState<GiftCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (id: string) => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/gift-cards/${id}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setGiftCards(giftCards.filter(g => g.id !== id));
+        setDeleteId(null);
+      } else {
+        alert("Failed to delete gift card");
+      }
+    } catch (error) {
+      console.error("Error deleting gift card:", error);
+      alert("Failed to delete gift card");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchGiftCards() {
@@ -217,6 +240,7 @@ export default function GiftCardsPage() {
                     <TableHead>Balance</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
+                    <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -246,6 +270,19 @@ export default function GiftCardsPage() {
                       </TableCell>
                       <TableCell className="text-sm text-slate-500">
                         {formatDate(new Date(card.purchasedAt))}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteId(card.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -279,6 +316,30 @@ export default function GiftCardsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">Delete Gift Card</h3>
+            <p className="text-slate-600 mb-4">
+              Are you sure you want to delete this gift card? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteId(null)} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete(deleteId)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

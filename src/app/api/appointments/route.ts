@@ -78,11 +78,27 @@ export async function POST(request: NextRequest) {
       source = "PHONE",
     } = body;
 
+    // Get locationId - use provided or get default location
+    let finalLocationId = locationId;
+    if (!finalLocationId) {
+      const defaultLocation = await prisma.location.findFirst({
+        orderBy: { createdAt: "asc" },
+      });
+      if (defaultLocation) {
+        finalLocationId = defaultLocation.id;
+      } else {
+        return NextResponse.json(
+          { error: "No location found. Please create a location first." },
+          { status: 400 }
+        );
+      }
+    }
+
     const appointment = await prisma.appointment.create({
       data: {
         clientId,
         staffId,
-        locationId,
+        locationId: finalLocationId,
         scheduledStart: new Date(scheduledStart),
         scheduledEnd: new Date(scheduledEnd),
         notes,

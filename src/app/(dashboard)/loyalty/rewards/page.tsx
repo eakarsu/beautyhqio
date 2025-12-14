@@ -31,6 +31,28 @@ export default function ManageRewardsPage() {
   const [rewards, setRewards] = useState<LoyaltyReward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (id: string) => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/loyalty/rewards/${id}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setRewards(rewards.filter(r => r.id !== id));
+        setDeleteId(null);
+      } else {
+        alert("Failed to delete reward");
+      }
+    } catch (error) {
+      console.error("Error deleting reward:", error);
+      alert("Failed to delete reward");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchRewards() {
@@ -140,6 +162,7 @@ export default function ManageRewardsPage() {
                   <TableHead>Value</TableHead>
                   <TableHead>Points Cost</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -177,6 +200,19 @@ export default function ManageRewardsPage() {
                         {reward.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteId(reward.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -184,6 +220,30 @@ export default function ManageRewardsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">Delete Reward</h3>
+            <p className="text-slate-600 mb-4">
+              Are you sure you want to delete this reward? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteId(null)} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete(deleteId)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

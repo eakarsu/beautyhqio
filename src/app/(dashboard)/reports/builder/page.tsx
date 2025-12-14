@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,19 +10,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   BarChart3,
   Download,
-  Filter,
   Play,
   Plus,
-  Save,
-  Table,
   X,
   Calendar,
-  DollarSign,
-  Users,
-  Scissors,
+  ArrowLeft,
+  FileSpreadsheet,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 interface ReportField {
   id: string;
@@ -64,17 +70,33 @@ const OPERATORS = [
 ];
 
 export default function ReportBuilderPage() {
+  const router = useRouter();
   const [reportName, setReportName] = useState("Untitled Report");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [filters, setFilters] = useState<ReportFilter[]>([]);
   const [groupBy, setGroupBy] = useState<string>("");
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [isRunning, setIsRunning] = useState(false);
+  const [reportData, setReportData] = useState<Record<string, unknown>[]>([]);
+  const [hasRun, setHasRun] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("Clients");
 
   const toggleField = (fieldId: string) => {
     setSelectedFields((prev) =>
       prev.includes(fieldId) ? prev.filter((f) => f !== fieldId) : [...prev, fieldId]
     );
+    // Clear previous report when fields change
+    setReportData([]);
+    setHasRun(false);
+  };
+
+  const handleCategoryChange = (category: string) => {
+    if (category !== activeCategory) {
+      setActiveCategory(category);
+      setSelectedFields([]); // Clear all selected fields when switching category
+      setReportData([]);
+      setHasRun(false);
+    }
   };
 
   const addFilter = () => {
@@ -93,9 +115,185 @@ export default function ReportBuilderPage() {
 
   const runReport = async () => {
     setIsRunning(true);
-    // Simulate report generation
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsRunning(false);
+    setReportData([]);
+
+    try {
+      const startDate = dateRange.start || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+      const endDate = dateRange.end || new Date().toISOString().split("T")[0];
+
+      // Determine which category of data to fetch based on selected fields
+      const clientFields = selectedFields.filter(f => AVAILABLE_FIELDS.find(af => af.id === f)?.category === "Clients");
+      const serviceFields = selectedFields.filter(f => AVAILABLE_FIELDS.find(af => af.id === f)?.category === "Services");
+      const staffFields = selectedFields.filter(f => AVAILABLE_FIELDS.find(af => af.id === f)?.category === "Staff");
+      const revenueFields = selectedFields.filter(f => AVAILABLE_FIELDS.find(af => af.id === f)?.category === "Revenue");
+
+      const results: Record<string, unknown>[] = [];
+
+      // Fetch client data if client fields selected
+      if (clientFields.length > 0) {
+        const res = await fetch(`/api/clients?limit=100`);
+        if (res.ok) {
+          const data = await res.json();
+          const clients = data.clients || data;
+          clients.forEach((client: Record<string, unknown>) => {
+            const row: Record<string, unknown> = {};
+            if (clientFields.includes("client_name")) row.client_name = `${client.firstName} ${client.lastName}`;
+            if (clientFields.includes("client_email")) row.client_email = client.email || "-";
+            if (clientFields.includes("client_phone")) row.client_phone = client.phone || "-";
+            if (clientFields.includes("total_visits")) row.total_visits = client.totalVisits || 0;
+            if (clientFields.includes("last_visit")) row.last_visit = client.lastVisit ? new Date(client.lastVisit as string).toLocaleDateString() : "-";
+            results.push(row);
+          });
+        }
+      }
+
+      // Fetch service data if service fields selected
+      if (serviceFields.length > 0 && results.length === 0) {
+        const res = await fetch(`/api/reports/services?startDate=${startDate}&endDate=${endDate}`);
+        if (res.ok) {
+          const data = await res.json();
+          (data.services || []).forEach((item: Record<string, unknown>) => {
+            const service = item.service as Record<string, unknown>;
+            const row: Record<string, unknown> = {};
+            if (serviceFields.includes("service_name")) row.service_name = service?.name || "-";
+            if (serviceFields.includes("service_price")) row.service_price = service?.price || 0;
+            if (serviceFields.includes("service_duration")) row.service_duration = service?.duration || 0;
+            results.push(row);
+          });
+        }
+      }
+
+      // Fetch staff data if staff fields selected
+      if (staffFields.length > 0 && results.length === 0) {
+        const res = await fetch(`/api/reports/staff-performance?startDate=${startDate}&endDate=${endDate}`);
+        if (res.ok) {
+          const data = await res.json();
+          (data.staff || []).forEach((item: Record<string, unknown>) => {
+            const staff = item.staff as Record<string, unknown>;
+            const user = staff?.user as Record<string, unknown>;
+            const appointments = item.appointments as Record<string, unknown>;
+            const revenue = item.revenue as Record<string, unknown>;
+            const row: Record<string, unknown> = {};
+            if (staffFields.includes("staff_name")) row.staff_name = staff?.displayName || `${user?.firstName} ${user?.lastName}` || "-";
+            if (staffFields.includes("staff_revenue")) row.staff_revenue = revenue?.total || 0;
+            if (staffFields.includes("staff_appointments")) row.staff_appointments = appointments?.total || 0;
+            results.push(row);
+          });
+        }
+      }
+
+      // Fetch revenue/transaction data if revenue fields selected
+      if (revenueFields.length > 0 && results.length === 0) {
+        const res = await fetch(`/api/transactions?startDate=${startDate}&endDate=${endDate}&limit=100`);
+        if (res.ok) {
+          const transactions = await res.json();
+          (Array.isArray(transactions) ? transactions : []).forEach((txn: Record<string, unknown>) => {
+            const row: Record<string, unknown> = {};
+            if (revenueFields.includes("transaction_date")) {
+              const date = txn.date || txn.createdAt;
+              row.transaction_date = date ? new Date(date as string).toLocaleDateString() : "-";
+            }
+            if (revenueFields.includes("transaction_total")) row.transaction_total = Number(txn.totalAmount) || 0;
+            if (revenueFields.includes("payment_method")) row.payment_method = txn.paymentMethod || "-";
+            if (revenueFields.includes("tip_amount")) row.tip_amount = Number(txn.tipAmount) || 0;
+            results.push(row);
+          });
+        }
+      }
+
+      setReportData(results);
+      setHasRun(true);
+    } catch (error) {
+      console.error("Error running report:", error);
+      alert("Failed to generate report");
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const exportCSV = () => {
+    if (reportData.length === 0) return;
+
+    const headers = selectedFields.map(f => AVAILABLE_FIELDS.find(af => af.id === f)?.name || f);
+    const csvContent = [
+      headers.join(","),
+      ...reportData.map(row =>
+        selectedFields.map(f => {
+          const value = row[f];
+          if (typeof value === "number") return value;
+          return `"${String(value || "").replace(/"/g, '""')}"`;
+        }).join(",")
+      )
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${reportName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+  };
+
+  const exportPDF = () => {
+    if (reportData.length === 0) return;
+
+    // Create a printable HTML document
+    const headers = selectedFields.map(f => AVAILABLE_FIELDS.find(af => af.id === f)?.name || f);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${reportName}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #333; border-bottom: 2px solid #e11d48; padding-bottom: 10px; }
+          .meta { color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #f1f5f9; padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+          td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+          tr:nth-child(even) { background: #f8fafc; }
+          .footer { margin-top: 30px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <h1>${reportName}</h1>
+        <div class="meta">
+          <p>Date Range: ${dateRange.start || "Start"} to ${dateRange.end || "End"}</p>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+          <p>Total Records: ${reportData.length}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${reportData.map(row => `
+              <tr>${selectedFields.map(f => {
+                const value = row[f];
+                const field = AVAILABLE_FIELDS.find(af => af.id === f);
+                if (field?.type === "currency" && typeof value === "number") {
+                  return `<td>$${value.toFixed(2)}</td>`;
+                }
+                return `<td>${value ?? "-"}</td>`;
+              }).join("")}</tr>
+            `).join("")}
+          </tbody>
+        </table>
+        <div class="footer">
+          <p>BeautyHQ Report - Generated by Report Builder</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
   };
 
   const categories = [...new Set(AVAILABLE_FIELDS.map((f) => f.category))];
@@ -103,15 +301,16 @@ export default function ReportBuilderPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Report Builder</h1>
-          <p className="text-muted-foreground">Create custom reports with your data</p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/reports")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Report Builder</h1>
+            <p className="text-muted-foreground">Create custom reports with your data</p>
+          </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <Save className="h-4 w-4 mr-2" />
-            Save Report
-          </Button>
           <Button
             onClick={runReport}
             disabled={isRunning || selectedFields.length === 0}
@@ -131,7 +330,7 @@ export default function ReportBuilderPage() {
             <CardDescription>Select fields to include in your report</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue={categories[0]}>
+            <Tabs value={activeCategory} onValueChange={handleCategoryChange}>
               <TabsList className="w-full grid grid-cols-2">
                 {categories.slice(0, 2).map((cat) => (
                   <TabsTrigger key={cat} value={cat}>
@@ -196,7 +395,11 @@ export default function ReportBuilderPage() {
                   <Input
                     type="date"
                     value={dateRange.start}
-                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                    onChange={(e) => {
+                      setDateRange({ ...dateRange, start: e.target.value });
+                      setReportData([]);
+                      setHasRun(false);
+                    }}
                     className="pl-10"
                   />
                 </div>
@@ -206,7 +409,11 @@ export default function ReportBuilderPage() {
                   <Input
                     type="date"
                     value={dateRange.end}
-                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                    onChange={(e) => {
+                      setDateRange({ ...dateRange, end: e.target.value });
+                      setReportData([]);
+                      setHasRun(false);
+                    }}
                     className="pl-10"
                   />
                 </div>
@@ -335,38 +542,95 @@ export default function ReportBuilderPage() {
           <CardHeader className="flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg">Report Preview</CardTitle>
-              <CardDescription>Run the report to see results</CardDescription>
+              <CardDescription>
+                {hasRun ? `${reportData.length} records found` : "Run the report to see results"}
+              </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={selectedFields.length === 0}>
-                <Table className="h-4 w-4 mr-2" />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={reportData.length === 0}
+                onClick={exportCSV}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Export CSV
               </Button>
-              <Button variant="outline" size="sm" disabled={selectedFields.length === 0}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={reportData.length === 0}
+                onClick={exportPDF}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Export PDF
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="min-h-[300px] flex items-center justify-center border border-dashed rounded-lg">
-              {isRunning ? (
+            {isRunning ? (
+              <div className="min-h-[300px] flex items-center justify-center border border-dashed rounded-lg">
                 <div className="text-center">
                   <div className="animate-spin h-8 w-8 border-4 border-rose-600 border-t-transparent rounded-full mx-auto mb-4" />
                   <p className="text-muted-foreground">Generating report...</p>
                 </div>
-              ) : selectedFields.length === 0 ? (
+              </div>
+            ) : selectedFields.length === 0 ? (
+              <div className="min-h-[300px] flex items-center justify-center border border-dashed rounded-lg">
                 <div className="text-center text-muted-foreground">
                   <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Select fields and run the report to see results</p>
                 </div>
-              ) : (
+              </div>
+            ) : !hasRun ? (
+              <div className="min-h-[300px] flex items-center justify-center border border-dashed rounded-lg">
                 <div className="text-center text-muted-foreground">
                   <Play className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Click &quot;Run Report&quot; to generate your custom report</p>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : reportData.length === 0 ? (
+              <div className="min-h-[300px] flex items-center justify-center border border-dashed rounded-lg">
+                <div className="text-center text-muted-foreground">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No data found for the selected criteria</p>
+                </div>
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="max-h-[400px] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {selectedFields.map(fieldId => {
+                          const field = AVAILABLE_FIELDS.find(f => f.id === fieldId);
+                          return (
+                            <TableHead key={fieldId}>{field?.name || fieldId}</TableHead>
+                          );
+                        })}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.map((row, idx) => (
+                        <TableRow key={idx}>
+                          {selectedFields.map(fieldId => {
+                            const value = row[fieldId];
+                            const field = AVAILABLE_FIELDS.find(f => f.id === fieldId);
+                            return (
+                              <TableCell key={fieldId}>
+                                {field?.type === "currency" && typeof value === "number"
+                                  ? formatCurrency(value)
+                                  : String(value ?? "-")}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

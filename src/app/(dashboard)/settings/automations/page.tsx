@@ -1,34 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
   Zap,
   Plus,
   Calendar,
-  MessageSquare,
-  Mail,
   Gift,
   Star,
   Clock,
-  Edit,
   Trash2,
-  Play,
+  ArrowLeft,
 } from "lucide-react";
 
 interface Automation {
@@ -51,23 +37,13 @@ const TRIGGER_TYPES = [
   { value: "review_received", label: "Review Received", icon: Star },
 ];
 
-const ACTION_TYPES = [
-  { value: "send_sms", label: "Send SMS", icon: MessageSquare },
-  { value: "send_email", label: "Send Email", icon: Mail },
-  { value: "add_points", label: "Add Loyalty Points", icon: Gift },
-  { value: "apply_discount", label: "Apply Discount", icon: Gift },
-  { value: "create_task", label: "Create Task", icon: Calendar },
-];
 
 export default function AutomationsSettingsPage() {
+  const router = useRouter();
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newAutomation, setNewAutomation] = useState({
-    name: "",
-    triggerType: "",
-    actionType: "",
-  });
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchAutomations();
@@ -137,7 +113,7 @@ export default function AutomationsSettingsPage() {
   const toggleAutomation = async (id: string, isActive: boolean) => {
     try {
       await fetch(`/api/automations/${id}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive }),
       });
@@ -149,20 +125,23 @@ export default function AutomationsSettingsPage() {
     }
   };
 
-  const handleCreate = async () => {
+  const handleDelete = async (id: string) => {
+    setIsDeleting(true);
     try {
-      const response = await fetch("/api/automations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newAutomation),
+      const response = await fetch(`/api/automations/${id}`, {
+        method: "DELETE",
       });
       if (response.ok) {
-        setIsDialogOpen(false);
-        setNewAutomation({ name: "", triggerType: "", actionType: "" });
-        fetchAutomations();
+        setAutomations((prev) => prev.filter((a) => a.id !== id));
+        setDeleteId(null);
+      } else {
+        alert("Failed to delete automation");
       }
     } catch (error) {
-      console.error("Error creating automation:", error);
+      console.error("Error deleting automation:", error);
+      alert("Failed to delete automation");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -178,92 +157,24 @@ export default function AutomationsSettingsPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Workflow Automations</h1>
-          <p className="text-muted-foreground">
-            Automate repetitive tasks and client communications
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/marketing")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Workflow Automations</h1>
+            <p className="text-muted-foreground">
+              Automate repetitive tasks and client communications
+            </p>
+          </div>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-rose-600 hover:bg-rose-700">
-              <Plus className="h-4 w-4 mr-2" />
-              New Automation
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Automation</DialogTitle>
-              <DialogDescription>
-                Set up a new automated workflow for your business
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  value={newAutomation.name}
-                  onChange={(e) =>
-                    setNewAutomation({ ...newAutomation, name: e.target.value })
-                  }
-                  placeholder="e.g., Welcome Email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Trigger</Label>
-                <Select
-                  value={newAutomation.triggerType}
-                  onValueChange={(v) =>
-                    setNewAutomation({ ...newAutomation, triggerType: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select trigger" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRIGGER_TYPES.map((trigger) => (
-                      <SelectItem key={trigger.value} value={trigger.value}>
-                        {trigger.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Action</Label>
-                <Select
-                  value={newAutomation.actionType}
-                  onValueChange={(v) =>
-                    setNewAutomation({ ...newAutomation, actionType: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select action" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ACTION_TYPES.map((action) => (
-                      <SelectItem key={action.value} value={action.value}>
-                        {action.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={!newAutomation.name || !newAutomation.triggerType}
-                className="bg-rose-600 hover:bg-rose-700"
-              >
-                Create Automation
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button
+          className="bg-rose-600 hover:bg-rose-700"
+          onClick={() => router.push("/settings/automations/new")}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Automation
+        </Button>
       </div>
 
       <Card>
@@ -285,7 +196,7 @@ export default function AutomationsSettingsPage() {
               <Button
                 className="mt-4"
                 variant="outline"
-                onClick={() => setIsDialogOpen(true)}
+                onClick={() => router.push("/settings/automations/new")}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create your first automation
@@ -298,9 +209,10 @@ export default function AutomationsSettingsPage() {
                 return (
                   <div
                     key={automation.id}
-                    className={`flex items-center justify-between p-4 border rounded-lg ${
+                    className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:border-rose-300 transition-colors ${
                       automation.isActive ? "bg-white" : "bg-muted/50"
                     }`}
+                    onClick={() => router.push(`/settings/automations/${automation.id}`)}
                   >
                     <div className="flex items-start gap-4">
                       <div
@@ -338,21 +250,19 @@ export default function AutomationsSettingsPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <Switch
                         checked={automation.isActive}
                         onCheckedChange={(checked) =>
                           toggleAutomation(automation.id, checked)
                         }
                       />
-                      <Button variant="ghost" size="icon" onClick={() => alert(`Edit automation: ${automation.name}`)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="text-red-600" onClick={() => {
-                        if (confirm(`Delete automation "${automation.name}"?`)) {
-                          setAutomations(prev => prev.filter(a => a.id !== automation.id));
-                        }
-                      }}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => setDeleteId(automation.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -363,6 +273,30 @@ export default function AutomationsSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">Delete Automation</h3>
+            <p className="text-slate-600 mb-4">
+              Are you sure you want to delete this automation? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteId(null)} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete(deleteId)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

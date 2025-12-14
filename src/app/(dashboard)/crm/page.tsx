@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -121,6 +122,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function CRMPage() {
+  const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -524,7 +526,10 @@ export default function CRMPage() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${filterStatus === "" ? "ring-2 ring-rose-500" : ""}`}
+            onClick={() => setFilterStatus("")}
+          >
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-slate-500" />
@@ -533,7 +538,10 @@ export default function CRMPage() {
               <p className="text-2xl font-bold">{stats.total}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${filterStatus === "NEW" ? "ring-2 ring-blue-500" : ""}`}
+            onClick={() => setFilterStatus("NEW")}
+          >
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <Target className="h-4 w-4 text-blue-500" />
@@ -542,7 +550,10 @@ export default function CRMPage() {
               <p className="text-2xl font-bold text-blue-600">{stats.new}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${filterStatus === "CONTACTED" ? "ring-2 ring-yellow-500" : ""}`}
+            onClick={() => setFilterStatus("CONTACTED")}
+          >
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-yellow-500" />
@@ -551,7 +562,10 @@ export default function CRMPage() {
               <p className="text-2xl font-bold text-yellow-600">{stats.contacted}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${filterStatus === "DEMO_SCHEDULED" ? "ring-2 ring-purple-500" : ""}`}
+            onClick={() => setFilterStatus("DEMO_SCHEDULED")}
+          >
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-purple-500" />
@@ -560,7 +574,10 @@ export default function CRMPage() {
               <p className="text-2xl font-bold text-purple-600">{stats.demoScheduled}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${filterStatus === "TRIAL" ? "ring-2 ring-orange-500" : ""}`}
+            onClick={() => setFilterStatus("TRIAL")}
+          >
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-orange-500" />
@@ -569,7 +586,10 @@ export default function CRMPage() {
               <p className="text-2xl font-bold text-orange-600">{stats.trial}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${filterStatus === "CONVERTED" ? "ring-2 ring-green-500" : ""}`}
+            onClick={() => setFilterStatus("CONVERTED")}
+          >
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
@@ -578,7 +598,10 @@ export default function CRMPage() {
               <p className="text-2xl font-bold text-green-600">{stats.converted}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${filterStatus === "LOST" ? "ring-2 ring-red-500" : ""}`}
+            onClick={() => setFilterStatus("LOST")}
+          >
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <XCircle className="h-4 w-4 text-red-500" />
@@ -635,7 +658,8 @@ export default function CRMPage() {
               {filteredLeads.map((lead) => (
                 <div
                   key={lead.id}
-                  className="p-4 hover:bg-muted/50 transition-colors"
+                  className="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/crm/${lead.id}`)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
@@ -687,7 +711,7 @@ export default function CRMPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={lead.status}
                         onValueChange={(v) => handleStatusChange(lead, v)}

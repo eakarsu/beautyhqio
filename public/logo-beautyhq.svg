@@ -1,0 +1,25 @@
+<svg width="300" height="80" viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background (transparent) -->
+
+  <!-- Sparkle/Diamond Icon -->
+  <g transform="translate(10, 10)">
+    <!-- Main diamond -->
+    <path d="M30 5 L45 25 L30 55 L15 25 Z" fill="#E11D48"/>
+    <!-- Sparkle lines -->
+    <line x1="30" y1="0" x2="30" y2="8" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
+    <line x1="30" y1="52" x2="30" y2="60" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
+    <line x1="5" y1="25" x2="12" y2="25" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
+    <line x1="48" y1="25" x2="55" y2="25" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
+    <!-- Small sparkles -->
+    <circle cx="12" cy="10" r="2" fill="#F43F5E"/>
+    <circle cx="48" cy="10" r="2" fill="#F43F5E"/>
+    <circle cx="12" cy="40" r="1.5" fill="#F43F5E"/>
+    <circle cx="48" cy="40" r="1.5" fill="#F43F5E"/>
+  </g>
+
+  <!-- Text: Beauty -->
+  <text x="75" y="52" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="38" font-weight="700" fill="#E11D48">Beauty</text>
+
+  <!-- Text: HQ -->
+  <text x="205" y="52" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="38" font-weight="700" fill="#1F2937">HQ</text>
+</svg>

@@ -180,10 +180,18 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Soft delete by setting status to BLOCKED
-    await prisma.client.update({
+    // Delete related records first (to avoid foreign key constraints)
+    await prisma.activity.deleteMany({ where: { clientId: id } });
+    await prisma.clientNote.deleteMany({ where: { clientId: id } });
+    await prisma.attachment.deleteMany({ where: { clientId: id } });
+    await prisma.clientPhoto.deleteMany({ where: { clientId: id } });
+    await prisma.serviceFormula.deleteMany({ where: { clientId: id } });
+    await prisma.clientPreference.deleteMany({ where: { clientId: id } });
+    await prisma.review.deleteMany({ where: { clientId: id } });
+
+    // Delete the client
+    await prisma.client.delete({
       where: { id },
-      data: { status: "BLOCKED" },
     });
 
     return NextResponse.json({ success: true });

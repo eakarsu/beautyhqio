@@ -143,8 +143,17 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(staff, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating staff:", error);
+
+    // Handle unique constraint error
+    if (error.code === "P2002") {
+      return NextResponse.json(
+        { error: "A staff member with this email already exists." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to create staff" },
       { status: 500 }

@@ -92,8 +92,17 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(giftCard, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating gift card:", error);
+
+    // Handle unique constraint error (duplicate code)
+    if (error.code === "P2002") {
+      return NextResponse.json(
+        { error: "A gift card with this code already exists. Please try again." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to create gift card" },
       { status: 500 }
