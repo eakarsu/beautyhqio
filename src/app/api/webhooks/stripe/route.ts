@@ -128,6 +128,41 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      // Stripe Connect events for staff payouts
+      case "account.updated": {
+        const account = event.data.object as Stripe.Account;
+        console.log("Connect account updated:", account.id);
+
+        // Determine account status
+        let status = "pending";
+        if (account.charges_enabled && account.payouts_enabled) {
+          status = "active";
+        } else if (account.requirements?.disabled_reason) {
+          status = "restricted";
+        }
+
+        // Update staff record
+        await prisma.staff.updateMany({
+          where: { stripeAccountId: account.id },
+          data: { stripeAccountStatus: status },
+        });
+        break;
+      }
+
+      case "payout.paid": {
+        const payout = event.data.object as Stripe.Payout;
+        console.log("Payout completed:", payout.id, "Amount:", payout.amount / 100);
+        // Could log payout to database if needed
+        break;
+      }
+
+      case "transfer.created": {
+        const transfer = event.data.object as Stripe.Transfer;
+        console.log("Transfer created:", transfer.id, "to:", transfer.destination);
+        // Could log transfer to database if needed
+        break;
+      }
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }

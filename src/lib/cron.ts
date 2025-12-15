@@ -59,9 +59,6 @@ export function initCronJobs() {
   const reminderJob = cron.schedule("0 * * * *", async () => {
     console.log("[Cron] Hourly reminder job triggered");
     await processReminders();
-  }, {
-    scheduled: true,
-    timezone: process.env.TZ || "America/New_York",
   });
 
   // Also run immediately on startup (after a small delay to ensure server is ready)

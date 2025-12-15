@@ -26,8 +26,20 @@ import {
   Loader2,
   CheckCircle,
   ShoppingBag,
+  CreditCard,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import { formatPhone, getInitials, formatDate, formatCurrency } from "@/lib/utils";
+import StripeCardForm from "@/components/clients/StripeCardForm";
+
+interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+}
 
 interface ClientData {
   id: string;
@@ -92,6 +104,9 @@ export default function ClientProfilePage() {
   const [aiRecommendations, setAiRecommendations] = useState<StyleRecommendation | null>(null);
   const [client, setClient] = useState<ClientData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [showAddCardModal, setShowAddCardModal] = useState(false);
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchClient() {
@@ -111,6 +126,41 @@ export default function ClientProfilePage() {
       fetchClient();
     }
   }, [params.id]);
+
+  const fetchPaymentMethods = async () => {
+    try {
+      const response = await fetch(`/api/clients/${params.id}/payment-methods`);
+      if (response.ok) {
+        const data = await response.json();
+        setPaymentMethods(data.paymentMethods || []);
+      }
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (params.id) {
+      fetchPaymentMethods();
+    }
+  }, [params.id]);
+
+  const handleDeleteCard = async (paymentMethodId: string) => {
+    setDeletingCardId(paymentMethodId);
+    try {
+      const response = await fetch(
+        `/api/clients/${params.id}/payment-methods?paymentMethodId=${paymentMethodId}`,
+        { method: "DELETE" }
+      );
+      if (response.ok) {
+        setPaymentMethods((prev) => prev.filter((pm) => pm.id !== paymentMethodId));
+      }
+    } catch (error) {
+      console.error("Error deleting card:", error);
+    } finally {
+      setDeletingCardId(null);
+    }
+  };
 
   const fetchAIRecommendations = async () => {
     setAiLoading(true);
@@ -246,6 +296,10 @@ export default function ClientProfilePage() {
           <TabsTrigger value="formulas">Formulas</TabsTrigger>
           <TabsTrigger value="photos">Photos</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
+          <TabsTrigger value="payments" className="flex items-center gap-1">
+            <CreditCard className="h-3 w-3" />
+            Payment Methods
+          </TabsTrigger>
           <TabsTrigger value="ai" className="flex items-center gap-1">
             <Sparkles className="h-3 w-3" />
             AI Recommendations
@@ -350,6 +404,68 @@ export default function ClientProfilePage() {
                     <Heart className="h-4 w-4 text-rose-500" />
                     <span className="text-sm">Sensitive scalp treatment</span>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Payment Methods */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Payment Methods
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAddCardModal(true)}
+                      className="text-rose-600 hover:text-rose-700"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {paymentMethods.length === 0 ? (
+                    <p className="text-sm text-slate-500">No payment methods saved</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {paymentMethods.map((card) => (
+                        <div
+                          key={card.id}
+                          className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-7 bg-gradient-to-r from-slate-700 to-slate-900 rounded flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">
+                                {card.brand?.toUpperCase().slice(0, 4)}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">•••• {card.last4}</p>
+                              <p className="text-xs text-slate-500">
+                                Expires {card.expMonth}/{card.expYear}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteCard(card.id)}
+                            disabled={deletingCardId === card.id}
+                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                          >
+                            {deletingCardId === card.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -500,6 +616,80 @@ export default function ClientProfilePage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="payments" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-slate-500" />
+                  Saved Payment Methods
+                </CardTitle>
+                <Button onClick={() => setShowAddCardModal(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Card
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {paymentMethods.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <CreditCard className="h-8 w-8 text-slate-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">
+                    No payment methods saved
+                  </h3>
+                  <p className="text-sm text-slate-500 mb-4">
+                    Add a card to enable faster checkout and recurring payments.
+                  </p>
+                  <Button onClick={() => setShowAddCardModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Payment Method
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paymentMethods.map((card) => (
+                    <div
+                      key={card.id}
+                      className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-slate-50 to-slate-100 border"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-8 bg-gradient-to-br from-slate-700 to-slate-900 rounded-md flex items-center justify-center">
+                          <span className="text-white text-xs font-bold uppercase">
+                            {card.brand?.slice(0, 4)}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            •••• •••• •••• {card.last4}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            Expires {card.expMonth}/{card.expYear}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteCard(card.id)}
+                        disabled={deletingCardId === card.id}
+                        className="text-slate-400 hover:text-red-600 hover:bg-red-50"
+                      >
+                        {deletingCardId === card.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="ai" className="mt-4">
           <div className="space-y-6">
             {/* AI Header Card */}
@@ -643,26 +833,28 @@ export default function ClientProfilePage() {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
 
-function Plus(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M5 12h14" />
-      <path d="M12 5v14" />
-    </svg>
+      {/* Add Card Modal */}
+      {showAddCardModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <h3 className="text-xl font-semibold text-slate-900 mb-2">
+              Add Payment Method
+            </h3>
+            <p className="text-sm text-slate-500 mb-6">
+              Add a credit or debit card for {client.firstName}. This card will be securely stored with Stripe.
+            </p>
+            <StripeCardForm
+              clientId={params.id as string}
+              onSuccess={() => {
+                fetchPaymentMethods();
+                setShowAddCardModal(false);
+              }}
+              onCancel={() => setShowAddCardModal(false)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

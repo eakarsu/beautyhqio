@@ -20,8 +20,10 @@ import {
   Mail,
   Phone,
   Briefcase,
+  Banknote,
 } from "lucide-react";
 import { format } from "date-fns";
+import StaffPayouts from "@/components/staff/StaffPayouts";
 
 interface Staff {
   id: string;
@@ -37,6 +39,8 @@ interface Staff {
   reviewCount: number;
   rebookRate?: number;
   isActive: boolean;
+  stripeAccountId?: string;
+  stripeAccountStatus?: string;
   user: {
     firstName: string;
     lastName: string;
@@ -269,6 +273,10 @@ export default function StaffProfilePage({ params }: { params: Promise<{ id: str
                 <TabsTrigger value="performance">Performance</TabsTrigger>
                 <TabsTrigger value="schedule">Schedule</TabsTrigger>
                 <TabsTrigger value="commissions">Commissions</TabsTrigger>
+                <TabsTrigger value="payouts" className="flex items-center gap-1">
+                  <Banknote className="h-3 w-3" />
+                  Payouts
+                </TabsTrigger>
               </TabsList>
             </CardHeader>
             <CardContent>
@@ -356,6 +364,14 @@ export default function StaffProfilePage({ params }: { params: Promise<{ id: str
                     </div>
                   </div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="payouts">
+                <StaffPayouts
+                  staffId={id}
+                  stripeAccountId={staff.stripeAccountId}
+                  stripeAccountStatus={staff.stripeAccountStatus}
+                />
               </TabsContent>
             </CardContent>
           </Tabs>

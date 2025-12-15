@@ -43,6 +43,8 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-toast": "^1.2.15",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.5.3",
     "@twilio/voice-sdk": "^2.17.0",
     "@types/twilio": "^3.19.2",
     "bcryptjs": "^3.0.3",

@@ -32,6 +32,9 @@ model Business {
   // Tax
   taxRate       Decimal   @db.Decimal(5, 4) @default(0)
 
+  // Stripe
+  stripeCustomerId String?
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -108,7 +111,8 @@ model Location {
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
-  password      String
+  emailVerified DateTime?
+  password      String?   // Optional for OAuth users
   firstName     String
   lastName      String
   phone         String?
@@ -128,6 +132,27 @@ model User {
   staff         Staff?
   auditLogs     AuditLog[]
   savedFilters  SavedFilter[]
+  accounts      Account[]
+}
+
+// OAuth Account model for social login (Google, Microsoft, Apple)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
 enum UserRole {
@@ -176,6 +201,10 @@ model Staff {
   googleCalendarToken String?
   googleRefreshToken String?
   googleCalendarId String?
+
+  // Stripe Connect (for payouts)
+  stripeAccountId     String?
+  stripeAccountStatus String?   @default("not_connected") // not_connected, pending, active, restricted
 
   // Working hours (JSON)
   workingHours  Json?
@@ -276,6 +305,9 @@ model Client {
 
   // Status
   status        ClientStatus  @default(ACTIVE)
+
+  // Stripe
+  stripeCustomerId String?
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

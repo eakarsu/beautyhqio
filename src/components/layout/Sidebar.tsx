@@ -20,6 +20,7 @@ import {
   Star,
   UserCircle,
   Target,
+  Wallet,
 } from "lucide-react";
 
 const navigation = [
@@ -33,6 +34,7 @@ const navigation = [
   { name: "Products", href: "/products", icon: Package },
   { name: "Loyalty", href: "/loyalty", icon: Gift },
   { name: "Gift Cards", href: "/gift-cards", icon: CreditCard },
+  { name: "Billing", href: "/billing", icon: Wallet },
   { name: "Marketing", href: "/marketing", icon: Megaphone },
   { name: "Reviews", href: "/reviews", icon: Star },
   { name: "Reports", href: "/reports", icon: BarChart3 },
