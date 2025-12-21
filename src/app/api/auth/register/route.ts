@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+// Generate URL-friendly slug from business name
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -43,6 +51,8 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
+    let isNewBusiness = false;
+
     // If no business exists and businessName provided, create one
     if (!business && businessName) {
       business = await prisma.business.create({
@@ -54,6 +64,7 @@ export async function POST(request: NextRequest) {
           supportedLanguages: ["en"],
         },
       });
+      isNewBusiness = true;
     }
 
     // If still no business, return error
@@ -62,6 +73,51 @@ export async function POST(request: NextRequest) {
         { error: "No business found. Please run database seed first." },
         { status: 400 }
       );
+    }
+
+    // Create BusinessSubscription if it doesn't exist (STARTER plan - free, 20% commission)
+    const existingSubscription = await prisma.businessSubscription.findUnique({
+      where: { businessId: business.id },
+    });
+
+    if (!existingSubscription) {
+      await prisma.businessSubscription.create({
+        data: {
+          businessId: business.id,
+          plan: "STARTER",
+          status: "ACTIVE",
+          monthlyPrice: 0,
+          marketplaceCommissionPct: 20,
+        },
+      });
+    }
+
+    // Create PublicSalonProfile if it doesn't exist
+    const existingProfile = await prisma.publicSalonProfile.findUnique({
+      where: { businessId: business.id },
+    });
+
+    if (!existingProfile) {
+      // Generate unique slug
+      let slug = generateSlug(business.name);
+      let uniqueSlug = slug;
+      let counter = 1;
+
+      while (await prisma.publicSalonProfile.findUnique({ where: { slug: uniqueSlug } })) {
+        uniqueSlug = `${slug}-${counter}`;
+        counter++;
+      }
+
+      await prisma.publicSalonProfile.create({
+        data: {
+          businessId: business.id,
+          slug: uniqueSlug,
+          isListed: true,
+          specialties: [],
+          amenities: [],
+          galleryImages: [],
+        },
+      });
     }
 
     // Create the user

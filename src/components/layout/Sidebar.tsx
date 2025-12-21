@@ -21,6 +21,8 @@ import {
   UserCircle,
   Target,
   Wallet,
+  Store,
+  TrendingUp,
 } from "lucide-react";
 
 const navigation = [
@@ -38,8 +40,11 @@ const navigation = [
   { name: "Marketing", href: "/marketing", icon: Megaphone },
   { name: "Reviews", href: "/reviews", icon: Star },
   { name: "Reports", href: "/reports", icon: BarChart3 },
+  { name: "Marketplace Leads", href: "/reports/leads", icon: TrendingUp },
   { name: "AI Features", href: "/ai", icon: Bot },
   { name: "Sales CRM", href: "/crm", icon: Target },
+  { name: "Marketplace", href: "/marketplace", icon: Store },
+  { name: "Subscription", href: "/subscription", icon: CreditCard },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

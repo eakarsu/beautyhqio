@@ -61,7 +61,22 @@ export async function POST(request: NextRequest) {
       case "customer.subscription.created": {
         const subscription = event.data.object as Stripe.Subscription;
         console.log("Subscription created:", subscription.id);
-        // Handle membership subscription creation
+
+        // Check if this is a business subscription
+        if (subscription.metadata?.type === "business_subscription") {
+          const businessId = subscription.metadata.businessId;
+          if (businessId) {
+            await prisma.businessSubscription.updateMany({
+              where: { businessId },
+              data: {
+                stripeSubscriptionId: subscription.id,
+                status: "ACTIVE",
+                currentPeriodStart: new Date(subscription.current_period_start * 1000),
+                currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+              },
+            });
+          }
+        }
         break;
       }
 
@@ -69,13 +84,32 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         console.log("Subscription updated:", subscription.id);
 
-        // Update membership subscription status
-        await prisma.membershipSubscription.updateMany({
-          where: { stripeSubscriptionId: subscription.id },
-          data: {
-            status: subscription.status === "active" ? "active" : "paused",
-          },
-        });
+        // Check if this is a business subscription
+        if (subscription.metadata?.type === "business_subscription") {
+          const businessId = subscription.metadata.businessId;
+          if (businessId) {
+            let status: "ACTIVE" | "PAST_DUE" | "CANCELLED" = "ACTIVE";
+            if (subscription.status === "past_due") status = "PAST_DUE";
+            if (subscription.status === "canceled") status = "CANCELLED";
+
+            await prisma.businessSubscription.updateMany({
+              where: { businessId },
+              data: {
+                status,
+                currentPeriodStart: new Date(subscription.current_period_start * 1000),
+                currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+              },
+            });
+          }
+        } else {
+          // Handle membership subscription status
+          await prisma.membershipSubscription.updateMany({
+            where: { stripeSubscriptionId: subscription.id },
+            data: {
+              status: subscription.status === "active" ? "active" : "paused",
+            },
+          });
+        }
         break;
       }
 
@@ -83,13 +117,30 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         console.log("Subscription cancelled:", subscription.id);
 
-        await prisma.membershipSubscription.updateMany({
-          where: { stripeSubscriptionId: subscription.id },
-          data: {
-            status: "cancelled",
-            cancelledAt: new Date(),
-          },
-        });
+        // Check if this is a business subscription
+        if (subscription.metadata?.type === "business_subscription") {
+          const businessId = subscription.metadata.businessId;
+          if (businessId) {
+            await prisma.businessSubscription.updateMany({
+              where: { businessId },
+              data: {
+                status: "CANCELLED",
+                cancelledAt: new Date(),
+                plan: "STARTER", // Downgrade to free tier
+                monthlyPrice: 0,
+                marketplaceCommissionPct: 20,
+              },
+            });
+          }
+        } else {
+          await prisma.membershipSubscription.updateMany({
+            where: { stripeSubscriptionId: subscription.id },
+            data: {
+              status: "cancelled",
+              cancelledAt: new Date(),
+            },
+          });
+        }
         break;
       }
 
@@ -97,20 +148,52 @@ export async function POST(request: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice & { subscription?: string | { id: string } };
         console.log("Invoice paid:", invoice.id);
 
-        // Update membership subscription payment info
-        // Get subscription from invoice (subscription property may be string or Subscription object)
-        const subscriptionId = typeof invoice.subscription === 'string'
-          ? invoice.subscription
-          : invoice.subscription?.id;
+        // Check if this is a commission invoice
+        if (invoice.metadata?.type === "commission_invoice") {
+          const invoiceId = invoice.metadata.invoiceId;
+          const businessId = invoice.metadata.businessId;
 
-        if (subscriptionId) {
-          await prisma.membershipSubscription.updateMany({
-            where: { stripeSubscriptionId: subscriptionId },
-            data: {
-              lastPaymentDate: new Date(),
-              lastPaymentAmount: (invoice.amount_paid || 0) / 100,
-            },
-          });
+          if (invoiceId) {
+            // Update business invoice status
+            await prisma.businessInvoice.update({
+              where: { id: invoiceId },
+              data: {
+                status: "PAID",
+                paidAt: new Date(),
+                stripeInvoiceId: invoice.id,
+              },
+            });
+
+            // Mark all unpaid leads as commission paid
+            if (businessId) {
+              await prisma.marketplaceLead.updateMany({
+                where: {
+                  businessId,
+                  status: "COMPLETED",
+                  commissionPaidAt: null,
+                },
+                data: {
+                  commissionPaidAt: new Date(),
+                },
+              });
+            }
+          }
+        } else {
+          // Update membership subscription payment info
+          // Get subscription from invoice (subscription property may be string or Subscription object)
+          const subscriptionId = typeof invoice.subscription === 'string'
+            ? invoice.subscription
+            : invoice.subscription?.id;
+
+          if (subscriptionId) {
+            await prisma.membershipSubscription.updateMany({
+              where: { stripeSubscriptionId: subscriptionId },
+              data: {
+                lastPaymentDate: new Date(),
+                lastPaymentAmount: (invoice.amount_paid || 0) / 100,
+              },
+            });
+          }
         }
         break;
       }

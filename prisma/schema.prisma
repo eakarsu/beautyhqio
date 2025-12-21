@@ -18,6 +18,14 @@ model Business {
   email         String?
   website       String?
   logo          String?
+
+  // Address
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  country       String    @default("US")
+
   timezone      String    @default("America/New_York")
   defaultLanguage String  @default("en")
   supportedLanguages String[] @default(["en"])
@@ -50,6 +58,11 @@ model Business {
   campaigns     Campaign[]
   automations   Automation[]
   savedFilters  SavedFilter[]
+
+  // Marketplace & Lead Generation
+  subscription      BusinessSubscription?
+  publicProfile     PublicSalonProfile?
+  marketplaceLeads  MarketplaceLead[]
 }
 
 enum BusinessType {
@@ -104,6 +117,7 @@ model Location {
   appointments  Appointment[]
   waitlist      WaitlistEntry[]
   transactions  Transaction[]
+  marketplaceLeads MarketplaceLead[]
 }
 
 // ============ USERS & STAFF ============
@@ -331,6 +345,7 @@ model Client {
   attachments   Attachment[]
   familyMemberships FamilyMember[]
   primaryFamilyGroups FamilyGroup[] @relation("PrimaryFamilyContact")
+  marketplaceLeads MarketplaceLead[]
 }
 
 enum ClientStatus {
@@ -609,6 +624,7 @@ model Appointment {
   services      AppointmentService[]
   photos        ClientPhoto[]
   transaction   Transaction?
+  marketplaceLead MarketplaceLead?
 }
 
 enum AppointmentStatus {
@@ -632,6 +648,7 @@ enum BookingSource {
   REFERRAL
   KIOSK
   AI_VOICE
+  MARKETPLACE
 }
 
 model AppointmentService {
@@ -1555,4 +1572,185 @@ model ContactMessage {
   message       String
   isRead        Boolean   @default(false)
   createdAt     DateTime  @default(now())
+}
+
+// ============ MARKETPLACE & LEAD GENERATION ============
+
+model BusinessSubscription {
+  id                       String             @id @default(cuid())
+  plan                     SubscriptionPlan   @default(STARTER)
+  status                   SubscriptionStatus @default(ACTIVE)
+  billingCycle             String             @default("monthly")
+  monthlyPrice             Decimal            @db.Decimal(10, 2) @default(0)
+  marketplaceCommissionPct Decimal            @db.Decimal(5, 2) @default(20)
+
+  // Stripe
+  stripeCustomerId         String?
+  stripeSubscriptionId     String?
+
+  // Trial
+  trialEndsAt              DateTime?
+
+  // Billing dates
+  currentPeriodStart       DateTime?
+  currentPeriodEnd         DateTime?
+
+  // Cancellation
+  cancelledAt              DateTime?
+  cancelReason             String?
+
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  business                 Business           @relation(fields: [businessId], references: [id])
+  businessId               String             @unique
+  invoices                 BusinessInvoice[]
+}
+
+enum SubscriptionPlan {
+  STARTER
+  GROWTH
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  TRIAL
+}
+
+model MarketplaceLead {
+  id               String            @id @default(cuid())
+  source           MarketplaceSource @default(MARKETPLACE_SEARCH)
+  status           LeadStatusType    @default(NEW)
+
+  // Session & UTM tracking
+  sessionId        String?
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  searchQuery      String?
+
+  // Timestamps
+  viewedAt         DateTime          @default(now())
+  bookedAt         DateTime?
+  completedAt      DateTime?
+
+  // Commission
+  commissionRate   Decimal?          @db.Decimal(5, 2)
+  commissionAmount Decimal?          @db.Decimal(10, 2)
+  commissionPaidAt DateTime?
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relations
+  business         Business          @relation(fields: [businessId], references: [id])
+  businessId       String
+  location         Location?         @relation(fields: [locationId], references: [id])
+  locationId       String?
+  appointment      Appointment?      @relation(fields: [appointmentId], references: [id])
+  appointmentId    String?           @unique
+  client           Client?           @relation(fields: [clientId], references: [id])
+  clientId         String?
+}
+
+enum MarketplaceSource {
+  MARKETPLACE_SEARCH
+  MARKETPLACE_BROWSE
+  GOOGLE_ORGANIC
+  FACEBOOK_ADS
+  INSTAGRAM_ADS
+  REFERRAL_LINK
+  DIRECT_LINK
+  EMAIL_CAMPAIGN
+}
+
+enum LeadStatusType {
+  NEW
+  VIEWED_PROFILE
+  STARTED_BOOKING
+  BOOKED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model BusinessInvoice {
+  id                 String        @id @default(cuid())
+  invoiceNumber      String        @unique
+  periodStart        DateTime
+  periodEnd          DateTime
+
+  // Amounts
+  subscriptionAmount Decimal       @db.Decimal(10, 2) @default(0)
+  commissionAmount   Decimal       @db.Decimal(10, 2) @default(0)
+  totalAmount        Decimal       @db.Decimal(10, 2)
+
+  // Status
+  status             InvoiceStatus @default(PENDING)
+
+  // Payment
+  stripeInvoiceId    String?
+  paidAt             DateTime?
+
+  // Details (JSON array of lead commissions)
+  lineItems          Json?
+
+  dueDate            DateTime
+  createdAt          DateTime      @default(now())
+
+  subscription       BusinessSubscription @relation(fields: [subscriptionId], references: [id])
+  subscriptionId     String
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PAID
+  PAST_DUE
+  VOID
+}
+
+model PublicSalonProfile {
+  id                String   @id @default(cuid())
+  slug              String   @unique
+
+  // Listing settings
+  isListed          Boolean  @default(true)
+  featuredUntil     DateTime?
+
+  // SEO
+  metaTitle         String?
+  metaDescription   String?
+
+  // Profile content
+  headline          String?
+  description       String?
+  specialties       String[]
+  amenities         String[]
+
+  // Gallery
+  coverImage        String?
+  galleryImages     String[]
+
+  // Stats (cached for performance)
+  avgRating         Decimal? @db.Decimal(3, 2)
+  reviewCount       Int      @default(0)
+  priceRange        String?
+
+  // Verification
+  isVerified        Boolean  @default(false)
+  verifiedAt        DateTime?
+
+  // Analytics
+  viewCount         Int      @default(0)
+  bookingClickCount Int      @default(0)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  business          Business @relation(fields: [businessId], references: [id])
+  businessId        String   @unique
 }

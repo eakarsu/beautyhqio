@@ -241,4 +241,157 @@ export function isStripeConfigured(): boolean {
   return stripe !== null;
 }
 
+// ============ BUSINESS SUBSCRIPTION FUNCTIONS ============
+
+// Create a business subscription for salon owners
+export async function createBusinessSubscription(
+  customerId: string,
+  priceId: string,
+  businessId: string
+) {
+  const stripeClient = ensureStripe();
+  const subscription = await stripeClient.subscriptions.create({
+    customer: customerId,
+    items: [{ price: priceId }],
+    metadata: { businessId, type: "business_subscription" },
+    payment_behavior: "default_incomplete",
+    expand: ["latest_invoice.payment_intent"],
+  });
+
+  return subscription;
+}
+
+// Update a business subscription (upgrade/downgrade)
+export async function updateBusinessSubscription(
+  subscriptionId: string,
+  newPriceId: string
+) {
+  const stripeClient = ensureStripe();
+
+  // Get current subscription
+  const subscription = await stripeClient.subscriptions.retrieve(subscriptionId);
+
+  // Update with new price
+  return stripeClient.subscriptions.update(subscriptionId, {
+    items: [{
+      id: subscription.items.data[0].id,
+      price: newPriceId,
+    }],
+    proration_behavior: "create_prorations",
+  });
+}
+
+// Create a one-time invoice for commission charges
+export async function createCommissionInvoice(
+  customerId: string,
+  amount: number,
+  description: string,
+  invoiceId: string,
+  businessId: string
+) {
+  const stripeClient = ensureStripe();
+
+  // Create the invoice
+  const invoice = await stripeClient.invoices.create({
+    customer: customerId,
+    collection_method: "charge_automatically",
+    metadata: {
+      invoiceId,
+      businessId,
+      type: "commission_invoice"
+    },
+  });
+
+  // Add the commission as an invoice item
+  await stripeClient.invoiceItems.create({
+    customer: customerId,
+    invoice: invoice.id,
+    amount: Math.round(amount * 100), // Convert to cents
+    currency: "usd",
+    description,
+  });
+
+  // Finalize and attempt to pay
+  return stripeClient.invoices.finalizeInvoice(invoice.id, {
+    auto_advance: true,
+  });
+}
+
+// Get subscription details
+export async function getSubscription(subscriptionId: string) {
+  const stripeClient = ensureStripe();
+  return stripeClient.subscriptions.retrieve(subscriptionId);
+}
+
+// List invoices for a customer
+export async function listCustomerInvoices(
+  customerId: string,
+  limit: number = 10
+) {
+  const stripeClient = ensureStripe();
+  return stripeClient.invoices.list({
+    customer: customerId,
+    limit,
+  });
+}
+
+// Create or get Stripe products for subscription plans
+export async function getOrCreateSubscriptionProducts() {
+  const stripeClient = ensureStripe();
+
+  const plans = [
+    { name: "BeautyHQ Growth", amount: 4900, interval: "month" as const },
+    { name: "BeautyHQ Pro", amount: 14900, interval: "month" as const },
+  ];
+
+  const products: Record<string, { productId: string; priceId: string }> = {};
+
+  for (const plan of plans) {
+    // Search for existing product
+    const existingProducts = await stripeClient.products.search({
+      query: `name:'${plan.name}'`,
+    });
+
+    let productId: string;
+
+    if (existingProducts.data.length > 0) {
+      productId = existingProducts.data[0].id;
+    } else {
+      // Create new product
+      const product = await stripeClient.products.create({
+        name: plan.name,
+        metadata: { type: "business_subscription" },
+      });
+      productId = product.id;
+    }
+
+    // Get or create price
+    const prices = await stripeClient.prices.list({
+      product: productId,
+      active: true,
+    });
+
+    let priceId: string;
+
+    if (prices.data.length > 0) {
+      priceId = prices.data[0].id;
+    } else {
+      const price = await stripeClient.prices.create({
+        product: productId,
+        unit_amount: plan.amount,
+        currency: "usd",
+        recurring: { interval: plan.interval },
+      });
+      priceId = price.id;
+    }
+
+    products[plan.name.replace("BeautyHQ ", "").toUpperCase()] = {
+      productId,
+      priceId,
+    };
+  }
+
+  return products;
+}
+
 export { stripe };

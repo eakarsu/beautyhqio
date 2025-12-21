@@ -17,9 +17,15 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
+ARG TARGETARCH
+
 RUN npm ci
-# Install platform-specific native modules for cross-platform builds
-RUN npm install lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu --save-optional
+# Install platform-specific native modules based on architecture
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+      npm install lightningcss-linux-arm64-gnu @tailwindcss/oxide-linux-arm64-gnu --save-optional; \
+    else \
+      npm install lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu --save-optional; \
+    fi
 RUN npx prisma generate
 
 COPY . .

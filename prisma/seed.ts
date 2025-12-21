@@ -875,24 +875,382 @@ async function main() {
   }
   console.log("Created client activities");
 
+  // ============================================
+  // MARKETPLACE & SUBSCRIPTION SAMPLE DATA
+  // ============================================
+
+  // Create additional businesses for marketplace variety
+  const additionalBusinesses = await Promise.all([
+    prisma.business.create({
+      data: {
+        name: "Glamour Hair Studio",
+        type: "HAIR_SALON",
+        phone: "5551111000",
+        email: "hello@glamourhair.com",
+        timezone: "America/New_York",
+        defaultLanguage: "en",
+        supportedLanguages: ["en", "es"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Zen Spa & Wellness",
+        type: "SPA",
+        phone: "5552222000",
+        email: "info@zenspa.com",
+        timezone: "America/Los_Angeles",
+        defaultLanguage: "en",
+        supportedLanguages: ["en"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Nails by Nicole",
+        type: "NAIL_SALON",
+        phone: "5553333000",
+        email: "nicole@nailsbynicole.com",
+        timezone: "America/Chicago",
+        defaultLanguage: "en",
+        supportedLanguages: ["en", "vi"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "The Gentlemen's Barber",
+        type: "BARBERSHOP",
+        phone: "5554444000",
+        email: "book@gentlemensbarber.com",
+        timezone: "America/New_York",
+        defaultLanguage: "en",
+        supportedLanguages: ["en"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Radiant Skin Clinic",
+        type: "SPA",
+        phone: "5555555000",
+        email: "hello@radiantskin.com",
+        timezone: "America/Denver",
+        defaultLanguage: "en",
+        supportedLanguages: ["en", "es"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Lash & Brow Bar",
+        type: "LASH_BROW",
+        phone: "5556666000",
+        email: "appointments@lashandbrow.com",
+        timezone: "America/New_York",
+        defaultLanguage: "en",
+        supportedLanguages: ["en"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Urban Cuts NYC",
+        type: "HAIR_SALON",
+        phone: "5557777000",
+        email: "info@urbancuts.nyc",
+        timezone: "America/New_York",
+        defaultLanguage: "en",
+        supportedLanguages: ["en", "es", "zh"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Serenity Day Spa",
+        type: "SPA",
+        phone: "5558888000",
+        email: "relax@serenityspa.com",
+        timezone: "America/Los_Angeles",
+        defaultLanguage: "en",
+        supportedLanguages: ["en"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Polished Nails & Beauty",
+        type: "NAIL_SALON",
+        phone: "5559999000",
+        email: "book@polishednails.com",
+        timezone: "America/Chicago",
+        defaultLanguage: "en",
+        supportedLanguages: ["en", "ko"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Mane Attraction Salon",
+        type: "HAIR_SALON",
+        phone: "5550001111",
+        email: "hello@maneattraction.com",
+        timezone: "America/New_York",
+        defaultLanguage: "en",
+        supportedLanguages: ["en"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Classic Fade Barbershop",
+        type: "BARBERSHOP",
+        phone: "5550002222",
+        email: "cuts@classicfade.com",
+        timezone: "America/Phoenix",
+        defaultLanguage: "en",
+        supportedLanguages: ["en", "es"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Blush Beauty Lounge",
+        type: "MAKEUP",
+        phone: "5550003333",
+        email: "info@blushbeauty.com",
+        timezone: "America/New_York",
+        defaultLanguage: "en",
+        supportedLanguages: ["en"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Harmony Wellness Center",
+        type: "SPA",
+        phone: "5550004444",
+        email: "wellness@harmonycenter.com",
+        timezone: "America/Denver",
+        defaultLanguage: "en",
+        supportedLanguages: ["en", "es"],
+      },
+    }),
+    prisma.business.create({
+      data: {
+        name: "Trendy Tresses Salon",
+        type: "HAIR_SALON",
+        phone: "5550005555",
+        email: "style@trendytresses.com",
+        timezone: "America/Los_Angeles",
+        defaultLanguage: "en",
+        supportedLanguages: ["en"],
+      },
+    }),
+  ]);
+  console.log("Created additional businesses:", additionalBusinesses.length);
+
+  // Combine all businesses for subscriptions
+  const allBusinesses = [business, ...additionalBusinesses];
+
+  // Create BusinessSubscription for each business (15 total)
+  const subscriptionPlans = [
+    { plan: "STARTER" as const, monthlyPrice: 0, commission: 20, status: "ACTIVE" as const },
+    { plan: "GROWTH" as const, monthlyPrice: 49, commission: 12, status: "ACTIVE" as const },
+    { plan: "PRO" as const, monthlyPrice: 149, commission: 5, status: "ACTIVE" as const },
+  ];
+
+  const subscriptions = [];
+  for (let i = 0; i < allBusinesses.length; i++) {
+    const planData = subscriptionPlans[i % subscriptionPlans.length];
+    const trialEnd = i % 4 === 0 ? new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+
+    const subscription = await prisma.businessSubscription.create({
+      data: {
+        businessId: allBusinesses[i].id,
+        plan: planData.plan,
+        status: trialEnd ? "TRIAL" : planData.status,
+        monthlyPrice: planData.monthlyPrice,
+        marketplaceCommissionPct: planData.commission,
+        trialEndsAt: trialEnd,
+        currentPeriodStart: new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000),
+        currentPeriodEnd: new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000),
+      },
+    });
+    subscriptions.push(subscription);
+  }
+  console.log("Created business subscriptions:", subscriptions.length);
+
+  // Create PublicSalonProfile for each business (15 total)
+  const profileData = [
+    { slug: "luxe-beauty-studio", headline: "Your Premier Full-Service Beauty Destination", description: "Award-winning salon offering hair, nails, and spa services in the heart of downtown NYC.", specialties: ["Balayage", "Keratin Treatment", "Bridal Styling"], amenities: ["Free WiFi", "Parking", "Online Booking", "Credit Cards Accepted"], priceRange: "$$$", isVerified: true, avgRating: 4.8, reviewCount: 156, viewCount: 2450, bookingClickCount: 380 },
+    { slug: "glamour-hair-studio", headline: "Where Style Meets Sophistication", description: "Trendy hair salon specializing in color transformations and modern cuts.", specialties: ["Hair Color", "Highlights", "Hair Extensions"], amenities: ["Free WiFi", "Online Booking", "Late Hours"], priceRange: "$$", avgRating: 4.6, reviewCount: 89, viewCount: 1820, bookingClickCount: 245 },
+    { slug: "zen-spa-wellness", headline: "Find Your Inner Peace", description: "Escape the daily stress with our luxurious spa treatments and wellness therapies.", specialties: ["Hot Stone Massage", "Deep Tissue Massage", "Aromatherapy"], amenities: ["Private Rooms", "Refreshments", "Parking", "Wheelchair Accessible"], priceRange: "$$$$", isVerified: true, avgRating: 4.9, reviewCount: 203, viewCount: 3100, bookingClickCount: 520 },
+    { slug: "nails-by-nicole", headline: "Art at Your Fingertips", description: "Creative nail artistry and meticulous care for beautiful, healthy nails.", specialties: ["Nail Art", "Gel Extensions", "Japanese Manicure"], amenities: ["Free WiFi", "Credit Cards Accepted", "Online Booking"], priceRange: "$$", avgRating: 4.7, reviewCount: 124, viewCount: 1650, bookingClickCount: 290 },
+    { slug: "gentlemens-barber", headline: "Classic Cuts, Modern Style", description: "Traditional barbershop experience with a contemporary twist. Expert fades and hot shaves.", specialties: ["Fades", "Hot Towel Shave", "Beard Grooming"], amenities: ["Free WiFi", "Refreshments", "Late Hours"], priceRange: "$$", avgRating: 4.8, reviewCount: 178, viewCount: 2100, bookingClickCount: 410 },
+    { slug: "radiant-skin-clinic", headline: "Glow From Within", description: "Medical-grade skincare treatments for all skin types and concerns.", specialties: ["Hydrafacial", "Chemical Peels", "Microneedling"], amenities: ["Private Rooms", "Parking", "Credit Cards Accepted"], priceRange: "$$$", isVerified: true, avgRating: 4.9, reviewCount: 145, viewCount: 1980, bookingClickCount: 340 },
+    { slug: "lash-brow-bar", headline: "Eyes That Wow", description: "Specialists in lash extensions, lifts, and brow shaping for stunning eyes.", specialties: ["Lash Extensions", "Lash Lift", "Brow Lamination"], amenities: ["Free WiFi", "Online Booking", "Credit Cards Accepted"], priceRange: "$$", avgRating: 4.6, reviewCount: 98, viewCount: 1420, bookingClickCount: 215 },
+    { slug: "urban-cuts-nyc", headline: "New York's Cutting Edge Salon", description: "Trendsetting hair salon in the heart of Manhattan with celebrity stylists.", specialties: ["Precision Cuts", "Vivid Colors", "Hair Restoration"], amenities: ["Free WiFi", "Refreshments", "Online Booking", "Credit Cards Accepted"], priceRange: "$$$$", isVerified: true, avgRating: 4.7, reviewCount: 234, viewCount: 4200, bookingClickCount: 680 },
+    { slug: "serenity-day-spa", headline: "A Day of Pure Bliss", description: "Full-day spa packages for ultimate relaxation and rejuvenation.", specialties: ["Couples Massage", "Body Wraps", "Hydrotherapy"], amenities: ["Private Rooms", "Refreshments", "Parking", "Wheelchair Accessible"], priceRange: "$$$", avgRating: 4.8, reviewCount: 167, viewCount: 2800, bookingClickCount: 450 },
+    { slug: "polished-nails-beauty", headline: "Perfectly Polished Every Time", description: "Fast, friendly nail services with the highest hygiene standards.", specialties: ["Dip Powder", "Acrylic Sets", "Pedicure Spa"], amenities: ["Free WiFi", "Online Booking", "Kids Friendly"], priceRange: "$", avgRating: 4.5, reviewCount: 256, viewCount: 3500, bookingClickCount: 580 },
+    { slug: "mane-attraction-salon", headline: "Your Hair, Your Statement", description: "Creative color work and precision cuts for all hair types.", specialties: ["Curly Hair", "Textured Hair", "Color Correction"], amenities: ["Free WiFi", "Parking", "Online Booking"], priceRange: "$$", avgRating: 4.7, reviewCount: 112, viewCount: 1580, bookingClickCount: 225 },
+    { slug: "classic-fade-barbershop", headline: "Fresh Cuts, Clean Lines", description: "Master barbers delivering flawless fades and classic styles.", specialties: ["Skin Fades", "Line Ups", "Kids Cuts"], amenities: ["Free WiFi", "Late Hours", "Credit Cards Accepted"], priceRange: "$", avgRating: 4.6, reviewCount: 189, viewCount: 2250, bookingClickCount: 390 },
+    { slug: "blush-beauty-lounge", headline: "Beauty Without Limits", description: "Full-service beauty lounge offering makeup, hair, and skincare.", specialties: ["Bridal Makeup", "Special Effects", "Makeup Lessons"], amenities: ["Free WiFi", "Private Rooms", "Online Booking"], priceRange: "$$", avgRating: 4.5, reviewCount: 78, viewCount: 1120, bookingClickCount: 165 },
+    { slug: "harmony-wellness-center", headline: "Balance Mind, Body & Spirit", description: "Holistic wellness center combining traditional and modern healing.", specialties: ["Reiki", "Acupuncture", "Meditation Classes"], amenities: ["Private Rooms", "Parking", "Refreshments", "Wheelchair Accessible"], priceRange: "$$$", avgRating: 4.8, reviewCount: 134, viewCount: 1890, bookingClickCount: 295 },
+    { slug: "trendy-tresses-salon", headline: "Stay Ahead of the Trends", description: "LA's hottest salon for cutting-edge styles and viral hair trends.", specialties: ["Money Pieces", "Face Framing", "Lived-in Color"], amenities: ["Free WiFi", "Refreshments", "Online Booking", "Late Hours"], priceRange: "$$", avgRating: 4.6, reviewCount: 145, viewCount: 2340, bookingClickCount: 375 },
+  ];
+
+  const profiles = [];
+  for (let i = 0; i < allBusinesses.length; i++) {
+    const pData = profileData[i];
+    const profile = await prisma.publicSalonProfile.create({
+      data: {
+        businessId: allBusinesses[i].id,
+        slug: pData.slug,
+        isListed: true,
+        headline: pData.headline,
+        description: pData.description,
+        specialties: pData.specialties,
+        amenities: pData.amenities,
+        priceRange: pData.priceRange,
+        isVerified: pData.isVerified || false,
+        avgRating: pData.avgRating,
+        reviewCount: pData.reviewCount,
+        viewCount: pData.viewCount,
+        bookingClickCount: pData.bookingClickCount,
+        galleryImages: [],
+      },
+    });
+    profiles.push(profile);
+  }
+  console.log("Created public salon profiles:", profiles.length);
+
+  // Create MarketplaceLead for each business (20+ leads total)
+  const leadSources = ["MARKETPLACE_SEARCH", "MARKETPLACE_BROWSE", "GOOGLE_ORGANIC", "FACEBOOK_ADS", "REFERRAL_LINK"] as const;
+  const leadStatuses = ["NEW", "VIEWED_PROFILE", "STARTED_BOOKING", "BOOKED", "COMPLETED", "CANCELLED", "NO_SHOW"] as const;
+
+  const utmSources = ["google", "facebook", "instagram", "email", "direct"];
+  const utmMediums = ["cpc", "organic", "social", "email", "referral"];
+  const utmCampaigns = ["summer_promo", "new_client", "holiday_special", "brand_awareness", null];
+  const searchQueries = ["hair salon near me", "balayage specialist", "best spa manhattan", "affordable nail salon", "mens haircut downtown", "lash extensions", "massage therapy", null];
+
+  const leads = [];
+  // Create 25 leads - first 15 for main business, rest distributed
+  for (let i = 0; i < 40; i++) {
+    // First 20 leads go to main business (Luxe Beauty Studio)
+    const businessIdx = i < 20 ? 0 : (i % allBusinesses.length);
+    const targetBusiness = allBusinesses[businessIdx];
+    const subscription = subscriptions[businessIdx];
+
+    const statusIdx = Math.floor(Math.random() * leadStatuses.length);
+    const status = leadStatuses[statusIdx];
+
+    const dayOffset = Math.floor(Math.random() * 30);
+    const viewedDate = new Date(today);
+    viewedDate.setDate(today.getDate() - dayOffset);
+
+    let bookedAt = null;
+    let completedAt = null;
+    let commissionRate = null;
+    let commissionAmount = null;
+
+    if (["BOOKED", "COMPLETED", "CANCELLED", "NO_SHOW"].includes(status)) {
+      bookedAt = new Date(viewedDate.getTime() + Math.random() * 2 * 24 * 60 * 60 * 1000);
+    }
+
+    if (status === "COMPLETED") {
+      completedAt = new Date(bookedAt!.getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000);
+      commissionRate = subscription.marketplaceCommissionPct;
+      const bookingValue = 50 + Math.floor(Math.random() * 200);
+      commissionAmount = Math.round(bookingValue * Number(commissionRate) / 100 * 100) / 100;
+    }
+
+    const lead = await prisma.marketplaceLead.create({
+      data: {
+        businessId: targetBusiness.id,
+        locationId: locations[0].id,
+        clientId: clients[Math.floor(Math.random() * clients.length)].id,
+        source: leadSources[Math.floor(Math.random() * leadSources.length)],
+        status,
+        sessionId: `session_${Date.now()}_${i}`,
+        utmSource: utmSources[Math.floor(Math.random() * utmSources.length)],
+        utmMedium: utmMediums[Math.floor(Math.random() * utmMediums.length)],
+        utmCampaign: utmCampaigns[Math.floor(Math.random() * utmCampaigns.length)],
+        searchQuery: searchQueries[Math.floor(Math.random() * searchQueries.length)],
+        viewedAt: viewedDate,
+        bookedAt,
+        completedAt,
+        commissionRate,
+        commissionAmount,
+        commissionPaidAt: status === "COMPLETED" && Math.random() > 0.5 ? new Date() : null,
+      },
+    });
+    leads.push(lead);
+  }
+  console.log("Created marketplace leads:", leads.length);
+
+  // Create BusinessInvoice for businesses with completed leads
+  const invoices = [];
+  for (let i = 0; i < 10; i++) {
+    const businessIdx = i % allBusinesses.length;
+    const subscription = subscriptions[businessIdx];
+
+    const periodStart = new Date(today);
+    periodStart.setMonth(periodStart.getMonth() - 1);
+    periodStart.setDate(1);
+
+    const periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    periodEnd.setDate(0);
+
+    const dueDate = new Date(periodEnd);
+    dueDate.setDate(dueDate.getDate() + 15);
+
+    const subscriptionAmount = Number(subscription.monthlyPrice);
+    const commissionAmount = 50 + Math.floor(Math.random() * 200);
+    const totalAmount = subscriptionAmount + commissionAmount;
+
+    const statuses = ["PENDING", "PAID", "PAID", "PAID", "PAST_DUE"] as const;
+    const invoiceStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+    const invoice = await prisma.businessInvoice.create({
+      data: {
+        subscriptionId: subscription.id,
+        invoiceNumber: `INV-${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, "0")}-${(i + 1).toString().padStart(4, "0")}`,
+        periodStart,
+        periodEnd,
+        subscriptionAmount,
+        commissionAmount,
+        totalAmount,
+        status: invoiceStatus,
+        dueDate,
+        paidAt: invoiceStatus === "PAID" ? new Date(dueDate.getTime() - Math.random() * 5 * 24 * 60 * 60 * 1000) : null,
+        lineItems: {
+          items: [
+            { description: `${subscription.plan} Plan - Monthly`, amount: subscriptionAmount },
+            { description: "Marketplace Commission", amount: commissionAmount },
+          ],
+        },
+      },
+    });
+    invoices.push(invoice);
+  }
+  console.log("Created business invoices:", invoices.length);
+
   console.log("\n✅ Seed completed successfully!");
   console.log("\n📋 Summary:");
-  console.log(`   - Business: ${business.name}`);
+  console.log(`   - Businesses: ${allBusinesses.length} (1 main + 14 marketplace)`);
   console.log(`   - Locations: ${locations.length}`);
   console.log(`   - Users: ${users.length + 1}`);
   console.log(`   - Services: ${services.length} (36 services)`);
   console.log(`   - Products: ${productsData.length} (23 products)`);
-  console.log(`   - Clients: ${clients.length} (20 clients)`);
+  console.log(`   - Clients: ${clients.length} (25 clients)`);
   console.log(`   - Appointments: ${appointmentsData.length} (35 appointments)`);
   console.log(`   - Sales: 50 transactions`);
-  console.log(`   - Gift Cards: ${giftCardCodes.length} (20 gift cards)`);
+  console.log(`   - Gift Cards: ${giftCardCodes.length} (25 gift cards)`);
   console.log(`   - Reviews: 25 reviews`);
-  console.log(`   - Campaigns: ${campaignsData.length} (20 campaigns)`);
-  console.log(`   - Loyalty Rewards: ${rewardsData.length} (15 rewards)`);
-  console.log(`   - Automations: ${automationsData.length} (15 automations)`);
+  console.log(`   - Campaigns: ${campaignsData.length} (25 campaigns)`);
+  console.log(`   - Loyalty Rewards: ${rewardsData.length} (25 rewards)`);
+  console.log(`   - Automations: ${automationsData.length} (25 automations)`);
+  console.log("\n🏪 Marketplace Data:");
+  console.log(`   - Business Subscriptions: ${subscriptions.length}`);
+  console.log(`   - Public Salon Profiles: ${profiles.length}`);
+  console.log(`   - Marketplace Leads: ${leads.length}`);
+  console.log(`   - Business Invoices: ${invoices.length}`);
   console.log("\n🔑 Login credentials:");
   console.log("   Admin: admin@luxebeauty.com / admin123");
   console.log("   Staff: any staff email / password123");
+  console.log("\n🌐 Marketplace URLs:");
+  console.log("   /explore - Browse all salons");
+  console.log("   /salon/luxe-beauty-studio - Example salon profile");
 }
 
 main()
