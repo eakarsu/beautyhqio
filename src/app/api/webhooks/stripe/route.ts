@@ -66,13 +66,14 @@ export async function POST(request: NextRequest) {
         if (subscription.metadata?.type === "business_subscription") {
           const businessId = subscription.metadata.businessId;
           if (businessId) {
+            const subData = subscription as unknown as { current_period_start: number; current_period_end: number };
             await prisma.businessSubscription.updateMany({
               where: { businessId },
               data: {
                 stripeSubscriptionId: subscription.id,
                 status: "ACTIVE",
-                currentPeriodStart: new Date(subscription.current_period_start * 1000),
-                currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+                currentPeriodStart: new Date(subData.current_period_start * 1000),
+                currentPeriodEnd: new Date(subData.current_period_end * 1000),
               },
             });
           }
@@ -92,12 +93,13 @@ export async function POST(request: NextRequest) {
             if (subscription.status === "past_due") status = "PAST_DUE";
             if (subscription.status === "canceled") status = "CANCELLED";
 
+            const subData = subscription as unknown as { current_period_start: number; current_period_end: number };
             await prisma.businessSubscription.updateMany({
               where: { businessId },
               data: {
                 status,
-                currentPeriodStart: new Date(subscription.current_period_start * 1000),
-                currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+                currentPeriodStart: new Date(subData.current_period_start * 1000),
+                currentPeriodEnd: new Date(subData.current_period_end * 1000),
               },
             });
           }

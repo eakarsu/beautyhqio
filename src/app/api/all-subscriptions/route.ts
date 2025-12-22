@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const PLAN_CONFIG = {
-  STARTER: { price: 0, commission: 20 },
-  GROWTH: { price: 49, commission: 12 },
-  PRO: { price: 149, commission: 5 },
+  STARTER: { price: 0, commission: 9 },
+  GROWTH: { price: 49, commission: 0 },
+  PRO: { price: 149, commission: 0 },
 };
 
 // POST /api/all-subscriptions - Create a new subscription

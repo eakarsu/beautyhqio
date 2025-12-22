@@ -4,9 +4,9 @@ import { SubscriptionPlan } from "@prisma/client";
 
 // Commission rates by subscription plan
 export const COMMISSION_RATES: Record<SubscriptionPlan, number> = {
-  STARTER: 20,  // 20% - Free tier
-  GROWTH: 12,   // 12% - $49/month
-  PRO: 5,       // 5%  - $149/month
+  STARTER: 9,   // 9% - Free tier
+  GROWTH: 0,    // 0% - $49/month (no commission)
+  PRO: 0,       // 0% - $149/month (no commission)
 };
 
 // Subscription pricing
@@ -132,16 +132,14 @@ export function shouldUpgrade(
  * Get recommended plan based on monthly lead revenue
  */
 export function getRecommendedPlan(monthlyLeadRevenue: number): SubscriptionPlan {
-  // STARTER (20%): $0 subscription, 20% commission
-  // GROWTH (12%): $49 subscription, 12% commission
-  // PRO (5%): $149 subscription, 5% commission
+  // STARTER (9%): $0 subscription, 9% commission
+  // GROWTH (0%): $49 subscription, no commission
+  // PRO (0%): $149 subscription, no commission
 
-  // Breakeven for GROWTH: $49 / (20% - 12%) = $49 / 0.08 = $612.50/month
-  // Breakeven for PRO: $149 / (20% - 5%) = $149 / 0.15 = $993.33/month
+  // Breakeven for GROWTH: $49 / 9% = $49 / 0.09 = $544.44/month
+  // PRO is for high-volume salons wanting premium features
 
-  if (monthlyLeadRevenue >= 993.33) {
-    return "PRO";
-  } else if (monthlyLeadRevenue >= 612.50) {
+  if (monthlyLeadRevenue >= 544.44) {
     return "GROWTH";
   } else {
     return "STARTER";

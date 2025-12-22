@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 // GET /api/marketplace/salons/[slug] - Get salon public profile
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
 
     const profile = await prisma.publicSalonProfile.findUnique({
       where: { slug },

@@ -46,31 +46,28 @@ interface Subscription {
 
 const PLAN_DETAILS = [
   {
-    name: "PRO",
-    price: 149,
-    commission: 5,
-    icon: Crown,
-    color: "purple",
-    description: "Best for established salons with high volume",
+    name: "STARTER",
+    price: 0,
+    commission: 9,
+    icon: Building2,
+    color: "gray",
+    description: "Get started for free",
     features: [
-      "5% commission on leads",
-      "Top placement in search",
-      "Verified badge",
-      "Dedicated account manager",
-      "Custom integrations",
-      "Priority support 24/7",
-      "Advanced analytics",
+      "9% commission on leads",
+      "Listed on marketplace",
+      "Basic profile",
+      "Email support",
     ],
   },
   {
     name: "GROWTH",
     price: 49,
-    commission: 12,
+    commission: 0,
     icon: Zap,
     color: "rose",
     description: "Perfect for growing salons",
     features: [
-      "12% commission on leads",
+      "No commission on leads",
       "Featured placement",
       "Analytics dashboard",
       "Priority support",
@@ -78,17 +75,20 @@ const PLAN_DETAILS = [
     ],
   },
   {
-    name: "STARTER",
-    price: 0,
-    commission: 20,
-    icon: Building2,
-    color: "gray",
-    description: "Get started for free",
+    name: "PRO",
+    price: 149,
+    commission: 0,
+    icon: Crown,
+    color: "purple",
+    description: "Best for established salons with high volume",
     features: [
-      "20% commission on leads",
-      "Listed on marketplace",
-      "Basic profile",
-      "Email support",
+      "No commission on leads",
+      "Top placement in search",
+      "Verified badge",
+      "Dedicated account manager",
+      "Custom integrations",
+      "Priority support 24/7",
+      "Advanced analytics",
     ],
   },
 ];
@@ -598,19 +598,19 @@ export default function SubscriptionsPage() {
                   <SelectItem value="STARTER">
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
-                      <span>Starter - Free (20% commission)</span>
+                      <span>Starter - Free (9% commission)</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="GROWTH">
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4" />
-                      <span>Growth - $49/mo (12% commission)</span>
+                      <span>Growth - $49/mo (no commission)</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="PRO">
                     <div className="flex items-center gap-2">
                       <Crown className="h-4 w-4" />
-                      <span>Pro - $149/mo (5% commission)</span>
+                      <span>Pro - $149/mo (no commission)</span>
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -621,13 +621,13 @@ export default function SubscriptionsPage() {
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm font-medium mb-2">Selected Plan Summary</p>
               {newSub.plan === "STARTER" && (
-                <p className="text-sm text-gray-600">Free monthly fee, 20% commission on leads</p>
+                <p className="text-sm text-gray-600">Free monthly fee, 9% commission on leads</p>
               )}
               {newSub.plan === "GROWTH" && (
-                <p className="text-sm text-gray-600">$49/month, 12% commission on leads</p>
+                <p className="text-sm text-gray-600">$49/month, no commission on leads</p>
               )}
               {newSub.plan === "PRO" && (
-                <p className="text-sm text-gray-600">$149/month, 5% commission on leads</p>
+                <p className="text-sm text-gray-600">$149/month, no commission on leads</p>
               )}
             </div>
 
