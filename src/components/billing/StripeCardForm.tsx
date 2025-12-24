@@ -33,7 +33,6 @@ const cardElementOptions = {
       iconColor: "#ef4444",
     },
   },
-  hidePostalCode: true,
 };
 
 export default function StripeCardForm({
@@ -135,7 +134,7 @@ export default function StripeCardForm({
           <CardElement options={cardElementOptions} />
         </div>
         <p className="text-xs text-gray-500">
-          Enter your card number, expiry date, and CVC
+          Enter your card number, expiry date, CVC, and ZIP code
         </p>
       </div>
 
