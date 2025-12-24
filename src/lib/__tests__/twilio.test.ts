@@ -8,16 +8,59 @@ dotenv.config();
 const mockMessagesCreate = jest.fn();
 const mockCallsCreate = jest.fn();
 
-jest.mock('twilio', () => {
-  return jest.fn(() => ({
-    messages: {
-      create: mockMessagesCreate,
-    },
-    calls: {
-      create: mockCallsCreate,
-    },
-  }));
-});
+// Mock VoiceResponse for TwiML generation
+class MockVoiceResponse {
+  private elements: string[] = [];
+
+  say(options: { voice?: string; language?: string }, text: string) {
+    this.elements.push(`<Say voice="${options.voice}" language="${options.language}">${text}</Say>`);
+    return this;
+  }
+
+  pause(options: { length: number }) {
+    this.elements.push(`<Pause length="${options.length}"/>`);
+    return this;
+  }
+
+  gather(options: Record<string, unknown>) {
+    return { say: this.say.bind(this) };
+  }
+
+  play(url: string) {
+    this.elements.push(`<Play>${url}</Play>`);
+    return this;
+  }
+
+  redirect(url: string) {
+    this.elements.push(`<Redirect>${url}</Redirect>`);
+    return this;
+  }
+
+  hangup() {
+    this.elements.push('<Hangup/>');
+    return this;
+  }
+
+  toString() {
+    return `<Response>${this.elements.join('')}</Response>`;
+  }
+}
+
+const mockTwilio = jest.fn(() => ({
+  messages: {
+    create: mockMessagesCreate,
+  },
+  calls: {
+    create: mockCallsCreate,
+  },
+}));
+
+// Add twiml property to mock
+(mockTwilio as unknown as { twiml: { VoiceResponse: typeof MockVoiceResponse } }).twiml = {
+  VoiceResponse: MockVoiceResponse,
+};
+
+jest.mock('twilio', () => mockTwilio);
 
 // Use environment variables (from .env or system)
 // Fallback to test values if not set
@@ -26,6 +69,9 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test_auth_toke
 process.env.TWILIO_API_KEY_SID = process.env.TWILIO_API_KEY_SID || '';
 process.env.TWILIO_API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET || '';
 process.env.TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+15551234567';
+
+// Get the configured phone number for test assertions
+const TWILIO_FROM_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 
 // Import after mocking
 import {
@@ -65,7 +111,7 @@ describe('Twilio SMS Functions', () => {
       expect(mockMessagesCreate).toHaveBeenCalledWith({
         body: 'Test message',
         to: '+15551234567',
-        from: '+15551234567',
+        from: TWILIO_FROM_NUMBER,
       });
     });
 
@@ -138,7 +184,7 @@ describe('Twilio SMS Functions', () => {
       expect(mockMessagesCreate).toHaveBeenCalledWith({
         body: 'Check this image',
         to: '+15551234567',
-        from: '+15551234567',
+        from: TWILIO_FROM_NUMBER,
         mediaUrl: ['https://example.com/image.jpg'],
       });
     });
@@ -287,7 +333,7 @@ describe('Twilio Voice Functions', () => {
       expect(result.callId).toBe('CA123456');
       expect(mockCallsCreate).toHaveBeenCalledWith({
         to: '+15551234567',
-        from: '+15551234567',
+        from: TWILIO_FROM_NUMBER,
         url: 'https://example.com/twiml',
       });
     });
@@ -307,7 +353,7 @@ describe('Twilio Voice Functions', () => {
       expect(result.success).toBe(true);
       expect(mockCallsCreate).toHaveBeenCalledWith({
         to: '+15551234567',
-        from: '+15551234567',
+        from: TWILIO_FROM_NUMBER,
         twiml,
       });
     });
