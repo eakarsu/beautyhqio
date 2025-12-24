@@ -1,8 +1,22 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 
-// Load environment variables from .env file if available
+// Load environment variables from .env file
 import * as dotenv from 'dotenv';
 dotenv.config();
+
+// Validate required environment variables
+const requiredEnvVars = [
+  'TWILIO_ACCOUNT_SID',
+  'TWILIO_PHONE_NUMBER',
+];
+
+const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+if (missingVars.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+}
+
+// Get env values for test assertions
+const TWILIO_FROM_NUMBER = process.env.TWILIO_PHONE_NUMBER!;
 
 // Mock twilio before importing the module
 const mockMessagesCreate = jest.fn();
@@ -61,17 +75,6 @@ const mockTwilio = jest.fn(() => ({
 };
 
 jest.mock('twilio', () => mockTwilio);
-
-// Use environment variables (from .env or system)
-// Fallback to test values if not set
-process.env.TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || 'ACtest123456789';
-process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test_auth_token';
-process.env.TWILIO_API_KEY_SID = process.env.TWILIO_API_KEY_SID || '';
-process.env.TWILIO_API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET || '';
-process.env.TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+15551234567';
-
-// Get the configured phone number for test assertions
-const TWILIO_FROM_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 
 // Import after mocking
 import {
