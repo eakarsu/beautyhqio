@@ -616,7 +616,32 @@ export default function ClientProfilePage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payments" className="mt-4">
+        <TabsContent value="payments" className="mt-4 space-y-4">
+          {/* Add Card Form - Shown inline for better mobile compatibility */}
+          {showAddCardModal && (
+            <Card className="border-rose-200 bg-rose-50/30">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Plus className="h-5 w-5 text-rose-500" />
+                  Add Payment Method
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-slate-500 mb-4">
+                  Add a credit or debit card for {client?.firstName}. This card will be securely stored with Stripe.
+                </p>
+                <StripeCardForm
+                  clientId={params.id as string}
+                  onSuccess={() => {
+                    fetchPaymentMethods();
+                    setShowAddCardModal(false);
+                  }}
+                  onCancel={() => setShowAddCardModal(false)}
+                />
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -624,14 +649,16 @@ export default function ClientProfilePage() {
                   <CreditCard className="h-5 w-5 text-slate-500" />
                   Saved Payment Methods
                 </CardTitle>
-                <Button onClick={() => setShowAddCardModal(true)} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Card
-                </Button>
+                {!showAddCardModal && (
+                  <Button onClick={() => setShowAddCardModal(true)} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Card
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
-              {paymentMethods.length === 0 ? (
+              {paymentMethods.length === 0 && !showAddCardModal ? (
                 <div className="text-center py-12">
                   <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                     <CreditCard className="h-8 w-8 text-slate-400" />
@@ -647,6 +674,10 @@ export default function ClientProfilePage() {
                     Add Payment Method
                   </Button>
                 </div>
+              ) : paymentMethods.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">
+                  No cards saved yet. Add one above.
+                </p>
               ) : (
                 <div className="space-y-3">
                   {paymentMethods.map((card) => (
@@ -834,33 +865,6 @@ export default function ClientProfilePage() {
         </TabsContent>
       </Tabs>
 
-      {/* Add Card Modal */}
-      {showAddCardModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          style={{ touchAction: 'manipulation' }}
-        >
-          <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
-            style={{ touchAction: 'manipulation' }}
-          >
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">
-              Add Payment Method
-            </h3>
-            <p className="text-sm text-slate-500 mb-6">
-              Add a credit or debit card for {client.firstName}. This card will be securely stored with Stripe.
-            </p>
-            <StripeCardForm
-              clientId={params.id as string}
-              onSuccess={() => {
-                fetchPaymentMethods();
-                setShowAddCardModal(false);
-              }}
-              onCancel={() => setShowAddCardModal(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
