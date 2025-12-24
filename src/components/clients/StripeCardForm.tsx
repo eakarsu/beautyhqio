@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Elements,
   CardElement,
@@ -26,25 +26,6 @@ function CardFormContent({ clientId, onSuccess, onCancel }: CardFormProps) {
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Focus handler for iOS - helps with iframe touch issues
-  const focusCardElement = useCallback((e?: React.TouchEvent | React.MouseEvent) => {
-    // Prevent default to stop iOS from doing its own thing
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    if (!elements) return;
-
-    // Small delay helps iOS process the touch event first
-    setTimeout(() => {
-      const cardElement = elements.getElement(CardElement);
-      if (cardElement) {
-        cardElement.focus();
-      }
-    }, 10);
-  }, [elements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,19 +87,22 @@ function CardFormContent({ clientId, onSuccess, onCancel }: CardFormProps) {
           Card Details
         </label>
         <div
-          className="p-4 border border-slate-200 rounded-lg bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 transition-all min-h-[52px] cursor-text"
-          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          onClick={(e) => focusCardElement(e)}
-          onTouchStart={(e) => focusCardElement(e)}
+          className="p-4 border-2 border-slate-200 rounded-lg bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 transition-all"
+          style={{
+            minHeight: '56px',
+            touchAction: 'auto',
+            WebkitUserSelect: 'text',
+            userSelect: 'text',
+          }}
         >
           <CardElement
             options={{
               style: {
                 base: {
-                  fontSize: "16px",
+                  fontSize: "18px",
                   color: "#1e293b",
                   fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-                  lineHeight: "24px",
+                  lineHeight: "28px",
                   "::placeholder": {
                     color: "#94a3b8",
                   },
@@ -130,6 +114,9 @@ function CardFormContent({ clientId, onSuccess, onCancel }: CardFormProps) {
             }}
           />
         </div>
+        <p className="text-xs text-slate-500 mt-1">
+          Tap the field above to enter your card details
+        </p>
       </div>
 
       {error && (
