@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import {
   useStripe,
   useElements,
-  CardNumberElement,
-  CardExpiryElement,
-  CardCvcElement,
+  CardElement,
 } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,13 +16,14 @@ interface StripeCardFormProps {
   onCancel: () => void;
 }
 
+// Use single CardElement - better iOS Safari support than split elements
 const cardElementOptions = {
   style: {
     base: {
-      fontSize: "16px",
+      fontSize: "18px",
       color: "#1f2937",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      lineHeight: "24px",
+      lineHeight: "28px",
       "::placeholder": {
         color: "#9ca3af",
       },
@@ -34,6 +33,7 @@ const cardElementOptions = {
       iconColor: "#ef4444",
     },
   },
+  hidePostalCode: true,
 };
 
 export default function StripeCardForm({
@@ -47,34 +47,6 @@ export default function StripeCardForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Refs for programmatic focus on iOS
-  const cardNumberRef = useRef<any>(null);
-  const cardExpiryRef = useRef<any>(null);
-  const cardCvcRef = useRef<any>(null);
-
-  // Focus handler for iOS - helps with iframe touch issues
-  const focusElement = useCallback((elementType: 'cardNumber' | 'cardExpiry' | 'cardCvc', e?: React.TouchEvent | React.MouseEvent) => {
-    // Prevent default to stop iOS from doing its own thing
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    if (!elements) return;
-
-    // Small delay helps iOS process the touch event first
-    setTimeout(() => {
-      const element = elements.getElement(
-        elementType === 'cardNumber' ? CardNumberElement :
-        elementType === 'cardExpiry' ? CardExpiryElement :
-        CardCvcElement
-      );
-      if (element) {
-        element.focus();
-      }
-    }, 10);
-  }, [elements]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -85,7 +57,7 @@ export default function StripeCardForm({
     setLoading(true);
     setError(null);
 
-    const cardElement = elements.getElement(CardNumberElement);
+    const cardElement = elements.getElement(CardElement);
 
     if (!cardElement) {
       setError("Card element not found");
@@ -136,7 +108,7 @@ export default function StripeCardForm({
       {/* Security Badge */}
       <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
         <Lock className="h-4 w-4" />
-        <span>Your card information is encrypted and secure. We never store your full card number.</span>
+        <span>Your card information is encrypted and secure.</span>
       </div>
 
       {error && (
@@ -145,46 +117,26 @@ export default function StripeCardForm({
         </div>
       )}
 
-      {/* Card Number */}
+      {/* Single Card Element - better iOS support */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2">
           <CreditCard className="h-4 w-4" />
-          Card Number
+          Card Details
         </Label>
         <div
-          className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
-          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          onClick={(e) => focusElement('cardNumber', e)}
-          onTouchStart={(e) => focusElement('cardNumber', e)}
+          className="border-2 rounded-lg p-4 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500"
+          style={{
+            minHeight: '56px',
+            touchAction: 'auto',
+            WebkitUserSelect: 'text',
+            userSelect: 'text',
+          }}
         >
-          <CardNumberElement options={cardElementOptions} />
+          <CardElement options={cardElementOptions} />
         </div>
-      </div>
-
-      {/* Expiry and CVC */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Expiry Date</Label>
-          <div
-            className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-            onClick={(e) => focusElement('cardExpiry', e)}
-            onTouchStart={(e) => focusElement('cardExpiry', e)}
-          >
-            <CardExpiryElement options={cardElementOptions} />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>CVC</Label>
-          <div
-            className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-            onClick={(e) => focusElement('cardCvc', e)}
-            onTouchStart={(e) => focusElement('cardCvc', e)}
-          >
-            <CardCvcElement options={cardElementOptions} />
-          </div>
-        </div>
+        <p className="text-xs text-gray-500">
+          Enter your card number, expiry date, and CVC
+        </p>
       </div>
 
       {/* Buttons */}

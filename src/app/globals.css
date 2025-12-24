@@ -52,90 +52,16 @@ body {
   background: #94a3b8;
 }
 
-/* Stripe Elements Mobile Fix */
-/* Critical: These rules ensure Stripe iframes receive touch events on mobile */
-
-/* Target Stripe's auto-generated class names */
-.StripeElement,
-.__PrivateStripeElement,
-.__PrivateStripeElement iframe,
-.__PrivateStripeElement-input,
-[class*="StripeElement"],
-[class*="__PrivateStripeElement"] {
-  touch-action: manipulation !important;
-  -webkit-tap-highlight-color: transparent !important;
-  -webkit-touch-callout: none !important;
-  -webkit-user-select: text !important;
-  user-select: text !important;
-}
-
-/* Ensure Stripe element containers have proper touch handling and height */
-.StripeElement,
-.__PrivateStripeElement {
+/* Stripe Elements - minimal iOS fixes */
+/* Let Stripe handle its own iframe touch events */
+.StripeElement {
   min-height: 24px;
-  width: 100% !important;
-  position: relative !important;
 }
 
-/* Fix for iOS where iframes may not receive touch events */
-.StripeElement iframe,
-.__PrivateStripeElement iframe,
-iframe[name^="__privateStripeFrame"] {
-  pointer-events: auto !important;
-  min-height: 20px;
-  touch-action: manipulation !important;
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-/* Parent containers of Stripe elements need touch handling too */
-.StripeElement--focus,
-.StripeElement--invalid,
-.StripeElement--complete {
-  touch-action: manipulation !important;
-}
-
-/* Ensure modal overlays don't block Stripe input */
-[style*="touch-action"] iframe {
-  touch-action: manipulation !important;
-  pointer-events: auto !important;
-}
-
-/* iOS Safari specific fixes for input focus in iframes */
-@supports (-webkit-touch-callout: none) {
-  /* Only applies to iOS Safari */
-  .StripeElement,
-  .__PrivateStripeElement {
-    -webkit-overflow-scrolling: touch;
-    transform: translateZ(0);
-  }
-}
-
-/* Fix for forms containing Stripe elements */
-form:has(.StripeElement),
-form:has(.__PrivateStripeElement) {
-  touch-action: manipulation;
-}
-
-/* Mobile form input fixes - ensure proper tap target size */
+/* Ensure iframe is clickable on mobile */
 @media (max-width: 768px) {
   .StripeElement,
-  .__PrivateStripeElement,
-  [class*="StripeElement"] {
-    font-size: 16px !important;
-    min-height: 44px !important; /* iOS recommended touch target */
-  }
-
-  /* Container for Stripe elements needs good tap target */
-  .StripeElement iframe,
-  .__PrivateStripeElement iframe {
-    min-height: 44px !important;
-  }
-
-  /* Ensure the border container is also tappable */
-  .border:has(.StripeElement),
-  .rounded-lg:has(.StripeElement) {
-    min-height: 48px;
-    touch-action: manipulation;
+  .StripeElement iframe {
+    min-height: 44px;
   }
 }
