@@ -7,17 +7,9 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Loader2, CreditCard, AlertCircle, Lock } from "lucide-react";
-
-// Debug: Check if Stripe key is available
-const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
-if (typeof window !== 'undefined') {
-  console.log("Stripe key available:", stripeKey ? "Yes (starts with " + stripeKey.substring(0, 7) + "...)" : "NO - KEY IS MISSING!");
-}
-
-const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
 interface CardFormProps {
   clientId: string;
@@ -112,41 +104,42 @@ function PaymentFormContent({ onSuccess, onCancel }: Omit<CardFormProps, 'client
 }
 
 export default function StripeCardForm({ clientId, onSuccess, onCancel }: CardFormProps) {
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Show error if Stripe key is not configured
-  if (!stripePromise) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <div className="flex items-center gap-2 text-red-700">
-          <AlertCircle className="h-5 w-5" />
-          <span className="font-medium">Stripe Not Configured</span>
-        </div>
-        <p className="mt-2 text-sm text-red-600">
-          The Stripe publishable key is missing. Please ensure NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-          is set during the Docker build process.
-        </p>
-      </div>
-    );
-  }
-
-  // Fetch setup intent when component mounts
+  // Fetch Stripe key and setup intent when component mounts
   useEffect(() => {
-    async function createSetupIntent() {
+    async function initialize() {
       try {
-        const res = await fetch(`/api/clients/${clientId}/setup-intent`, {
+        // Step 1: Get Stripe publishable key from API (runtime)
+        const configRes = await fetch("/api/config/stripe");
+        if (!configRes.ok) {
+          throw new Error("Failed to load Stripe configuration");
+        }
+        const { publishableKey } = await configRes.json();
+
+        if (!publishableKey) {
+          throw new Error("Stripe publishable key not configured");
+        }
+
+        // Initialize Stripe with runtime key
+        const stripe = loadStripe(publishableKey);
+        setStripePromise(stripe);
+
+        // Step 2: Create setup intent
+        const setupRes = await fetch(`/api/clients/${clientId}/setup-intent`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });
 
-        if (!res.ok) {
-          const data = await res.json();
+        if (!setupRes.ok) {
+          const data = await setupRes.json();
           throw new Error(data.error || "Failed to create setup intent");
         }
 
-        const { clientSecret } = await res.json();
+        const { clientSecret } = await setupRes.json();
         setClientSecret(clientSecret);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize payment form");
@@ -155,7 +148,7 @@ export default function StripeCardForm({ clientId, onSuccess, onCancel }: CardFo
       }
     }
 
-    createSetupIntent();
+    initialize();
   }, [clientId]);
 
   if (loading) {
@@ -181,7 +174,7 @@ export default function StripeCardForm({ clientId, onSuccess, onCancel }: CardFo
     );
   }
 
-  if (!clientSecret) {
+  if (!stripePromise || !clientSecret) {
     return (
       <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
         <p className="text-sm text-yellow-700">Initializing payment form...</p>

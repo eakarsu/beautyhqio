@@ -1,29 +1,38 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
-
-// Get the key and log it
-const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 
 export default function StripeTestPage() {
   const [nativeInputValue, setNativeInputValue] = useState("");
   const [stripeLoaded, setStripeLoaded] = useState<boolean | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
-  const [stripeInstance, setStripeInstance] = useState<any>(null);
+  const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
+  const [publishableKey, setPublishableKey] = useState<string | null>(null);
 
   useEffect(() => {
     async function initStripe() {
-      if (!stripeKey) {
-        setStripeError("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is empty or not set");
-        setStripeLoaded(false);
-        return;
-      }
-
       try {
-        const stripe = await loadStripe(stripeKey);
+        // Fetch key from API (runtime)
+        const res = await fetch("/api/config/stripe");
+        if (!res.ok) {
+          setStripeError("Failed to fetch Stripe config from API");
+          setStripeLoaded(false);
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.publishableKey) {
+          setStripeError("Stripe publishable key not configured on server");
+          setStripeLoaded(false);
+          return;
+        }
+
+        setPublishableKey(data.publishableKey);
+
+        const stripe = await loadStripe(data.publishableKey);
         if (stripe) {
           setStripeInstance(stripe);
           setStripeLoaded(true);
@@ -44,20 +53,23 @@ export default function StripeTestPage() {
     <div className="p-6 max-w-2xl mx-auto space-y-8">
       <h1 className="text-2xl font-bold">Stripe Mobile Input Test</h1>
 
-      {/* Test 1: Environment Variable */}
+      {/* Test 1: API Fetch */}
       <div className="p-4 border rounded-lg space-y-2">
-        <h2 className="font-semibold">1. Environment Variable Check</h2>
-        <div className={`p-3 rounded ${stripeKey ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-          {stripeKey ? (
+        <h2 className="font-semibold">1. Runtime API Key Check</h2>
+        <p className="text-sm text-gray-600">Fetching Stripe key from /api/config/stripe...</p>
+        <div className={`p-3 rounded ${publishableKey ? "bg-green-100 text-green-800" : stripeError ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"}`}>
+          {publishableKey ? (
             <>
-              <p className="font-medium">✓ Key is set</p>
-              <p className="text-sm font-mono">Starts with: {stripeKey.substring(0, 12)}...</p>
+              <p className="font-medium">✓ Key fetched from API</p>
+              <p className="text-sm font-mono">Starts with: {publishableKey.substring(0, 12)}...</p>
+            </>
+          ) : stripeError ? (
+            <>
+              <p className="font-medium">✗ Failed to get key</p>
+              <p className="text-sm">{stripeError}</p>
             </>
           ) : (
-            <>
-              <p className="font-medium">✗ Key is NOT set</p>
-              <p className="text-sm">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing. Must be set during Docker BUILD.</p>
-            </>
+            <p>Loading...</p>
           )}
         </div>
       </div>
@@ -129,7 +141,7 @@ export default function StripeTestPage() {
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h2 className="font-semibold text-blue-800">What to check:</h2>
         <ol className="list-decimal list-inside text-sm text-blue-700 space-y-1 mt-2">
-          <li>If #1 shows key is NOT set → Rebuild Docker with build args</li>
+          <li>If #1 shows key NOT set → Check your Docker env-file has STRIPE_PUBLISHABLE_KEY</li>
           <li>If #2 native input doesn&apos;t work → General mobile issue, not Stripe</li>
           <li>If #3 shows Stripe failed → Check network/console for errors</li>
           <li>If #4 card element doesn&apos;t respond → Specific Stripe iframe issue</li>

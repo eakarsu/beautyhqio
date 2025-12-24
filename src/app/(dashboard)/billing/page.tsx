@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,11 +16,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CreditCard, Plus, Trash2, Lock, Shield, CheckCircle } from "lucide-react";
+import { CreditCard, Plus, Trash2, Lock, Shield, CheckCircle, AlertCircle } from "lucide-react";
 import StripeCardForm from "@/components/billing/StripeCardForm";
-
-// Initialize Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 
 interface PaymentMethod {
   id: string;
@@ -55,6 +52,44 @@ export default function BillingPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [stripeError, setStripeError] = useState<string | null>(null);
+
+  // Fetch Stripe key at runtime and payment methods
+  useEffect(() => {
+    async function initialize() {
+      try {
+        // Fetch Stripe publishable key from API (runtime)
+        const configRes = await fetch("/api/config/stripe");
+        if (configRes.ok) {
+          const { publishableKey } = await configRes.json();
+          if (publishableKey) {
+            setStripePromise(loadStripe(publishableKey));
+          } else {
+            setStripeError("Stripe key not configured");
+          }
+        } else {
+          setStripeError("Failed to load Stripe configuration");
+        }
+      } catch (error) {
+        console.error("Error loading Stripe:", error);
+        setStripeError("Failed to load Stripe");
+      }
+
+      // Fetch payment methods
+      try {
+        const response = await fetch("/api/stripe/payment-methods");
+        const data = await response.json();
+        setPaymentMethods(data.paymentMethods || []);
+      } catch (error) {
+        console.error("Error fetching payment methods:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    initialize();
+  }, []);
 
   // Fetch saved payment methods
   const fetchPaymentMethods = async () => {
@@ -64,14 +99,8 @@ export default function BillingPage() {
       setPaymentMethods(data.paymentMethods || []);
     } catch (error) {
       console.error("Error fetching payment methods:", error);
-    } finally {
-      setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchPaymentMethods();
-  }, []);
 
   // Create setup intent for adding new card
   const handleAddCard = async () => {
@@ -149,8 +178,21 @@ export default function BillingPage() {
         </CardContent>
       </Card>
 
+      {/* Stripe Error */}
+      {stripeError && (
+        <Card className="mb-6 border-red-200 bg-red-50">
+          <CardContent className="flex items-center gap-4 py-4">
+            <AlertCircle className="h-6 w-6 text-red-600" />
+            <div>
+              <h3 className="font-medium text-red-900">Stripe Configuration Error</h3>
+              <p className="text-sm text-red-700">{stripeError}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Add Card Form */}
-      {showAddCard && clientSecret && (
+      {showAddCard && clientSecret && stripePromise && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
