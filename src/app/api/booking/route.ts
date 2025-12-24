@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendAppointmentConfirmationEmail } from "@/lib/email";
 
 // POST /api/booking - Create online booking
 export async function POST(request: NextRequest) {
@@ -167,6 +168,46 @@ export async function POST(request: NextRequest) {
         metadata: { appointmentId: appointment.id, source },
       },
     });
+
+    // Send confirmation email if client has email
+    if (client.email) {
+      try {
+        // Get business settings for email
+        const settings = await prisma.settings.findFirst();
+        const staffName = appointment.staff?.displayName ||
+          `${appointment.staff?.user?.firstName || ''} ${appointment.staff?.user?.lastName || ''}`.trim() ||
+          'Our Team';
+
+        // Format date and time for email
+        const formattedDate = scheduledStart.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+        const formattedTime = scheduledStart.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+        await sendAppointmentConfirmationEmail(
+          client.email,
+          `${client.firstName} ${client.lastName || ''}`.trim(),
+          formattedDate,
+          formattedTime,
+          service.name,
+          staffName,
+          settings?.businessName || 'Beauty & Wellness',
+          settings?.phone || appointment.location?.phone || '',
+          settings?.address || appointment.location?.address || '',
+          client.preferredLanguage || 'en'
+        );
+      } catch (emailError) {
+        // Log but don't fail the booking if email fails
+        console.error('Failed to send confirmation email:', emailError);
+      }
+    }
 
     return NextResponse.json(
       {

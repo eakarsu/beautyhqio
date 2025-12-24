@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendAppointmentConfirmationEmail } from "@/lib/email";
 
 // GET /api/appointments - List appointments
 export async function GET(request: NextRequest) {
@@ -137,6 +138,53 @@ export async function POST(request: NextRequest) {
           metadata: { appointmentId: appointment.id },
         },
       });
+    }
+
+    // Send confirmation email if client has email
+    if (appointment.client?.email) {
+      try {
+        // Get business settings and location for email
+        const settings = await prisma.settings.findFirst();
+        const location = await prisma.location.findUnique({
+          where: { id: finalLocationId },
+        });
+
+        const staffName = appointment.staff?.displayName ||
+          `${appointment.staff?.user?.firstName || ''} ${appointment.staff?.user?.lastName || ''}`.trim() ||
+          'Our Team';
+
+        const serviceName = appointment.services?.[0]?.service?.name || 'Appointment';
+        const startDate = new Date(scheduledStart);
+
+        // Format date and time for email
+        const formattedDate = startDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+        const formattedTime = startDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+        await sendAppointmentConfirmationEmail(
+          appointment.client.email,
+          `${appointment.client.firstName} ${appointment.client.lastName || ''}`.trim(),
+          formattedDate,
+          formattedTime,
+          serviceName,
+          staffName,
+          settings?.businessName || 'Beauty & Wellness',
+          settings?.phone || location?.phone || '',
+          settings?.address || location?.address || '',
+          appointment.client.preferredLanguage || 'en'
+        );
+      } catch (emailError) {
+        // Log but don't fail the appointment if email fails
+        console.error('Failed to send confirmation email:', emailError);
+      }
     }
 
     return NextResponse.json(appointment, { status: 201 });
