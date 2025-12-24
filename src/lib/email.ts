@@ -202,3 +202,179 @@ export async function sendAppointmentReminderEmail(
 export function isEmailConfigured(): boolean {
   return !!(process.env.SMTP_USER && process.env.SMTP_PASSWORD);
 }
+
+// Multi-language email templates for appointment confirmations
+export const emailConfirmationTemplates = {
+  en: {
+    subject: (serviceName: string) => `Appointment Confirmed: ${serviceName}`,
+    body: (clientName: string, date: string, time: string, serviceName: string, staffName: string, businessName: string, businessPhone: string, businessAddress: string) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0;">Appointment Confirmed!</h1>
+        </div>
+        <div style="padding: 30px; background: #fff;">
+          <p style="font-size: 16px; color: #333;">Hi ${clientName},</p>
+          <p style="font-size: 16px; color: #333;">Your appointment has been confirmed. Here are your booking details:</p>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Service:</strong> ${serviceName}</p>
+            <p style="margin: 5px 0;"><strong>Date:</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>Time:</strong> ${time}</p>
+            <p style="margin: 5px 0;"><strong>With:</strong> ${staffName}</p>
+          </div>
+          <div style="background: #fef3c7; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>Location:</strong> ${businessAddress}</p>
+          </div>
+          <p style="font-size: 14px; color: #666;">Need to reschedule or cancel? Please call us at <strong>${businessPhone}</strong> or reply to this email.</p>
+          <p style="font-size: 14px; color: #666;">We look forward to seeing you!</p>
+        </div>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center;">
+          <p style="font-size: 12px; color: #666; margin: 0;">${businessName}</p>
+          <p style="font-size: 12px; color: #666; margin: 5px 0;">${businessPhone}</p>
+        </div>
+      </div>
+    `,
+  },
+  es: {
+    subject: (serviceName: string) => `Cita Confirmada: ${serviceName}`,
+    body: (clientName: string, date: string, time: string, serviceName: string, staffName: string, businessName: string, businessPhone: string, businessAddress: string) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0;">¡Cita Confirmada!</h1>
+        </div>
+        <div style="padding: 30px; background: #fff;">
+          <p style="font-size: 16px; color: #333;">Hola ${clientName},</p>
+          <p style="font-size: 16px; color: #333;">Su cita ha sido confirmada. Aquí están los detalles de su reserva:</p>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Servicio:</strong> ${serviceName}</p>
+            <p style="margin: 5px 0;"><strong>Fecha:</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>Hora:</strong> ${time}</p>
+            <p style="margin: 5px 0;"><strong>Con:</strong> ${staffName}</p>
+          </div>
+          <div style="background: #fef3c7; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>Ubicación:</strong> ${businessAddress}</p>
+          </div>
+          <p style="font-size: 14px; color: #666;">¿Necesita reprogramar o cancelar? Llámenos al <strong>${businessPhone}</strong> o responda a este correo.</p>
+          <p style="font-size: 14px; color: #666;">¡Esperamos verle pronto!</p>
+        </div>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center;">
+          <p style="font-size: 12px; color: #666; margin: 0;">${businessName}</p>
+          <p style="font-size: 12px; color: #666; margin: 5px 0;">${businessPhone}</p>
+        </div>
+      </div>
+    `,
+  },
+  vi: {
+    subject: (serviceName: string) => `Xác Nhận Lịch Hẹn: ${serviceName}`,
+    body: (clientName: string, date: string, time: string, serviceName: string, staffName: string, businessName: string, businessPhone: string, businessAddress: string) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0;">Lịch Hẹn Đã Được Xác Nhận!</h1>
+        </div>
+        <div style="padding: 30px; background: #fff;">
+          <p style="font-size: 16px; color: #333;">Xin chào ${clientName},</p>
+          <p style="font-size: 16px; color: #333;">Lịch hẹn của bạn đã được xác nhận. Đây là chi tiết đặt lịch:</p>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Dịch vụ:</strong> ${serviceName}</p>
+            <p style="margin: 5px 0;"><strong>Ngày:</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>Giờ:</strong> ${time}</p>
+            <p style="margin: 5px 0;"><strong>Với:</strong> ${staffName}</p>
+          </div>
+          <div style="background: #fef3c7; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>Địa chỉ:</strong> ${businessAddress}</p>
+          </div>
+          <p style="font-size: 14px; color: #666;">Cần đổi lịch hoặc hủy? Vui lòng gọi <strong>${businessPhone}</strong> hoặc trả lời email này.</p>
+          <p style="font-size: 14px; color: #666;">Chúng tôi mong được gặp bạn!</p>
+        </div>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center;">
+          <p style="font-size: 12px; color: #666; margin: 0;">${businessName}</p>
+          <p style="font-size: 12px; color: #666; margin: 5px 0;">${businessPhone}</p>
+        </div>
+      </div>
+    `,
+  },
+  ko: {
+    subject: (serviceName: string) => `예약 확인: ${serviceName}`,
+    body: (clientName: string, date: string, time: string, serviceName: string, staffName: string, businessName: string, businessPhone: string, businessAddress: string) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0;">예약이 확인되었습니다!</h1>
+        </div>
+        <div style="padding: 30px; background: #fff;">
+          <p style="font-size: 16px; color: #333;">${clientName}님 안녕하세요,</p>
+          <p style="font-size: 16px; color: #333;">예약이 확인되었습니다. 예약 세부 정보는 다음과 같습니다:</p>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>서비스:</strong> ${serviceName}</p>
+            <p style="margin: 5px 0;"><strong>날짜:</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>시간:</strong> ${time}</p>
+            <p style="margin: 5px 0;"><strong>담당:</strong> ${staffName}</p>
+          </div>
+          <div style="background: #fef3c7; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>위치:</strong> ${businessAddress}</p>
+          </div>
+          <p style="font-size: 14px; color: #666;">일정 변경이나 취소가 필요하시면 <strong>${businessPhone}</strong>으로 연락하시거나 이 이메일에 회신해 주세요.</p>
+          <p style="font-size: 14px; color: #666;">뵙기를 기대합니다!</p>
+        </div>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center;">
+          <p style="font-size: 12px; color: #666; margin: 0;">${businessName}</p>
+          <p style="font-size: 12px; color: #666; margin: 5px 0;">${businessPhone}</p>
+        </div>
+      </div>
+    `,
+  },
+  zh: {
+    subject: (serviceName: string) => `预约确认：${serviceName}`,
+    body: (clientName: string, date: string, time: string, serviceName: string, staffName: string, businessName: string, businessPhone: string, businessAddress: string) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0;">预约已确认！</h1>
+        </div>
+        <div style="padding: 30px; background: #fff;">
+          <p style="font-size: 16px; color: #333;">${clientName}您好，</p>
+          <p style="font-size: 16px; color: #333;">您的预约已确认。以下是您的预约详情：</p>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>服务：</strong> ${serviceName}</p>
+            <p style="margin: 5px 0;"><strong>日期：</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>时间：</strong> ${time}</p>
+            <p style="margin: 5px 0;"><strong>服务人员：</strong> ${staffName}</p>
+          </div>
+          <div style="background: #fef3c7; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>地址：</strong> ${businessAddress}</p>
+          </div>
+          <p style="font-size: 14px; color: #666;">如需改期或取消，请致电 <strong>${businessPhone}</strong> 或回复此邮件。</p>
+          <p style="font-size: 14px; color: #666;">期待您的光临！</p>
+        </div>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center;">
+          <p style="font-size: 12px; color: #666; margin: 0;">${businessName}</p>
+          <p style="font-size: 12px; color: #666; margin: 5px 0;">${businessPhone}</p>
+        </div>
+      </div>
+    `,
+  },
+};
+
+// Send appointment confirmation email
+export async function sendAppointmentConfirmationEmail(
+  email: string,
+  clientName: string,
+  date: string,
+  time: string,
+  serviceName: string,
+  staffName: string,
+  businessName: string = "Beauty & Wellness",
+  businessPhone: string = "",
+  businessAddress: string = "",
+  language: string = "en"
+) {
+  const template =
+    emailConfirmationTemplates[language as keyof typeof emailConfirmationTemplates] ||
+    emailConfirmationTemplates.en;
+
+  const subject = template.subject(serviceName);
+  const html = template.body(clientName, date, time, serviceName, staffName, businessName, businessPhone, businessAddress);
+
+  return sendEmail({
+    to: email,
+    subject,
+    html,
+  });
+}
