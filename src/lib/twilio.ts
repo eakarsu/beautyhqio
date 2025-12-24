@@ -221,6 +221,42 @@ export async function sendAppointmentReminder(
   return sendSMS({ to: phone, message });
 }
 
+// Appointment confirmation templates (sent immediately after booking)
+export const confirmationTemplates = {
+  en: (clientName: string, date: string, time: string, serviceName: string, businessName: string) =>
+    `Hi ${clientName}! Your ${serviceName} appointment at ${businessName} is confirmed for ${date} at ${time}. We look forward to seeing you!`,
+
+  es: (clientName: string, date: string, time: string, serviceName: string, businessName: string) =>
+    `Hola ${clientName}! Su cita de ${serviceName} en ${businessName} está confirmada para el ${date} a las ${time}. ¡Esperamos verle!`,
+
+  vi: (clientName: string, date: string, time: string, serviceName: string, businessName: string) =>
+    `Xin chào ${clientName}! Lịch hẹn ${serviceName} tại ${businessName} đã được xác nhận vào ${date} lúc ${time}. Hẹn gặp bạn!`,
+
+  ko: (clientName: string, date: string, time: string, serviceName: string, businessName: string) =>
+    `${clientName}님 안녕하세요! ${businessName}에서 ${date} ${time}에 예약하신 ${serviceName}이(가) 확인되었습니다. 뵙겠습니다!`,
+
+  zh: (clientName: string, date: string, time: string, serviceName: string, businessName: string) =>
+    `${clientName}您好！您在${businessName}预约的${serviceName}已确认，时间为${date} ${time}。期待您的光临！`,
+};
+
+// Send appointment confirmation SMS (immediately after booking)
+export async function sendAppointmentConfirmationSMS(
+  phone: string,
+  clientName: string,
+  date: string,
+  time: string,
+  serviceName: string,
+  businessName: string = "Beauty & Wellness",
+  language: string = "en"
+) {
+  const template =
+    confirmationTemplates[language as keyof typeof confirmationTemplates] ||
+    confirmationTemplates.en;
+  const message = template(clientName, date, time, serviceName, businessName);
+
+  return sendSMS({ to: phone, message });
+}
+
 // Voice greeting in different languages
 export const voiceGreetings = {
   en: "Thank you for calling. How can I help you today? Press 1 to book an appointment, press 2 to check your appointment, or press 3 to speak with someone.",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmationEmail } from "@/lib/email";
+import { sendAppointmentConfirmationSMS } from "@/lib/twilio";
 
 // POST /api/booking - Create online booking
 export async function POST(request: NextRequest) {
@@ -206,6 +207,39 @@ export async function POST(request: NextRequest) {
       } catch (emailError) {
         // Log but don't fail the booking if email fails
         console.error('Failed to send confirmation email:', emailError);
+      }
+    }
+
+    // Send confirmation SMS if client has phone and allows SMS
+    if (client.phone && client.allowSms !== false) {
+      try {
+        // Get business settings for SMS
+        const settings = await prisma.settings.findFirst();
+
+        // Format date and time for SMS
+        const formattedDate = scheduledStart.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        });
+        const formattedTime = scheduledStart.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+        await sendAppointmentConfirmationSMS(
+          client.phone,
+          `${client.firstName}`,
+          formattedDate,
+          formattedTime,
+          service.name,
+          settings?.businessName || 'Beauty & Wellness',
+          client.preferredLanguage || 'en'
+        );
+      } catch (smsError) {
+        // Log but don't fail the booking if SMS fails
+        console.error('Failed to send confirmation SMS:', smsError);
       }
     }
 
