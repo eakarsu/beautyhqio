@@ -317,26 +317,27 @@ export default function HomePage() {
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           <Card className="border-2 border-gray-200">
             <CardHeader className="text-center">
-              <CardTitle className="text-xl">Starter</CardTitle>
+              <CardTitle className="text-xl">STARTER</CardTitle>
               <div className="mt-4">
-                <span className="text-4xl font-bold">$49</span>
+                <span className="text-4xl font-bold">$0</span>
                 <span className="text-gray-500">/month</span>
               </div>
-              <CardDescription className="mt-2">For solo professionals</CardDescription>
+              <p className="text-sm text-rose-600 font-medium mt-1">9% commission on leads</p>
+              <CardDescription className="mt-2">Get started for free</CardDescription>
             </CardHeader>
             <div className="px-6 pb-6">
               <ul className="space-y-3">
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> 1 Staff member
+                  <CheckCircle className="h-4 w-4 text-green-500" /> 9% commission on leads
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> Online booking
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Listed on marketplace
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> Client management
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Basic profile
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> Basic reports
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Email support
                 </li>
               </ul>
             </div>
@@ -347,26 +348,30 @@ export default function HomePage() {
               Most Popular
             </div>
             <CardHeader className="text-center">
-              <CardTitle className="text-xl">Professional</CardTitle>
+              <CardTitle className="text-xl">GROWTH</CardTitle>
               <div className="mt-4">
-                <span className="text-4xl font-bold">$99</span>
+                <span className="text-4xl font-bold">$49</span>
                 <span className="text-gray-500">/month</span>
               </div>
-              <CardDescription className="mt-2">For growing salons</CardDescription>
+              <p className="text-sm text-rose-600 font-medium mt-1">No commission on leads</p>
+              <CardDescription className="mt-2">Perfect for growing salons</CardDescription>
             </CardHeader>
             <div className="px-6 pb-6">
               <ul className="space-y-3">
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> Up to 5 staff
+                  <CheckCircle className="h-4 w-4 text-green-500" /> No commission on leads
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> AI features included
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Featured placement
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> SMS marketing
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Analytics dashboard
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> Advanced reports
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Priority support
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Marketing tools
                 </li>
               </ul>
             </div>
@@ -374,26 +379,36 @@ export default function HomePage() {
 
           <Card className="border-2 border-gray-200">
             <CardHeader className="text-center">
-              <CardTitle className="text-xl">Enterprise</CardTitle>
+              <CardTitle className="text-xl">PRO</CardTitle>
               <div className="mt-4">
-                <span className="text-4xl font-bold">$199</span>
+                <span className="text-4xl font-bold">$149</span>
                 <span className="text-gray-500">/month</span>
               </div>
-              <CardDescription className="mt-2">For multi-location businesses</CardDescription>
+              <p className="text-sm text-rose-600 font-medium mt-1">No commission on leads</p>
+              <CardDescription className="mt-2">Best for established salons</CardDescription>
             </CardHeader>
             <div className="px-6 pb-6">
               <ul className="space-y-3">
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> Unlimited staff
+                  <CheckCircle className="h-4 w-4 text-green-500" /> No commission on leads
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> Multiple locations
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Top placement in search
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" /> Priority support
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Verified badge
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Dedicated account manager
                 </li>
                 <li className="flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4 text-green-500" /> Custom integrations
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Priority support 24/7
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500" /> Advanced analytics
                 </li>
               </ul>
             </div>

@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, ArrowRight, X } from "lucide-react";
+import { CheckCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
@@ -39,64 +39,51 @@ export default function PricingPage() {
       {/* Pricing Cards */}
       <section className="container mx-auto px-4 pb-20">
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {/* Starter */}
+          {/* STARTER */}
           <Card className="border-2 border-gray-200 relative">
             <CardHeader className="text-center pb-2">
-              <CardTitle className="text-xl">Starter</CardTitle>
+              <CardTitle className="text-xl">STARTER</CardTitle>
               <div className="mt-4">
-                <span className="text-5xl font-bold">$29</span>
+                <span className="text-5xl font-bold">$0</span>
                 <span className="text-gray-500">/month</span>
               </div>
-              <CardDescription className="mt-2">Perfect for solo professionals</CardDescription>
+              <p className="text-sm text-rose-600 font-medium mt-1">9% commission on leads</p>
+              <CardDescription className="mt-2">Get started for free</CardDescription>
             </CardHeader>
             <div className="px-6 pb-6">
               <Link href="/register">
-                <Button className="w-full mb-6" variant="outline">Start Free Trial</Button>
+                <Button className="w-full mb-6" variant="outline">Start Free</Button>
               </Link>
               <ul className="space-y-3">
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> 1 Staff member
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> 9% commission on leads
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Unlimited clients
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Listed on marketplace
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Online booking
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Basic profile
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Client management
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Basic POS
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Email reminders
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Basic reports
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-400">
-                  <X className="h-4 w-4 shrink-0" /> SMS marketing
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-400">
-                  <X className="h-4 w-4 shrink-0" /> AI features
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Email support
                 </li>
               </ul>
             </div>
           </Card>
 
-          {/* Professional */}
+          {/* GROWTH */}
           <Card className="border-2 border-rose-500 relative shadow-xl scale-105">
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-4 py-1 rounded-full text-sm font-medium">
               Most Popular
             </div>
             <CardHeader className="text-center pb-2">
-              <CardTitle className="text-xl">Professional</CardTitle>
+              <CardTitle className="text-xl">GROWTH</CardTitle>
               <div className="mt-4">
-                <span className="text-5xl font-bold">$59</span>
+                <span className="text-5xl font-bold">$49</span>
                 <span className="text-gray-500">/month</span>
               </div>
-              <CardDescription className="mt-2">For growing salons & teams</CardDescription>
+              <p className="text-sm text-rose-600 font-medium mt-1">No commission on leads</p>
+              <CardDescription className="mt-2">Perfect for growing salons</CardDescription>
             </CardHeader>
             <div className="px-6 pb-6">
               <Link href="/register">
@@ -104,77 +91,60 @@ export default function PricingPage() {
               </Link>
               <ul className="space-y-3">
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Up to 5 staff members
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> No commission on leads
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Unlimited clients
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Featured placement
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Online booking
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Full POS with tips
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> SMS reminders (500/mo)
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> AI features included
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Advanced reports
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Loyalty program
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Gift cards
-                </li>
-              </ul>
-            </div>
-          </Card>
-
-          {/* Enterprise */}
-          <Card className="border-2 border-gray-200 relative">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-xl">Enterprise</CardTitle>
-              <div className="mt-4">
-                <span className="text-5xl font-bold">$149</span>
-                <span className="text-gray-500">/month</span>
-              </div>
-              <CardDescription className="mt-2">For multi-location businesses</CardDescription>
-            </CardHeader>
-            <div className="px-6 pb-6">
-              <Link href="/contact">
-                <Button className="w-full mb-6" variant="outline">Contact Sales</Button>
-              </Link>
-              <ul className="space-y-3">
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Unlimited staff
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Multiple locations
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Everything in Pro
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Unlimited SMS
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> AI Voice Receptionist
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Analytics dashboard
                 </li>
                 <li className="flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Priority support
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Custom integrations
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Marketing tools
+                </li>
+              </ul>
+            </div>
+          </Card>
+
+          {/* PRO */}
+          <Card className="border-2 border-gray-200 relative">
+            <CardHeader className="text-center pb-2">
+              <CardTitle className="text-xl">PRO</CardTitle>
+              <div className="mt-4">
+                <span className="text-5xl font-bold">$149</span>
+                <span className="text-gray-500">/month</span>
+              </div>
+              <p className="text-sm text-rose-600 font-medium mt-1">No commission on leads</p>
+              <CardDescription className="mt-2">Best for established salons</CardDescription>
+            </CardHeader>
+            <div className="px-6 pb-6">
+              <Link href="/register">
+                <Button className="w-full mb-6" variant="outline">Start Free Trial</Button>
+              </Link>
+              <ul className="space-y-3">
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> No commission on leads
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Top placement in search
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Verified badge
                 </li>
                 <li className="flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Dedicated account manager
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> API access
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Custom integrations
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Priority support 24/7
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> Advanced analytics
                 </li>
               </ul>
             </div>
@@ -184,8 +154,7 @@ export default function PricingPage() {
         {/* Comparison note */}
         <div className="text-center mt-12 max-w-2xl mx-auto">
           <p className="text-sm text-gray-500">
-            Compare to competitors: Vagaro ($30-70/mo), Booksy ($29.99/mo + $20/user), Fresha ($19.95/mo solo).
-            BeautyHQ includes AI features at no extra cost - competitors charge extra or don&apos;t offer them.
+            Start free with STARTER plan. Upgrade to GROWTH or PRO to eliminate commission fees and unlock premium features.
           </p>
         </div>
       </section>
