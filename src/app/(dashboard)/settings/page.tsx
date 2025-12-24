@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,20 @@ import {
   Shield,
   Palette,
   Globe,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
+
+interface CalendarStaff {
+  id: string;
+  name: string;
+  email: string;
+  connected: boolean;
+  calendarId: string | null;
+}
 
 interface SettingsData {
   businessName: string;
@@ -43,6 +56,11 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Google Calendar integration state
+  const [calendarStaff, setCalendarStaff] = useState<CalendarStaff[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [connectingStaffId, setConnectingStaffId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<SettingsData>({
     businessName: "",
@@ -110,6 +128,90 @@ export default function SettingsPage() {
   const handleInputChange = (field: keyof SettingsData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Fetch Google Calendar connection status for all staff
+  const fetchCalendarStatus = async () => {
+    setCalendarLoading(true);
+    try {
+      const response = await fetch("/api/calendar/status");
+      if (response.ok) {
+        const data = await response.json();
+        setCalendarStaff(data);
+      }
+    } catch (error) {
+      console.error("Error fetching calendar status:", error);
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
+  // Connect staff member to Google Calendar
+  const handleConnectCalendar = async (staffId: string) => {
+    setConnectingStaffId(staffId);
+    try {
+      const response = await fetch(`/api/calendar/auth?staffId=${staffId}&redirect=/settings?tab=integrations`);
+      if (response.ok) {
+        const { authUrl } = await response.json();
+        window.location.href = authUrl;
+      } else {
+        alert("Failed to start Google Calendar connection");
+      }
+    } catch (error) {
+      console.error("Error connecting calendar:", error);
+      alert("Failed to connect to Google Calendar");
+    } finally {
+      setConnectingStaffId(null);
+    }
+  };
+
+  // Disconnect staff member from Google Calendar
+  const handleDisconnectCalendar = async (staffId: string, staffName: string) => {
+    if (!confirm(`Are you sure you want to disconnect Google Calendar for ${staffName}? Future appointments will no longer sync.`)) {
+      return;
+    }
+
+    setConnectingStaffId(staffId);
+    try {
+      const response = await fetch(`/api/calendar/status?staffId=${staffId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setCalendarStaff((prev) =>
+          prev.map((staff) =>
+            staff.id === staffId ? { ...staff, connected: false, calendarId: null } : staff
+          )
+        );
+      } else {
+        alert("Failed to disconnect Google Calendar");
+      }
+    } catch (error) {
+      console.error("Error disconnecting calendar:", error);
+      alert("Failed to disconnect Google Calendar");
+    } finally {
+      setConnectingStaffId(null);
+    }
+  };
+
+  // Load calendar status when switching to integrations tab
+  useEffect(() => {
+    if (activeTab === "integrations" && calendarStaff.length === 0) {
+      fetchCalendarStatus();
+    }
+  }, [activeTab]);
+
+  // Check for successful Google Calendar connection on page load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("google") === "connected") {
+      setActiveTab("integrations");
+      fetchCalendarStatus();
+      // Clean up URL
+      window.history.replaceState({}, "", "/settings?tab=integrations");
+    }
+    if (params.get("tab") === "integrations") {
+      setActiveTab("integrations");
+    }
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -692,51 +794,153 @@ export default function SettingsPage() {
 
         {/* Integrations Settings */}
         <TabsContent value="integrations" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Connected Apps</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[
-                  { name: "Google Calendar", status: "Connected", icon: "G" },
-                  { name: "Stripe", status: "Connected", icon: "S" },
-                  { name: "Mailchimp", status: "Not Connected", icon: "M" },
-                  { name: "QuickBooks", status: "Not Connected", icon: "Q" },
-                  { name: "Instagram", status: "Connected", icon: "I" },
-                  { name: "Facebook", status: "Connected", icon: "F" },
-                ].map((integration) => (
-                  <div
-                    key={integration.name}
-                    className="flex items-center justify-between p-4 rounded-lg border"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-600">
-                        {integration.icon}
-                      </div>
-                      <span className="font-medium">{integration.name}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Badge
-                        variant={
-                          integration.status === "Connected"
-                            ? "success"
-                            : "secondary"
-                        }
-                      >
-                        {integration.status}
-                      </Badge>
-                      <Button variant="outline" size="sm" onClick={() => alert(`${integration.name} ${integration.status === "Connected" ? "configuration" : "connection"} opened`)}>
-                        {integration.status === "Connected"
-                          ? "Configure"
-                          : "Connect"}
-                      </Button>
-                    </div>
+          <div className="space-y-6">
+            {/* Google Calendar Integration */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <Calendar className="h-6 w-6 text-blue-600" />
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div>
+                    <CardTitle>Google Calendar</CardTitle>
+                    <CardDescription>
+                      Sync appointments with staff members&apos; Google Calendars
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {calendarLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                    <span className="ml-2 text-slate-500">Loading staff...</span>
+                  </div>
+                ) : calendarStaff.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <Calendar className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                    <p>No staff members found.</p>
+                    <p className="text-sm mt-1">Add staff members to enable calendar sync.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="text-sm text-slate-600 mb-4 p-3 bg-blue-50 rounded-lg">
+                      <strong>How it works:</strong> Connect each staff member&apos;s Google account to automatically sync their appointments to their personal Google Calendar.
+                    </div>
+                    {calendarStaff.map((staff) => (
+                      <div
+                        key={staff.id}
+                        className="flex items-center justify-between p-4 rounded-lg border hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            staff.connected ? "bg-green-100" : "bg-slate-100"
+                          }`}>
+                            {staff.connected ? (
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-slate-400" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-900">{staff.name}</p>
+                            <p className="text-sm text-slate-500">{staff.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge variant={staff.connected ? "success" : "secondary"}>
+                            {staff.connected ? "Connected" : "Not Connected"}
+                          </Badge>
+                          {staff.connected ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDisconnectCalendar(staff.id, staff.name)}
+                              disabled={connectingStaffId === staff.id}
+                            >
+                              {connectingStaffId === staff.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Disconnect"
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700"
+                              onClick={() => handleConnectCalendar(staff.id)}
+                              disabled={connectingStaffId === staff.id}
+                            >
+                              {connectingStaffId === staff.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Connecting...
+                                </>
+                              ) : (
+                                <>
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Connect
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Other Integrations */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Other Integrations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { name: "Stripe", status: "Connected", icon: "S", description: "Payment processing" },
+                    { name: "Mailchimp", status: "Not Connected", icon: "M", description: "Email marketing" },
+                    { name: "QuickBooks", status: "Not Connected", icon: "Q", description: "Accounting" },
+                    { name: "Instagram", status: "Connected", icon: "I", description: "Social media" },
+                    { name: "Facebook", status: "Connected", icon: "F", description: "Social media" },
+                  ].map((integration) => (
+                    <div
+                      key={integration.name}
+                      className="flex items-center justify-between p-4 rounded-lg border"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-600">
+                          {integration.icon}
+                        </div>
+                        <div>
+                          <span className="font-medium">{integration.name}</span>
+                          <p className="text-sm text-slate-500">{integration.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Badge
+                          variant={
+                            integration.status === "Connected"
+                              ? "success"
+                              : "secondary"
+                          }
+                        >
+                          {integration.status}
+                        </Badge>
+                        <Button variant="outline" size="sm" onClick={() => alert(`${integration.name} ${integration.status === "Connected" ? "configuration" : "connection"} opened`)}>
+                          {integration.status === "Connected"
+                            ? "Configure"
+                            : "Connect"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

@@ -51,3 +51,24 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Stripe Elements Mobile Fix */
+/* Critical: These rules ensure Stripe iframes receive touch events on mobile */
+.StripeElement,
+.StripeElement iframe {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Ensure Stripe element containers have proper touch handling and height */
+.StripeElement {
+  min-height: 24px;
+  width: 100% !important;
+}
+
+/* Fix for iOS where iframes may not receive touch events */
+.StripeElement iframe {
+  pointer-events: auto !important;
+  min-height: 20px;
+}
