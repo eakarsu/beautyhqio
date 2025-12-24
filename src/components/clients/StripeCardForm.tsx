@@ -86,7 +86,7 @@ function CardFormContent({ clientId, onSuccess, onCancel }: CardFormProps) {
         <label className="block text-sm font-medium text-slate-700 mb-2">
           Card Details
         </label>
-        <div className="p-4 border border-slate-200 rounded-lg bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 transition-all">
+        <div className="p-4 border border-slate-200 rounded-lg bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 transition-all min-h-[52px]" style={{ touchAction: 'manipulation' }}>
           <CardElement
             options={{
               style: {

@@ -122,7 +122,7 @@ export default function StripeCardForm({
           <CreditCard className="h-4 w-4" />
           Card Number
         </Label>
-        <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500">
+        <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px]" style={{ touchAction: 'manipulation' }}>
           <CardNumberElement options={cardElementOptions} />
         </div>
       </div>
@@ -131,13 +131,13 @@ export default function StripeCardForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Expiry Date</Label>
-          <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500">
+          <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px]" style={{ touchAction: 'manipulation' }}>
             <CardExpiryElement options={cardElementOptions} />
           </div>
         </div>
         <div className="space-y-2">
           <Label>CVC</Label>
-          <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500">
+          <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px]" style={{ touchAction: 'manipulation' }}>
             <CardCvcElement options={cardElementOptions} />
           </div>
         </div>
