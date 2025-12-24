@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Elements,
   CardElement,
@@ -26,6 +26,15 @@ function CardFormContent({ clientId, onSuccess, onCancel }: CardFormProps) {
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Focus handler for iOS - helps with iframe touch issues
+  const focusCardElement = useCallback(() => {
+    if (!elements) return;
+    const cardElement = elements.getElement(CardElement);
+    if (cardElement) {
+      cardElement.focus();
+    }
+  }, [elements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,13 +95,20 @@ function CardFormContent({ clientId, onSuccess, onCancel }: CardFormProps) {
         <label className="block text-sm font-medium text-slate-700 mb-2">
           Card Details
         </label>
-        <div className="p-4 border border-slate-200 rounded-lg bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 transition-all min-h-[52px]" style={{ touchAction: 'manipulation' }}>
+        <div
+          className="p-4 border border-slate-200 rounded-lg bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 transition-all min-h-[52px] cursor-text"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          onClick={focusCardElement}
+          onTouchEnd={focusCardElement}
+        >
           <CardElement
             options={{
               style: {
                 base: {
                   fontSize: "16px",
                   color: "#1e293b",
+                  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                  lineHeight: "24px",
                   "::placeholder": {
                     color: "#94a3b8",
                   },

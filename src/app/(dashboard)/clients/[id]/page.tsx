@@ -836,8 +836,14 @@ export default function ClientProfilePage() {
 
       {/* Add Card Modal */}
       {showAddCardModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
+            style={{ touchAction: 'manipulation' }}
+          >
             <h3 className="text-xl font-semibold text-slate-900 mb-2">
               Add Payment Method
             </h3>

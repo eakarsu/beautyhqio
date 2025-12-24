@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   useStripe,
   useElements,
@@ -23,7 +23,8 @@ const cardElementOptions = {
     base: {
       fontSize: "16px",
       color: "#1f2937",
-      fontFamily: "system-ui, -apple-system, sans-serif",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      lineHeight: "24px",
       "::placeholder": {
         color: "#9ca3af",
       },
@@ -45,6 +46,24 @@ export default function StripeCardForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Refs for programmatic focus on iOS
+  const cardNumberRef = useRef<any>(null);
+  const cardExpiryRef = useRef<any>(null);
+  const cardCvcRef = useRef<any>(null);
+
+  // Focus handler for iOS - helps with iframe touch issues
+  const focusElement = useCallback((elementType: 'cardNumber' | 'cardExpiry' | 'cardCvc') => {
+    if (!elements) return;
+    const element = elements.getElement(
+      elementType === 'cardNumber' ? CardNumberElement :
+      elementType === 'cardExpiry' ? CardExpiryElement :
+      CardCvcElement
+    );
+    if (element) {
+      element.focus();
+    }
+  }, [elements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +141,12 @@ export default function StripeCardForm({
           <CreditCard className="h-4 w-4" />
           Card Number
         </Label>
-        <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px]" style={{ touchAction: 'manipulation' }}>
+        <div
+          className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          onClick={() => focusElement('cardNumber')}
+          onTouchEnd={() => focusElement('cardNumber')}
+        >
           <CardNumberElement options={cardElementOptions} />
         </div>
       </div>
@@ -131,13 +155,23 @@ export default function StripeCardForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Expiry Date</Label>
-          <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px]" style={{ touchAction: 'manipulation' }}>
+          <div
+            className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            onClick={() => focusElement('cardExpiry')}
+            onTouchEnd={() => focusElement('cardExpiry')}
+          >
             <CardExpiryElement options={cardElementOptions} />
           </div>
         </div>
         <div className="space-y-2">
           <Label>CVC</Label>
-          <div className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px]" style={{ touchAction: 'manipulation' }}>
+          <div
+            className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            onClick={() => focusElement('cardCvc')}
+            onTouchEnd={() => focusElement('cardCvc')}
+          >
             <CardCvcElement options={cardElementOptions} />
           </div>
         </div>
