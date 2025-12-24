@@ -53,16 +53,26 @@ export default function StripeCardForm({
   const cardCvcRef = useRef<any>(null);
 
   // Focus handler for iOS - helps with iframe touch issues
-  const focusElement = useCallback((elementType: 'cardNumber' | 'cardExpiry' | 'cardCvc') => {
-    if (!elements) return;
-    const element = elements.getElement(
-      elementType === 'cardNumber' ? CardNumberElement :
-      elementType === 'cardExpiry' ? CardExpiryElement :
-      CardCvcElement
-    );
-    if (element) {
-      element.focus();
+  const focusElement = useCallback((elementType: 'cardNumber' | 'cardExpiry' | 'cardCvc', e?: React.TouchEvent | React.MouseEvent) => {
+    // Prevent default to stop iOS from doing its own thing
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
+
+    if (!elements) return;
+
+    // Small delay helps iOS process the touch event first
+    setTimeout(() => {
+      const element = elements.getElement(
+        elementType === 'cardNumber' ? CardNumberElement :
+        elementType === 'cardExpiry' ? CardExpiryElement :
+        CardCvcElement
+      );
+      if (element) {
+        element.focus();
+      }
+    }, 10);
   }, [elements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,8 +154,8 @@ export default function StripeCardForm({
         <div
           className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          onClick={() => focusElement('cardNumber')}
-          onTouchEnd={() => focusElement('cardNumber')}
+          onClick={(e) => focusElement('cardNumber', e)}
+          onTouchStart={(e) => focusElement('cardNumber', e)}
         >
           <CardNumberElement options={cardElementOptions} />
         </div>
@@ -158,8 +168,8 @@ export default function StripeCardForm({
           <div
             className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
             style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-            onClick={() => focusElement('cardExpiry')}
-            onTouchEnd={() => focusElement('cardExpiry')}
+            onClick={(e) => focusElement('cardExpiry', e)}
+            onTouchStart={(e) => focusElement('cardExpiry', e)}
           >
             <CardExpiryElement options={cardElementOptions} />
           </div>
@@ -169,8 +179,8 @@ export default function StripeCardForm({
           <div
             className="border rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 min-h-[48px] cursor-text"
             style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-            onClick={() => focusElement('cardCvc')}
-            onTouchEnd={() => focusElement('cardCvc')}
+            onClick={(e) => focusElement('cardCvc', e)}
+            onTouchStart={(e) => focusElement('cardCvc', e)}
           >
             <CardCvcElement options={cardElementOptions} />
           </div>

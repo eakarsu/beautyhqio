@@ -28,12 +28,22 @@ function CardFormContent({ clientId, onSuccess, onCancel }: CardFormProps) {
   const [loading, setLoading] = useState(false);
 
   // Focus handler for iOS - helps with iframe touch issues
-  const focusCardElement = useCallback(() => {
-    if (!elements) return;
-    const cardElement = elements.getElement(CardElement);
-    if (cardElement) {
-      cardElement.focus();
+  const focusCardElement = useCallback((e?: React.TouchEvent | React.MouseEvent) => {
+    // Prevent default to stop iOS from doing its own thing
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
+
+    if (!elements) return;
+
+    // Small delay helps iOS process the touch event first
+    setTimeout(() => {
+      const cardElement = elements.getElement(CardElement);
+      if (cardElement) {
+        cardElement.focus();
+      }
+    }, 10);
   }, [elements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,8 +108,8 @@ function CardFormContent({ clientId, onSuccess, onCancel }: CardFormProps) {
         <div
           className="p-4 border border-slate-200 rounded-lg bg-white focus-within:ring-2 focus-within:ring-rose-500 focus-within:border-rose-500 transition-all min-h-[52px] cursor-text"
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          onClick={focusCardElement}
-          onTouchEnd={focusCardElement}
+          onClick={(e) => focusCardElement(e)}
+          onTouchStart={(e) => focusCardElement(e)}
         >
           <CardElement
             options={{
