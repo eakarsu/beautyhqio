@@ -3,9 +3,16 @@ import twilio from "twilio";
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
+const apiKeySid = process.env.TWILIO_API_KEY_SID;
+const apiKeySecret = process.env.TWILIO_API_KEY_SECRET;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-const client = accountSid && authToken ? twilio(accountSid, authToken) : null;
+// Use API Key authentication if available, otherwise fall back to Auth Token
+const client = accountSid && apiKeySid && apiKeySecret
+  ? twilio(apiKeySid, apiKeySecret, { accountSid })
+  : accountSid && authToken
+    ? twilio(accountSid, authToken)
+    : null;
 
 export interface SendSMSParams {
   to: string;
