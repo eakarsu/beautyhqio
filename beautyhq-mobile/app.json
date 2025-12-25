@@ -18,9 +18,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.beautyhq.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "BeautyHQ needs camera access to take photos of clients and hairstyles.",
-        "NSPhotoLibraryUsageDescription": "BeautyHQ needs photo library access to save and upload images."
+        "NSPhotoLibraryUsageDescription": "BeautyHQ needs photo library access to save and upload images.",
+        "NSFaceIDUsageDescription": "BeautyHQ uses Face ID for secure authentication.",
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "entitlements": {
+        "aps-environment": "production"
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
@@ -29,12 +38,16 @@
         "backgroundColor": "#7C3AED"
       },
       "package": "com.beautyhq.app",
+      "versionCode": 1,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "NOTIFICATIONS"
-      ]
+        "NOTIFICATIONS",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -44,6 +57,21 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "14.0",
+            "useFrameworks": "static"
+          },
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "minSdkVersion": 24,
+            "buildToolsVersion": "34.0.0"
+          }
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -57,6 +85,12 @@
           "merchantIdentifier": "merchant.com.beautyhq",
           "enableGooglePay": true
         }
+      ],
+      [
+        "expo-updates",
+        {
+          "username": "beautyhq"
+        }
       ]
     ],
     "experiments": {
@@ -67,8 +101,16 @@
         "origin": false
       },
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "your-eas-project-id"
       }
-    }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/your-eas-project-id",
+      "fallbackToCacheTimeout": 30000
+    },
+    "owner": "beautyhq"
   }
 }

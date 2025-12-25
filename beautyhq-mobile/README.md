@@ -1,100 +1,172 @@
 # BeautyHQ Mobile
 
-React Native mobile app for BeautyHQ salon management platform, built with Expo.
+React Native mobile app for BeautyHQ salon management platform, built with Expo SDK 51.
 
 ## Features
 
 - **Dashboard** - Overview of today's appointments, revenue, and quick actions
-- **Appointments** - View, manage, and track appointments
+- **Appointments** - View, manage, and track appointments with status updates
 - **Clients** - Client database with profiles, history, and loyalty points
-- **POS** - Point of sale for processing payments
+- **POS** - Point of sale for processing payments with Stripe
+- **Booking** - Multi-step appointment booking flow
 - **Settings** - App and business configuration
+- **Push Notifications** - Appointment reminders and updates
 
 ## Tech Stack
 
-- **React Native** with Expo SDK 51
-- **Expo Router** for file-based navigation
-- **TypeScript** for type safety
-- **Zustand** for state management
-- **Axios** for API communication
-- **Expo Notifications** for push notifications
+| Technology | Purpose |
+|------------|---------|
+| React Native | Cross-platform mobile framework |
+| Expo SDK 51 | Development platform & build tools |
+| Expo Router | File-based navigation |
+| TypeScript | Type safety |
+| Zustand | State management |
+| Axios | API communication |
+| Stripe | Payment processing |
 
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- Node.js 18+
-- Expo CLI (`npm install -g expo-cli`)
-- Expo Go app on your device (for development)
+```bash
+# Required
+node --version  # >= 18.0.0
+npm install -g expo-cli eas-cli
+
+# Optional (for local builds)
+# macOS: Xcode 15+
+# All: Android Studio with SDK 34
+```
 
 ### Installation
 
 ```bash
-# Install dependencies
+cd beautyhq-mobile
 npm install
-
-# Start development server
-npm start
-
-# Run on iOS simulator
-npm run ios
-
-# Run on Android emulator
-npm run android
 ```
 
-### Environment Variables
-
-Copy `.env.example` to `.env` and configure:
+### Running
 
 ```bash
-cp .env.example .env
+# Development with Expo Go
+npm start
+
+# Development with native modules
+npm run start:dev
+
+# Clear cache
+npm run start:clear
 ```
 
-Required variables:
-- `EXPO_PUBLIC_API_URL` - Backend API URL
+## Build Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start Expo dev server |
+| `npm run build:dev:ios` | Development build for iOS |
+| `npm run build:dev:android` | Development build for Android |
+| `npm run build:preview:ios` | Preview build for iOS (TestFlight) |
+| `npm run build:preview:android` | Preview APK for Android |
+| `npm run build:prod:all` | Production builds for both platforms |
+| `npm run submit:ios` | Submit to App Store |
+| `npm run submit:android` | Submit to Play Store |
+| `npm run update:production` | OTA update to production |
+
+## Building Production Apps
+
+### Step 1: Configure EAS
+
+```bash
+# Login to Expo
+eas login
+
+# Initialize project (first time)
+eas init
+eas build:configure
+```
+
+### Step 2: Build
+
+```bash
+# Build for both platforms
+npm run build:prod:all
+
+# Or individually
+npm run build:prod:ios
+npm run build:prod:android
+```
+
+### Step 3: Submit to Stores
+
+```bash
+# iOS App Store
+npm run submit:ios
+
+# Google Play Store
+npm run submit:android
+```
 
 ## Project Structure
 
 ```
 beautyhq-mobile/
-├── app/                    # Expo Router screens
-│   ├── (auth)/            # Authentication screens
+├── app/                    # Screens (Expo Router)
+│   ├── (auth)/            # Login, register, forgot password
+│   │   ├── login.tsx
+│   │   ├── register.tsx
+│   │   └── forgot-password.tsx
 │   ├── (tabs)/            # Main tab screens
-│   ├── appointment/       # Appointment details
-│   ├── client/            # Client profile
-│   ├── booking/           # New booking flow
-│   └── checkout.tsx       # Checkout/POS
+│   │   ├── index.tsx      # Dashboard
+│   │   ├── appointments.tsx
+│   │   ├── clients.tsx
+│   │   ├── pos.tsx
+│   │   └── settings.tsx
+│   ├── appointment/[id].tsx  # Appointment details
+│   ├── client/[id].tsx       # Client profile
+│   ├── booking/new.tsx       # New booking flow
+│   └── checkout.tsx          # Payment checkout
 ├── src/
-│   ├── components/        # Reusable components
-│   │   └── ui/           # UI primitives
-│   ├── contexts/         # State management
-│   ├── hooks/            # Custom hooks
-│   ├── services/         # API services
-│   ├── types/            # TypeScript types
-│   └── utils/            # Utilities & helpers
-└── assets/               # Images & fonts
+│   ├── components/ui/     # Button, Input, Card, Avatar, etc.
+│   ├── services/          # API clients
+│   ├── contexts/          # Auth store (Zustand)
+│   ├── hooks/             # usePushNotifications
+│   ├── types/             # TypeScript interfaces
+│   └── utils/             # Colors, helpers
+├── assets/                # Icons, splash screen
+├── app.json              # Expo config
+├── eas.json              # EAS Build config
+└── BUILD_GUIDE.md        # Detailed build documentation
 ```
 
-## Building for Production
+## Environment Variables
 
 ```bash
-# Install EAS CLI
-npm install -g eas-cli
-
-# Configure EAS
-eas build:configure
-
-# Build for iOS
-eas build --platform ios
-
-# Build for Android
-eas build --platform android
+cp .env.example .env
 ```
+
+| Variable | Description |
+|----------|-------------|
+| `EXPO_PUBLIC_API_URL` | Backend API URL |
+| `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe public key |
 
 ## API Integration
 
-The app connects to the BeautyHQ backend API. Ensure the API is running and accessible from your device/emulator.
+The app connects to the BeautyHQ Next.js backend. Endpoints used:
+
+- `/api/auth/*` - Authentication
+- `/api/appointments/*` - Appointment management
+- `/api/clients/*` - Client database
+- `/api/transactions/*` - POS transactions
+- `/api/services/*` - Service catalog
+- `/api/staff/*` - Staff management
+
+## Detailed Documentation
+
+See [BUILD_GUIDE.md](./BUILD_GUIDE.md) for:
+- Complete build instructions
+- App Store submission process
+- Over-the-air updates
+- Troubleshooting
 
 ## License
 
