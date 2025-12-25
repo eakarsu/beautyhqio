@@ -1,0 +1,11 @@
+{
+  "configurations" : [
+    {
+      "id" : "default",
+      "name" : "Default"
+    }
+  ],
+  "defaultOptions" : {
+    "testTimeoutsEnabled" : true
+  }
+}
