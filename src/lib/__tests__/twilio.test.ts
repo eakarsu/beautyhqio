@@ -1,31 +1,78 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 
-// Load environment variables from .env file if available
+// Load environment variables from .env file
 import * as dotenv from 'dotenv';
 dotenv.config();
+
+// Store the phone number for test assertions
+const TWILIO_PHONE = process.env.TWILIO_PHONE_NUMBER || '+18043601129';
 
 // Mock twilio before importing the module
 const mockMessagesCreate = jest.fn();
 const mockCallsCreate = jest.fn();
 
-jest.mock('twilio', () => {
-  return jest.fn(() => ({
-    messages: {
-      create: mockMessagesCreate,
-    },
-    calls: {
-      create: mockCallsCreate,
-    },
-  }));
-});
+// Mock VoiceResponse class
+class MockVoiceResponse {
+  private elements: string[] = [];
 
-// Use environment variables (from .env or system)
-// Fallback to test values if not set
-process.env.TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || 'ACtest123456789';
-process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test_auth_token';
-process.env.TWILIO_API_KEY_SID = process.env.TWILIO_API_KEY_SID || '';
-process.env.TWILIO_API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET || '';
-process.env.TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+15551234567';
+  say(options: { voice?: string; language?: string }, text: string) {
+    const voice = options.voice || 'Polly.Joanna';
+    const language = options.language || 'en-US';
+    this.elements.push(`<Say voice="${voice}" language="${language}">${text}</Say>`);
+    return this;
+  }
+
+  pause(options: { length?: number }) {
+    this.elements.push(`<Pause length="${options.length || 1}"/>`);
+    return this;
+  }
+
+  hangup() {
+    this.elements.push('<Hangup/>');
+    return this;
+  }
+
+  gather(options: Record<string, unknown>) {
+    const gatherContent: string[] = [];
+    return {
+      say: (sayOptions: { voice?: string; language?: string }, text: string) => {
+        const voice = sayOptions.voice || 'Polly.Joanna';
+        const language = sayOptions.language || 'en-US';
+        gatherContent.push(`<Say voice="${voice}" language="${language}">${text}</Say>`);
+      },
+    };
+  }
+
+  play(url: string) {
+    this.elements.push(`<Play>${url}</Play>`);
+    return this;
+  }
+
+  redirect(url: string) {
+    this.elements.push(`<Redirect>${url}</Redirect>`);
+    return this;
+  }
+
+  toString() {
+    return `<?xml version="1.0" encoding="UTF-8"?><Response>${this.elements.join('')}</Response>`;
+  }
+}
+
+const mockTwilio = jest.fn(() => ({
+  messages: {
+    create: mockMessagesCreate,
+  },
+  calls: {
+    create: mockCallsCreate,
+  },
+}));
+
+// Add twiml property to the mock
+(mockTwilio as unknown as { twiml: { VoiceResponse: typeof MockVoiceResponse } }).twiml = {
+  VoiceResponse: MockVoiceResponse,
+};
+
+jest.mock('twilio', () => mockTwilio);
 
 // Import after mocking
 import {
@@ -55,7 +102,7 @@ describe('Twilio SMS Functions', () => {
       });
 
       const result = await sendSMS({
-        to: '5551234567',
+        to: '8043601129',
         message: 'Test message',
       });
 
@@ -64,8 +111,8 @@ describe('Twilio SMS Functions', () => {
       expect(result.status).toBe('sent');
       expect(mockMessagesCreate).toHaveBeenCalledWith({
         body: 'Test message',
-        to: '+15551234567',
-        from: '+15551234567',
+        to: '+18043601129',
+        from: TWILIO_PHONE,
       });
     });
 
@@ -76,13 +123,13 @@ describe('Twilio SMS Functions', () => {
       });
 
       await sendSMS({
-        to: '8045551234',
+        to: '8043601129',
         message: 'Test',
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: '+18045551234',
+          to: '+18043601129',
         })
       );
     });
@@ -94,13 +141,13 @@ describe('Twilio SMS Functions', () => {
       });
 
       await sendSMS({
-        to: '18045551234',
+        to: '18043601129',
         message: 'Test',
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: '+18045551234',
+          to: '+18043601129',
         })
       );
     });
@@ -112,13 +159,13 @@ describe('Twilio SMS Functions', () => {
       });
 
       await sendSMS({
-        to: '(804) 555-1234',
+        to: '(804) 360-1129',
         message: 'Test',
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: '+18045551234',
+          to: '+18043601129',
         })
       );
     });
@@ -130,15 +177,15 @@ describe('Twilio SMS Functions', () => {
       });
 
       await sendSMS({
-        to: '5551234567',
+        to: '8043601129',
         message: 'Check this image',
         mediaUrl: 'https://example.com/image.jpg',
       });
 
       expect(mockMessagesCreate).toHaveBeenCalledWith({
         body: 'Check this image',
-        to: '+15551234567',
-        from: '+15551234567',
+        to: '+18043601129',
+        from: TWILIO_PHONE,
         mediaUrl: ['https://example.com/image.jpg'],
       });
     });
@@ -147,7 +194,7 @@ describe('Twilio SMS Functions', () => {
       mockMessagesCreate.mockRejectedValueOnce(new Error('Network error'));
 
       const result = await sendSMS({
-        to: '5551234567',
+        to: '8043601129',
         message: 'Test',
       });
 
@@ -164,9 +211,9 @@ describe('Twilio SMS Functions', () => {
         .mockResolvedValueOnce({ sid: 'SM3', status: 'sent' });
 
       const result = await sendBulkSMS([
-        { phone: '5551111111', message: 'Message 1' },
-        { phone: '5552222222', message: 'Message 2' },
-        { phone: '5553333333', message: 'Message 3' },
+        { phone: '8043601129', message: 'Message 1' },
+        { phone: '8043601129', message: 'Message 2' },
+        { phone: '8043601129', message: 'Message 3' },
       ]);
 
       expect(result.total).toBe(3);
@@ -181,9 +228,9 @@ describe('Twilio SMS Functions', () => {
         .mockResolvedValueOnce({ sid: 'SM3', status: 'sent' });
 
       const result = await sendBulkSMS([
-        { phone: '5551111111', message: 'Message 1' },
-        { phone: '5552222222', message: 'Message 2' },
-        { phone: '5553333333', message: 'Message 3' },
+        { phone: '8043601129', message: 'Message 1' },
+        { phone: '8043601129', message: 'Message 2' },
+        { phone: '8043601129', message: 'Message 3' },
       ]);
 
       expect(result.total).toBe(3);
@@ -200,7 +247,7 @@ describe('Twilio SMS Functions', () => {
       });
 
       await sendAppointmentReminder(
-        '5551234567',
+        '8043601129',
         'John',
         'Dec 25',
         '2:00 PM',
@@ -224,7 +271,7 @@ describe('Twilio SMS Functions', () => {
       });
 
       await sendAppointmentReminder(
-        '5551234567',
+        '8043601129',
         'Maria',
         'Dec 25',
         '2:00 PM',
@@ -248,7 +295,7 @@ describe('Twilio SMS Functions', () => {
       });
 
       await sendAppointmentConfirmationSMS(
-        '5551234567',
+        '8043601129',
         'Jane',
         'Dec 26',
         '10:00 AM',
@@ -279,15 +326,15 @@ describe('Twilio Voice Functions', () => {
       });
 
       const result = await makeCall({
-        to: '5551234567',
+        to: '8043601129',
         twimlUrl: 'https://example.com/twiml',
       });
 
       expect(result.success).toBe(true);
       expect(result.callId).toBe('CA123456');
       expect(mockCallsCreate).toHaveBeenCalledWith({
-        to: '+15551234567',
-        from: '+15551234567',
+        to: '+18043601129',
+        from: TWILIO_PHONE,
         url: 'https://example.com/twiml',
       });
     });
@@ -300,14 +347,14 @@ describe('Twilio Voice Functions', () => {
 
       const twiml = '<Response><Say>Hello</Say></Response>';
       const result = await makeCall({
-        to: '5551234567',
+        to: '8043601129',
         twiml,
       });
 
       expect(result.success).toBe(true);
       expect(mockCallsCreate).toHaveBeenCalledWith({
-        to: '+15551234567',
-        from: '+15551234567',
+        to: '+18043601129',
+        from: TWILIO_PHONE,
         twiml,
       });
     });
@@ -316,7 +363,7 @@ describe('Twilio Voice Functions', () => {
       mockCallsCreate.mockRejectedValueOnce(new Error('Call failed'));
 
       const result = await makeCall({
-        to: '5551234567',
+        to: '8043601129',
         twimlUrl: 'https://example.com/twiml',
       });
 
@@ -333,7 +380,7 @@ describe('Twilio Voice Functions', () => {
       });
 
       await sendAppointmentReminderCall(
-        '5551234567',
+        '8043601129',
         'John',
         'Dec 25',
         '2:00 PM',
@@ -342,7 +389,7 @@ describe('Twilio Voice Functions', () => {
 
       expect(mockCallsCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: '+15551234567',
+          to: '+18043601129',
           twiml: expect.stringContaining('John'),
         })
       );
