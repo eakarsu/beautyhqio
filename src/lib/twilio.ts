@@ -26,22 +26,18 @@ export interface MakeCallParams {
   twiml?: string;
 }
 
-// Format phone number to E.164 format
+// Format phone number to E.164 format (US numbers)
 function formatPhoneNumber(phone: string): string {
   // Remove all non-numeric characters
   const cleaned = phone.replace(/\D/g, "");
 
-  // If already has country code
+  // If already has US country code (11 digits starting with 1)
   if (cleaned.length === 11 && cleaned.startsWith("1")) {
     return `+${cleaned}`;
   }
 
-  // Assume US number
-  if (cleaned.length === 10) {
-    return `+1${cleaned}`;
-  }
-
-  return `+${cleaned}`;
+  // Always add +1 for US numbers
+  return `+1${cleaned}`;
 }
 
 // Send SMS
