@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct LoginView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -7,6 +8,7 @@ struct LoginView: View {
     @State private var showingRegister = false
     @State private var showingForgotPassword = false
     @State private var isLoading = false
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -108,10 +110,26 @@ struct LoginView: View {
                             .frame(height: 1)
                     }
 
-                    // Social Login
-                    HStack(spacing: 16) {
-                        SocialLoginButton(icon: "apple.logo", action: {})
-                        SocialLoginButton(icon: "g.circle.fill", action: {})
+                    // Social Login Buttons
+                    VStack(spacing: 12) {
+                        // Sign in with Apple Button
+                        AppleSignInButton(
+                            isProcessing: authManager.isAppleSignInProcessing
+                        ) {
+                            Task {
+                                await authManager.signInWithApple()
+                            }
+                        }
+
+                        // Google Sign In Button (placeholder)
+                        SocialLoginButtonFull(
+                            icon: "g.circle.fill",
+                            title: "Sign in with Google",
+                            backgroundColor: Color(.systemGray6),
+                            foregroundColor: .primary
+                        ) {
+                            // TODO: Implement Google Sign In
+                        }
                     }
 
                     Spacer()
@@ -140,7 +158,87 @@ struct LoginView: View {
     }
 }
 
-// MARK: - Social Login Button
+// MARK: - Apple Sign In Button
+struct AppleSignInButton: View {
+    let isProcessing: Bool
+    let action: () -> Void
+    @Environment(\.colorScheme) var colorScheme
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "apple.logo")
+                        .font(.title3)
+                    Text("Sign in with Apple")
+                        .fontWeight(.medium)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(colorScheme == .dark ? Color.white : Color.black)
+                .foregroundColor(colorScheme == .dark ? Color.black : Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .opacity(isProcessing ? 0.6 : 1.0)
+
+                if isProcessing {
+                    ProgressView()
+                        .tint(colorScheme == .dark ? .black : .white)
+                }
+            }
+        }
+        .disabled(isProcessing)
+    }
+}
+
+// MARK: - Native Sign in with Apple Button Wrapper
+struct NativeAppleSignInButton: View {
+    let action: () -> Void
+    @Environment(\.colorScheme) var colorScheme
+
+    var body: some View {
+        SignInWithAppleButton(
+            onRequest: { request in
+                request.requestedScopes = [.fullName, .email]
+            },
+            onCompletion: { _ in
+                // Handled by AppleSignInManager
+            }
+        )
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .frame(height: 50)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture {
+            action()
+        }
+    }
+}
+
+// MARK: - Social Login Button (Full Width)
+struct SocialLoginButtonFull: View {
+    let icon: String
+    let title: String
+    let backgroundColor: Color
+    let foregroundColor: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title3)
+                Text(title)
+                    .fontWeight(.medium)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(backgroundColor)
+            .foregroundColor(foregroundColor)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+}
+
+// MARK: - Social Login Button (Icon Only) - Kept for backward compatibility
 struct SocialLoginButton: View {
     let icon: String
     let action: () -> Void
