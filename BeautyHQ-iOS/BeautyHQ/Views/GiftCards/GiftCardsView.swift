@@ -45,7 +45,9 @@ struct GiftCardsView: View {
                 await viewModel.loadData()
             }
             .sheet(isPresented: $showingCreateGiftCard) {
-                AddGiftCardView()
+                AddGiftCardView {
+                    Task { await viewModel.loadData() }
+                }
             }
         }
         .task {

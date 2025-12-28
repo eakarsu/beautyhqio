@@ -3,6 +3,7 @@ import SwiftUI
 struct SalesCRMView: View {
     @StateObject private var viewModel = SalesCRMViewModel()
     @State private var selectedTab = 0
+    @State private var showingAddDeal = false
 
     var body: some View {
         NavigationStack {
@@ -35,7 +36,7 @@ struct SalesCRMView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        // Add deal
+                        showingAddDeal = true
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -43,6 +44,11 @@ struct SalesCRMView: View {
             }
             .refreshable {
                 await viewModel.loadData()
+            }
+            .sheet(isPresented: $showingAddDeal) {
+                AddDealView {
+                    Task { await viewModel.loadData() }
+                }
             }
         }
         .task {
@@ -350,6 +356,53 @@ class SalesCRMViewModel: ObservableObject {
         case "converted": return 100
         case "lost": return 0
         default: return 20
+        }
+    }
+}
+
+// MARK: - Add Deal View
+struct AddDealView: View {
+    let onSave: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var dealName = ""
+    @State private var contactName = ""
+    @State private var value = ""
+    @State private var selectedStage = "New"
+
+    let stages = ["New", "Contacted", "Demo Scheduled", "Trial", "Converted"]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Deal Information") {
+                    TextField("Deal Name", text: $dealName)
+                    TextField("Contact Name", text: $contactName)
+                    TextField("Value ($)", text: $value)
+                        .keyboardType(.decimalPad)
+                }
+
+                Section("Stage") {
+                    Picker("Select Stage", selection: $selectedStage) {
+                        ForEach(stages, id: \.self) { stage in
+                            Text(stage).tag(stage)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add Deal")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave()
+                        dismiss()
+                    }
+                    .disabled(dealName.isEmpty)
+                }
+            }
         }
     }
 }

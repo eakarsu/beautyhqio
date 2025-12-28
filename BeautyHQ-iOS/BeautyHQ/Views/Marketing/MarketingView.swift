@@ -3,6 +3,7 @@ import SwiftUI
 struct MarketingView: View {
     @StateObject private var viewModel = MarketingViewModel()
     @State private var selectedTab = 0
+    @State private var showingAddCampaign = false
 
     var body: some View {
         NavigationStack {
@@ -35,7 +36,7 @@ struct MarketingView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        // Create campaign
+                        showingAddCampaign = true
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -43,6 +44,11 @@ struct MarketingView: View {
             }
             .refreshable {
                 await viewModel.loadData()
+            }
+            .sheet(isPresented: $showingAddCampaign) {
+                AddCampaignView {
+                    Task { await viewModel.loadData() }
+                }
             }
         }
         .task {
@@ -250,6 +256,129 @@ class MarketingViewModel: ObservableObject {
             print("Failed to load campaigns: \(error)")
         }
         isLoading = false
+    }
+}
+
+// MARK: - Add Campaign View
+struct AddCampaignView: View {
+    var onSave: (() -> Void)? = nil
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = AddCampaignViewModel()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Campaign Details") {
+                    TextField("Campaign Name *", text: $viewModel.name)
+
+                    Picker("Type", selection: $viewModel.type) {
+                        Text("Email").tag("EMAIL")
+                        Text("SMS").tag("SMS")
+                        Text("Push Notification").tag("PUSH")
+                    }
+                }
+
+                Section("Content") {
+                    TextField("Subject Line", text: $viewModel.subject)
+                    TextField("Message", text: $viewModel.content, axis: .vertical)
+                        .lineLimit(5...10)
+                }
+
+                Section("Audience") {
+                    Picker("Target", selection: $viewModel.audience) {
+                        Text("All Clients").tag("ALL")
+                        Text("Active Clients").tag("ACTIVE")
+                        Text("New Clients").tag("NEW")
+                        Text("Inactive Clients").tag("INACTIVE")
+                    }
+                }
+
+                Section("Schedule") {
+                    Toggle("Send Now", isOn: $viewModel.sendNow)
+
+                    if !viewModel.sendNow {
+                        DatePicker("Scheduled Date", selection: $viewModel.scheduledDate, in: Date()...)
+                    }
+                }
+
+                if let error = viewModel.error {
+                    Section {
+                        Text(error)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("New Campaign")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        Task {
+                            if await viewModel.save() {
+                                onSave?()
+                                dismiss()
+                            }
+                        }
+                    }
+                    .disabled(!viewModel.isValid || viewModel.isSaving)
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+class AddCampaignViewModel: ObservableObject {
+    @Published var name = ""
+    @Published var type = "EMAIL"
+    @Published var subject = ""
+    @Published var content = ""
+    @Published var audience = "ALL"
+    @Published var sendNow = false
+    @Published var scheduledDate = Date()
+    @Published var isSaving = false
+    @Published var error: String?
+
+    var isValid: Bool {
+        !name.isEmpty && !content.isEmpty
+    }
+
+    func save() async -> Bool {
+        isSaving = true
+        error = nil
+
+        do {
+            struct CreateCampaignRequest: Encodable {
+                let name: String
+                let type: String
+                let subject: String?
+                let content: String
+                let audience: String
+                let status: String
+                let scheduledAt: Date?
+            }
+
+            let request = CreateCampaignRequest(
+                name: name,
+                type: type,
+                subject: subject.isEmpty ? nil : subject,
+                content: content,
+                audience: audience,
+                status: sendNow ? "ACTIVE" : "DRAFT",
+                scheduledAt: sendNow ? nil : scheduledDate
+            )
+
+            let _: Campaign = try await APIClient.shared.post("/marketing/campaigns", body: request)
+            isSaving = false
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            isSaving = false
+            return false
+        }
     }
 }
 

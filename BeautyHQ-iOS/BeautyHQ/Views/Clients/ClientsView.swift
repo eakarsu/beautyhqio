@@ -36,7 +36,9 @@ struct ClientsView: View {
                 }
             }
             .sheet(isPresented: $showingAddClient) {
-                AddClientView()
+                AddClientView {
+                    Task { await viewModel.loadClients() }
+                }
             }
         }
         .task {

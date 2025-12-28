@@ -3,6 +3,10 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var viewModel = DashboardViewModel()
+    @State private var showingNewBooking = false
+    @State private var showingAddClient = false
+    @State private var showingPOS = false
+    @State private var selectedTab: Int = 0
 
     var body: some View {
         NavigationStack {
@@ -37,9 +41,7 @@ struct DashboardView: View {
                         .foregroundColor(.charcoal)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        // Notifications
-                    } label: {
+                    NavigationLink(destination: NotificationsView()) {
                         Image(systemName: "bell.fill")
                             .foregroundStyle(LinearGradient.roseGoldGradient)
                     }
@@ -48,6 +50,19 @@ struct DashboardView: View {
         }
         .task {
             await viewModel.loadData()
+        }
+        .sheet(isPresented: $showingNewBooking) {
+            AddAppointmentView {
+                Task { await viewModel.loadData() }
+            }
+        }
+        .sheet(isPresented: $showingAddClient) {
+            AddClientView {
+                Task { await viewModel.loadData() }
+            }
+        }
+        .sheet(isPresented: $showingPOS) {
+            NewSaleView()
         }
     }
 
@@ -120,16 +135,27 @@ struct DashboardView: View {
 
             HStack(spacing: Spacing.lg) {
                 AppQuickAction(icon: "plus", label: "New Booking", color: .roseGold) {
-                    // New booking
+                    showingNewBooking = true
                 }
                 AppQuickAction(icon: "person.badge.plus", label: "Add Client", color: .deepRose) {
-                    // Add client
+                    showingAddClient = true
                 }
                 AppQuickAction(icon: "creditcard.fill", label: "Checkout", color: .success) {
-                    // Checkout
+                    showingPOS = true
                 }
-                AppQuickAction(icon: "calendar", label: "Schedule", color: .champagneGold) {
-                    // Schedule
+                NavigationLink(destination: CalendarView()) {
+                    VStack(spacing: Spacing.sm) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 50, height: 50)
+                            .background(Color.champagneGold)
+                            .clipShape(Circle())
+                            .shadow(color: Color.champagneGold.opacity(0.3), radius: 6, x: 0, y: 3)
+                        Text("Schedule")
+                            .font(.appCaption)
+                            .foregroundColor(.charcoal)
+                    }
                 }
             }
         }
@@ -348,6 +374,27 @@ struct EmptyStateCard: View {
 
     var body: some View {
         AppEmptyState(icon: icon, title: "No Data", message: message)
+    }
+}
+
+// MARK: - Notifications View
+struct NotificationsView: View {
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.lg) {
+                AppEmptyState(
+                    icon: "bell.slash",
+                    title: "No Notifications",
+                    message: "You're all caught up! Check back later for updates."
+                )
+                .cardStyle()
+                .padding(.horizontal, Spacing.lg)
+            }
+            .padding(.vertical, Spacing.lg)
+        }
+        .background(Color.screenBackground)
+        .navigationTitle("Notifications")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

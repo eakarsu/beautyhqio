@@ -3,6 +3,7 @@ import SwiftUI
 struct SubscriptionsView: View {
     @StateObject private var viewModel = SubscriptionsViewModel()
     @State private var selectedSubscription: SubscriptionItem?
+    @State private var showingAddSubscription = false
 
     var body: some View {
         NavigationStack {
@@ -49,11 +50,16 @@ struct SubscriptionsView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        // Add subscription
+                        showingAddSubscription = true
                     } label: {
                         Image(systemName: "plus")
                             .foregroundStyle(LinearGradient.roseGoldGradient)
                     }
+                }
+            }
+            .sheet(isPresented: $showingAddSubscription) {
+                AddSubscriptionView {
+                    Task { await viewModel.loadSubscriptions() }
                 }
             }
             .refreshable {
@@ -410,6 +416,132 @@ class SubscriptionsViewModel: ObservableObject {
             print("Failed to load subscriptions: \(error)")
         }
         isLoading = false
+    }
+}
+
+// MARK: - Add Subscription View
+struct AddSubscriptionView: View {
+    let onSave: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = AddSubscriptionViewModel()
+
+    let plans = ["STARTER", "GROWTH", "PRO"]
+    let businessTypes = ["SALON", "SPA", "BARBERSHOP", "NAIL_SALON", "MEDICAL_SPA"]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Business Information") {
+                    TextField("Business Name", text: $viewModel.businessName)
+                    TextField("Email", text: $viewModel.email)
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+
+                    Picker("Business Type", selection: $viewModel.businessType) {
+                        ForEach(businessTypes, id: \.self) { type in
+                            Text(type.replacingOccurrences(of: "_", with: " ").capitalized).tag(type)
+                        }
+                    }
+                }
+
+                Section("Plan") {
+                    Picker("Select Plan", selection: $viewModel.selectedPlan) {
+                        ForEach(plans, id: \.self) { plan in
+                            Text(plan).tag(plan)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    // Plan details
+                    VStack(alignment: .leading, spacing: 4) {
+                        switch viewModel.selectedPlan {
+                        case "STARTER":
+                            Text("Free - 9% commission on marketplace leads")
+                        case "GROWTH":
+                            Text("$49/mo - No commission")
+                        case "PRO":
+                            Text("$149/mo - No commission + Premium features")
+                        default:
+                            EmptyView()
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+
+                if let error = viewModel.error {
+                    Section {
+                        Text(error)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Add Subscription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task {
+                            if await viewModel.save() {
+                                onSave()
+                                dismiss()
+                            }
+                        }
+                    }
+                    .disabled(!viewModel.isValid || viewModel.isSaving)
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+class AddSubscriptionViewModel: ObservableObject {
+    @Published var businessName = ""
+    @Published var email = ""
+    @Published var businessType = "SALON"
+    @Published var selectedPlan = "STARTER"
+    @Published var isSaving = false
+    @Published var error: String?
+
+    var isValid: Bool {
+        !businessName.isEmpty && !email.isEmpty
+    }
+
+    func save() async -> Bool {
+        isSaving = true
+        error = nil
+
+        do {
+            struct CreateSubscriptionRequest: Encodable {
+                let businessName: String
+                let email: String
+                let businessType: String
+                let plan: String
+            }
+
+            let request = CreateSubscriptionRequest(
+                businessName: businessName,
+                email: email,
+                businessType: businessType,
+                plan: selectedPlan
+            )
+
+            struct SubscriptionResponse: Decodable {
+                let subscription: SubscriptionItem
+            }
+
+            let _: SubscriptionResponse = try await APIClient.shared.post("/all-subscriptions", body: request)
+            isSaving = false
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            isSaving = false
+            return false
+        }
     }
 }
 

@@ -51,7 +51,9 @@ struct AppointmentsView: View {
                 }
             }
             .sheet(isPresented: $showingAddAppointment) {
-                AddAppointmentView()
+                AddAppointmentView {
+                    Task { await viewModel.loadAllAppointments() }
+                }
             }
         }
         .task {
@@ -168,7 +170,7 @@ struct AppointmentsView: View {
             await viewModel.loadAppointments(for: selectedDate)
         }
         .navigationDestination(for: Appointment.self) { appointment in
-            AppointmentDetailView(appointment: appointment)
+            AppointmentDetailView(initialAppointment: appointment)
         }
     }
 }

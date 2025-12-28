@@ -38,7 +38,9 @@ struct ProductsView: View {
                 }
             }
             .sheet(isPresented: $showingAddProduct) {
-                AddProductView()
+                AddProductView {
+                    Task { await viewModel.loadProducts() }
+                }
             }
             .refreshable {
                 await viewModel.loadProducts()

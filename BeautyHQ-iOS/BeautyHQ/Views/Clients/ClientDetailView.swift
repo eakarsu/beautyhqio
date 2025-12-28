@@ -3,6 +3,8 @@ import SwiftUI
 struct ClientDetailView: View {
     let client: Client
     @StateObject private var viewModel = ClientDetailViewModel()
+    @State private var showingEditClient = false
+    @State private var showingBookAppointment = false
 
     var body: some View {
         ScrollView {
@@ -34,7 +36,7 @@ struct ClientDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
-                    // Edit
+                    showingEditClient = true
                 } label: {
                     Image(systemName: "pencil")
                 }
@@ -45,6 +47,14 @@ struct ClientDetailView: View {
         }
         .task {
             await viewModel.loadAppointments(for: client.id)
+        }
+        .sheet(isPresented: $showingEditClient) {
+            EditClientView(client: client)
+        }
+        .sheet(isPresented: $showingBookAppointment) {
+            AddAppointmentView {
+                Task { await viewModel.loadAppointments(for: client.id) }
+            }
         }
     }
 
@@ -102,12 +112,26 @@ struct ClientDetailView: View {
 
     private var quickActions: some View {
         HStack(spacing: 24) {
-            QuickActionCircle(icon: "phone.fill", color: .green, title: "Call") {}
-            QuickActionCircle(icon: "message.fill", color: .blue, title: "Text") {}
-            if client.email != nil {
-                QuickActionCircle(icon: "envelope.fill", color: .purple, title: "Email") {}
+            QuickActionCircle(icon: "phone.fill", color: .green, title: "Call") {
+                if let url = URL(string: "tel:\(client.phone.filter { $0.isNumber })") {
+                    UIApplication.shared.open(url)
+                }
             }
-            QuickActionCircle(icon: "calendar", color: .pink, title: "Book") {}
+            QuickActionCircle(icon: "message.fill", color: .blue, title: "Text") {
+                if let url = URL(string: "sms:\(client.phone.filter { $0.isNumber })") {
+                    UIApplication.shared.open(url)
+                }
+            }
+            if let email = client.email {
+                QuickActionCircle(icon: "envelope.fill", color: .purple, title: "Email") {
+                    if let url = URL(string: "mailto:\(email)") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            }
+            QuickActionCircle(icon: "calendar", color: .pink, title: "Book") {
+                showingBookAppointment = true
+            }
         }
     }
 
@@ -149,9 +173,11 @@ struct ClientDetailView: View {
             HStack {
                 SectionHeader(icon: "calendar", title: "Appointments")
                 Spacer()
-                Button("See All") {}
-                    .font(.subheadline)
-                    .foregroundColor(.purple)
+                NavigationLink("See All") {
+                    ClientAppointmentsListView(clientId: client.id, clientName: client.fullName)
+                }
+                .font(.subheadline)
+                .foregroundColor(.purple)
             }
 
             if viewModel.appointments.isEmpty {
@@ -174,7 +200,7 @@ struct ClientDetailView: View {
 
     private var bookButton: some View {
         Button {
-            // Book appointment
+            showingBookAppointment = true
         } label: {
             HStack {
                 Image(systemName: "plus")
@@ -286,6 +312,132 @@ class ClientDetailViewModel: ObservableObject {
             appointments = try await ClientService.shared.getClientAppointments(clientId: clientId, limit: 5)
         } catch {
             // Handle error
+        }
+        isLoading = false
+    }
+}
+
+// MARK: - Edit Client View
+struct EditClientView: View {
+    let client: Client
+    @Environment(\.dismiss) private var dismiss
+    @State private var firstName: String = ""
+    @State private var lastName: String = ""
+    @State private var phone: String = ""
+    @State private var email: String = ""
+    @State private var notes: String = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Personal Information") {
+                    TextField("First Name", text: $firstName)
+                    TextField("Last Name", text: $lastName)
+                }
+
+                Section("Contact") {
+                    TextField("Phone", text: $phone)
+                        .keyboardType(.phonePad)
+                    TextField("Email", text: $email)
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+                }
+
+                Section("Notes") {
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 100)
+                }
+            }
+            .navigationTitle("Edit Client")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task {
+                            await saveClient()
+                        }
+                    }
+                    .disabled(isSaving || firstName.isEmpty || lastName.isEmpty || phone.isEmpty)
+                }
+            }
+            .onAppear {
+                firstName = client.firstName
+                lastName = client.lastName
+                phone = client.phone
+                email = client.email ?? ""
+                notes = client.notes ?? ""
+            }
+        }
+    }
+
+    private func saveClient() async {
+        isSaving = true
+        do {
+            let request = CreateClientRequest(
+                firstName: firstName,
+                lastName: lastName,
+                email: email.isEmpty ? nil : email,
+                phone: phone,
+                mobile: nil,
+                birthday: client.birthday,
+                notes: notes.isEmpty ? nil : notes
+            )
+            _ = try await ClientService.shared.updateClient(id: client.id, request)
+            dismiss()
+        } catch {
+            print("Error saving client: \(error)")
+        }
+        isSaving = false
+    }
+}
+
+// MARK: - Client Appointments List View
+struct ClientAppointmentsListView: View {
+    let clientId: String
+    let clientName: String
+    @State private var appointments: [Appointment] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+            } else if appointments.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 48))
+                        .foregroundColor(.gray)
+                    Text("No Appointments")
+                        .font(.headline)
+                    Text("This client has no appointment history.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                List(appointments) { appointment in
+                    NavigationLink(destination: AppointmentDetailView(initialAppointment: appointment)) {
+                        ClientAppointmentRow(appointment: appointment)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle("\(clientName)'s Appointments")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadAppointments()
+        }
+    }
+
+    private func loadAppointments() async {
+        do {
+            appointments = try await ClientService.shared.getClientAppointments(clientId: clientId, limit: 50)
+        } catch {
+            print("Error loading appointments: \(error)")
         }
         isLoading = false
     }

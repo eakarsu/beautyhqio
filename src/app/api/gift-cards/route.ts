@@ -1,5 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
+
+// Helper to get user from either web session or mobile JWT
+async function getAuthenticatedUser(request: NextRequest) {
+  // First try web session (NextAuth)
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! },
+      include: { business: true },
+    });
+    return user;
+  }
+
+  // If no web session, try mobile JWT token
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; businessId: string };
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: { business: true },
+      });
+      return user;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
 
 function generateGiftCardCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -48,9 +84,17 @@ export async function GET(request: NextRequest) {
 // POST /api/gift-cards - Create gift card
 export async function POST(request: NextRequest) {
   try {
+    // Get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user?.businessId) {
+      return NextResponse.json(
+        { error: "Unauthorized or no business associated" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
-      businessId,
       amount,
       purchasedById,
       recipientEmail,
@@ -63,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     const giftCard = await prisma.giftCard.create({
       data: {
-        businessId,
+        businessId: user.businessId,
         code,
         initialBalance: amount,
         currentBalance: amount,

@@ -496,6 +496,8 @@ struct ExportReportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedFormat: ExportFormat = .pdf
     @State private var isExporting = false
+    @State private var showingShareSheet = false
+    @State private var exportContent = ""
 
     var body: some View {
         NavigationStack {
@@ -542,15 +544,38 @@ struct ExportReportSheet: View {
                     .padding(.horizontal, Spacing.lg)
                 }
 
+                // Quick Actions
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    Text("Quick Actions")
+                        .font(.appHeadline)
+                        .foregroundColor(.charcoal)
+                        .padding(.horizontal, Spacing.lg)
+
+                    VStack(spacing: Spacing.sm) {
+                        ExportActionButton(icon: "printer", label: "Print Report") {
+                            // Print functionality
+                            exportContent = generateExportContent()
+                            UIPasteboard.general.string = exportContent
+                        }
+
+                        ExportActionButton(icon: "envelope", label: "Email Report") {
+                            exportContent = generateExportContent()
+                            showingShareSheet = true
+                        }
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                }
+
                 Spacer()
 
                 // Export Button
                 Button {
                     isExporting = true
+                    exportContent = generateExportContent()
                     onExport(selectedFormat)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         isExporting = false
-                        dismiss()
+                        showingShareSheet = true
                     }
                 } label: {
                     HStack(spacing: Spacing.sm) {
@@ -584,8 +609,96 @@ struct ExportReportSheet: View {
                     .foregroundColor(.roseGold)
                 }
             }
+            .sheet(isPresented: $showingShareSheet) {
+                ShareSheet(items: [exportContent])
+            }
         }
     }
+
+    private func generateExportContent() -> String {
+        guard let report = report else { return "No data" }
+
+        switch selectedFormat {
+        case .csv:
+            var csv = "Metric,Value\n"
+            csv += "Revenue,\"\(report.revenue)\"\n"
+            csv += "Total Appointments,\(report.totalAppointments)\n"
+            csv += "Completed Appointments,\(report.completedAppointments)\n"
+            csv += "Cancelled Appointments,\(report.cancelledAppointments)\n"
+            csv += "\nTop Services,Revenue\n"
+            for service in report.topServices {
+                csv += "\"\(service.name)\",\"\(service.revenue)\"\n"
+            }
+            csv += "\nTop Staff,Revenue\n"
+            for staff in report.topStaff {
+                csv += "\"\(staff.name)\",\"\(staff.revenue)\"\n"
+            }
+            return csv
+        case .pdf, .excel:
+            var text = "=== BeautyHQ Report ===\n"
+            text += "Period: \(period)\n\n"
+            text += "SUMMARY\n"
+            text += "-------\n"
+            text += "Revenue: \(report.revenue)\n"
+            text += "Total Appointments: \(report.totalAppointments)\n"
+            text += "Completed: \(report.completedAppointments)\n"
+            text += "Cancelled: \(report.cancelledAppointments)\n\n"
+            text += "TOP SERVICES\n"
+            text += "------------\n"
+            for (i, service) in report.topServices.enumerated() {
+                text += "\(i + 1). \(service.name) - \(service.revenue)\n"
+            }
+            text += "\nTOP STAFF\n"
+            text += "---------\n"
+            for (i, staff) in report.topStaff.enumerated() {
+                text += "\(i + 1). \(staff.name) - \(staff.revenue)\n"
+            }
+            return text
+        }
+    }
+}
+
+struct ExportActionButton: View {
+    let icon: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.md) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.roseGold)
+                    .frame(width: 40, height: 40)
+                    .background(Color.roseGold.opacity(0.15))
+                    .clipShape(Circle())
+
+                Text(label)
+                    .font(.appBody)
+                    .foregroundColor(.charcoal)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.softGray)
+            }
+            .padding(Spacing.md)
+            .background(Color.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        }
+    }
+}
+
+// MARK: - Share Sheet
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 struct ExportFormatButton: View {

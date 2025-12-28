@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		978EC1822F01A3BB00E2D3CE /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = 978EC1812F01A3BB00E2D3CE /* StripePaymentSheet */; };
 		F001000001 /* BeautyHQApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000001 /* BeautyHQApp.swift */; };
 		F001000002 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000002 /* Config.swift */; };
 		F001000003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000003 /* ContentView.swift */; };
@@ -27,7 +28,6 @@
 		F001000018 /* StaffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000018 /* StaffService.swift */; };
 		F001000019 /* TransactionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000019 /* TransactionService.swift */; };
 		F001000020 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000020 /* NotificationManager.swift */; };
-		F001000037 /* SocialAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000037 /* SocialAuthManager.swift */; };
 		F001000021 /* AppointmentsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000021 /* AppointmentsViewModel.swift */; };
 		F001000022 /* ClientsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000022 /* ClientsViewModel.swift */; };
 		F001000023 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000023 /* DashboardViewModel.swift */; };
@@ -44,6 +44,7 @@
 		F001000034 /* POSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000034 /* POSView.swift */; };
 		F001000035 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000035 /* SettingsView.swift */; };
 		F001000036 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F002000036 /* Assets.xcassets */; };
+		F001000037 /* SocialAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000037 /* SocialAuthManager.swift */; };
 		F001000040 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000040 /* CalendarView.swift */; };
 		F001000041 /* ServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000041 /* ServicesView.swift */; };
 		F001000042 /* StaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000042 /* StaffView.swift */; };
@@ -63,6 +64,8 @@
 		F001000056 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000056 /* Theme.swift */; };
 		F001000057 /* AppComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000057 /* AppComponents.swift */; };
 		F001000058 /* AddForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000058 /* AddForms.swift */; };
+		F001000059 /* AppleSignInManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000059 /* AppleSignInManager.swift */; };
+		F001000060 /* StripeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000060 /* StripeManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -87,8 +90,6 @@
 		F002000018 /* StaffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffService.swift; sourceTree = "<group>"; };
 		F002000019 /* TransactionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionService.swift; sourceTree = "<group>"; };
 		F002000020 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
-		F002000037 /* SocialAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialAuthManager.swift; sourceTree = "<group>"; };
-		F002000038 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F002000021 /* AppointmentsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentsViewModel.swift; sourceTree = "<group>"; };
 		F002000022 /* ClientsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientsViewModel.swift; sourceTree = "<group>"; };
 		F002000023 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
@@ -105,6 +106,8 @@
 		F002000034 /* POSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSView.swift; sourceTree = "<group>"; };
 		F002000035 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F002000036 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F002000037 /* SocialAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialAuthManager.swift; sourceTree = "<group>"; };
+		F002000038 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F002000040 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		F002000041 /* ServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServicesView.swift; sourceTree = "<group>"; };
 		F002000042 /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
@@ -124,12 +127,15 @@
 		F002000056 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		F002000057 /* AppComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppComponents.swift; sourceTree = "<group>"; };
 		F002000058 /* AddForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddForms.swift; sourceTree = "<group>"; };
+		F002000059 /* AppleSignInManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInManager.swift; sourceTree = "<group>"; };
+		F002000060 /* StripeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripeManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		F003000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				978EC1822F01A3BB00E2D3CE /* StripePaymentSheet in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -196,6 +202,7 @@
 			isa = PBXGroup;
 			children = (
 				F002000012 /* APIClient.swift */,
+				F002000059 /* AppleSignInManager.swift */,
 				F002000013 /* AppointmentService.swift */,
 				F002000014 /* AuthManager.swift */,
 				F002000015 /* ClientService.swift */,
@@ -203,6 +210,7 @@
 				F002000017 /* ServiceService.swift */,
 				F002000037 /* SocialAuthManager.swift */,
 				F002000018 /* StaffService.swift */,
+				F002000060 /* StripeManager.swift */,
 				F002000019 /* TransactionService.swift */,
 			);
 			path = Services;
@@ -469,6 +477,9 @@
 			buildRules = (
 			);
 			name = BeautyHQ;
+			packageProductDependencies = (
+				978EC1812F01A3BB00E2D3CE /* StripePaymentSheet */,
+			);
 			productName = BeautyHQ;
 			productReference = F002000000 /* BeautyHQ.app */;
 			productType = "com.apple.product-type.application";
@@ -496,6 +507,9 @@
 				Base,
 			);
 			mainGroup = F004000001;
+			packageReferences = (
+				978EC1802F01A3BB00E2D3CE /* XCRemoteSwiftPackageReference "stripe-ios" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = F004000003 /* Products */;
 			projectDirPath = "";
@@ -574,6 +588,8 @@
 				F001000056 /* Theme.swift in Sources */,
 				F001000057 /* AppComponents.swift in Sources */,
 				F001000058 /* AddForms.swift in Sources */,
+				F001000059 /* AppleSignInManager.swift in Sources */,
+				F001000060 /* StripeManager.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */
@@ -780,6 +796,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		978EC1802F01A3BB00E2D3CE /* XCRemoteSwiftPackageReference "stripe-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stripe/stripe-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 25.3.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		978EC1812F01A3BB00E2D3CE /* StripePaymentSheet */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 978EC1802F01A3BB00E2D3CE /* XCRemoteSwiftPackageReference "stripe-ios" */;
+			productName = StripePaymentSheet;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F005000002 /* Project object */;
 }

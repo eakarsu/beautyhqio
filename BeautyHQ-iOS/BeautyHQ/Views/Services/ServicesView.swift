@@ -47,7 +47,9 @@ struct ServicesView: View {
                 await viewModel.loadServices()
             }
             .sheet(isPresented: $showingAddService) {
-                AddServiceView()
+                AddServiceView {
+                    Task { await viewModel.loadServices() }
+                }
             }
         }
         .task {

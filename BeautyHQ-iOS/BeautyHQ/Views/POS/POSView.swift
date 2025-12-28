@@ -123,9 +123,7 @@ struct POSView: View {
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
             }
 
-            Button {
-                // View receipts
-            } label: {
+            NavigationLink(destination: ReceiptsListView()) {
                 Image(systemName: "doc.text")
                     .font(.title3)
                     .frame(width: 50, height: 50)
@@ -634,6 +632,50 @@ class NewSaleViewModel: ObservableObject {
         // TODO: Implement actual checkout via API
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         isProcessing = false
+    }
+}
+
+// MARK: - Receipts List View
+struct ReceiptsListView: View {
+    @State private var transactions: [Transaction] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+            } else if transactions.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 48))
+                        .foregroundColor(.gray)
+                    Text("No Receipts")
+                        .font(.headline)
+                    Text("Your transaction receipts will appear here.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                List(transactions) { transaction in
+                    TransactionRowView(transaction: transaction)
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle("Receipts")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadTransactions()
+        }
+    }
+
+    private func loadTransactions() async {
+        do {
+            transactions = try await APIClient.shared.get("/transactions")
+        } catch {
+            print("Error loading transactions: \(error)")
+        }
+        isLoading = false
     }
 }
 

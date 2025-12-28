@@ -2,6 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
+
+// Helper to get user from either web session or mobile JWT
+async function getAuthenticatedUser(request: NextRequest) {
+  // First try web session (NextAuth)
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! },
+      include: { business: true },
+    });
+    return user;
+  }
+
+  // If no web session, try mobile JWT token
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; businessId: string };
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: { business: true },
+      });
+      return user;
+    } catch {
+      // Invalid token
+      return null;
+    }
+  }
+
+  return null;
+}
 
 // GET /api/clients - List clients with search and filters
 export async function GET(request: NextRequest) {
@@ -91,9 +126,9 @@ export async function GET(request: NextRequest) {
 // POST /api/clients - Create a new client
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized. Please log in again." }, { status: 401 });
     }
 
     const body = await request.json();
@@ -158,7 +193,7 @@ export async function POST(request: NextRequest) {
         title: "Client created",
         description: `New client ${firstName} ${lastName} added`,
         clientId: client.id,
-        userId: session.user.id,
+        userId: user.id,
       },
     });
 

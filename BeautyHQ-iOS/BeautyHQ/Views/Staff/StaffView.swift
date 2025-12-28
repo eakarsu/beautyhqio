@@ -55,7 +55,9 @@ struct StaffView: View {
                 await viewModel.loadStaff()
             }
             .sheet(isPresented: $showingAddStaff) {
-                AddStaffView()
+                AddStaffView {
+                    Task { await viewModel.loadStaff() }
+                }
             }
         }
         .task {

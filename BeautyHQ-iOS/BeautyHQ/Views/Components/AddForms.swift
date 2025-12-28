@@ -2,6 +2,7 @@ import SwiftUI
 
 // MARK: - Add Client View
 struct AddClientView: View {
+    var onSave: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = AddClientViewModel()
 
@@ -72,6 +73,7 @@ struct AddClientView: View {
                     Button("Save") {
                         Task {
                             if await viewModel.save() {
+                                onSave?()
                                 dismiss()
                             }
                         }
@@ -147,53 +149,81 @@ class AddClientViewModel: ObservableObject {
 
 // MARK: - Add Appointment View
 struct AddAppointmentView: View {
+    var onSave: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = AddAppointmentViewModel()
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Client") {
-                    Picker("Select Client", selection: $viewModel.selectedClientId) {
-                        Text("Walk-in").tag("")
-                        ForEach(viewModel.clients) { client in
-                            Text(client.fullName).tag(client.id)
-                        }
+            Group {
+                if viewModel.isLoading {
+                    VStack {
+                        ProgressView()
+                        Text("Loading...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                }
-
-                Section("Service") {
-                    Picker("Select Service *", selection: $viewModel.selectedServiceId) {
-                        Text("Select...").tag("")
-                        ForEach(viewModel.services) { service in
-                            Text("\(service.name) - $\(String(format: "%.0f", service.price))").tag(service.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    Form {
+                        Section("Client") {
+                            Picker("Select Client", selection: $viewModel.selectedClientId) {
+                                Text("Walk-in").tag("")
+                                ForEach(viewModel.clients) { client in
+                                    Text(client.fullName).tag(client.id)
+                                }
+                            }
+                            if viewModel.clients.isEmpty {
+                                Text("No clients found")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                    }
-                }
 
-                Section("Staff") {
-                    Picker("Select Staff *", selection: $viewModel.selectedStaffId) {
-                        Text("Select...").tag("")
-                        ForEach(viewModel.staff) { staff in
-                            Text(staff.fullName).tag(staff.id)
+                        Section("Service") {
+                            Picker("Select Service *", selection: $viewModel.selectedServiceId) {
+                                Text("Select...").tag("")
+                                ForEach(viewModel.services) { service in
+                                    Text("\(service.name) - $\(String(format: "%.0f", service.price))").tag(service.id)
+                                }
+                            }
+                            if viewModel.services.isEmpty {
+                                Text("No services found")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                    }
-                }
 
-                Section("Date & Time") {
-                    DatePicker("Date", selection: $viewModel.date, displayedComponents: .date)
-                    DatePicker("Time", selection: $viewModel.time, displayedComponents: .hourAndMinute)
-                }
+                        Section("Staff") {
+                            Picker("Select Staff *", selection: $viewModel.selectedStaffId) {
+                                Text("Select...").tag("")
+                                ForEach(viewModel.staff) { staff in
+                                    Text(staff.fullName).tag(staff.id)
+                                }
+                            }
+                            if viewModel.staff.isEmpty {
+                                Text("No staff found")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
 
-                Section("Notes") {
-                    TextField("Notes (optional)", text: $viewModel.notes, axis: .vertical)
-                        .lineLimit(3...6)
-                }
+                        Section("Date & Time") {
+                            DatePicker("Date", selection: $viewModel.date, displayedComponents: .date)
+                            DatePicker("Time", selection: $viewModel.time, displayedComponents: .hourAndMinute)
+                        }
 
-                if let error = viewModel.error {
-                    Section {
-                        Text(error)
-                            .foregroundColor(.red)
+                        Section("Notes") {
+                            TextField("Notes (optional)", text: $viewModel.notes, axis: .vertical)
+                                .lineLimit(3...6)
+                        }
+
+                        if let error = viewModel.error {
+                            Section {
+                                Text(error)
+                                    .foregroundColor(.red)
+                            }
+                        }
                     }
                 }
             }
@@ -207,6 +237,7 @@ struct AddAppointmentView: View {
                     Button("Book") {
                         Task {
                             if await viewModel.save() {
+                                onSave?()
                                 dismiss()
                             }
                         }
@@ -221,6 +252,11 @@ struct AddAppointmentView: View {
     }
 }
 
+// Response wrapper for paginated clients
+private struct ClientsListResponse: Decodable {
+    let clients: [Client]
+}
+
 @MainActor
 class AddAppointmentViewModel: ObservableObject {
     @Published var clients: [Client] = []
@@ -232,6 +268,7 @@ class AddAppointmentViewModel: ObservableObject {
     @Published var date = Date()
     @Published var time = Date()
     @Published var notes = ""
+    @Published var isLoading = false
     @Published var isSaving = false
     @Published var error: String?
 
@@ -240,17 +277,26 @@ class AddAppointmentViewModel: ObservableObject {
     }
 
     func loadData() async {
+        isLoading = true
+        error = nil
+
         do {
-            async let clientsTask: [Client] = APIClient.shared.get("/clients")
+            // Clients API returns paginated response { clients: [...], pagination: {...} }
+            async let clientsTask: ClientsListResponse = APIClient.shared.get("/clients?limit=100")
+            // Services and Staff return direct arrays
             async let servicesTask: [Service] = APIClient.shared.get("/services")
             async let staffTask: [Staff] = APIClient.shared.get("/staff")
 
-            clients = try await clientsTask
+            let clientsResponse = try await clientsTask
+            clients = clientsResponse.clients
             services = try await servicesTask
             staff = try await staffTask
         } catch {
+            self.error = "Failed to load data: \(error.localizedDescription)"
             print("Failed to load data: \(error)")
         }
+
+        isLoading = false
     }
 
     func save() async -> Bool {
@@ -323,6 +369,7 @@ class AddAppointmentViewModel: ObservableObject {
 
 // MARK: - Add Staff View
 struct AddStaffView: View {
+    var onSave: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = AddStaffViewModel()
 
@@ -392,6 +439,7 @@ struct AddStaffView: View {
                     Button("Save") {
                         Task {
                             if await viewModel.save() {
+                                onSave?()
                                 dismiss()
                             }
                         }
@@ -466,6 +514,7 @@ class AddStaffViewModel: ObservableObject {
 
 // MARK: - Add Service View
 struct AddServiceView: View {
+    var onSave: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = AddServiceViewModel()
 
@@ -541,6 +590,7 @@ struct AddServiceView: View {
                     Button("Save") {
                         Task {
                             if await viewModel.save() {
+                                onSave?()
                                 dismiss()
                             }
                         }
@@ -609,6 +659,7 @@ class AddServiceViewModel: ObservableObject {
 
 // MARK: - Add Product View
 struct AddProductView: View {
+    var onSave: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = AddProductViewModel()
 
@@ -676,6 +727,7 @@ struct AddProductView: View {
                     Button("Save") {
                         Task {
                             if await viewModel.save() {
+                                onSave?()
                                 dismiss()
                             }
                         }
@@ -753,6 +805,7 @@ class AddProductViewModel: ObservableObject {
 
 // MARK: - Add Gift Card View
 struct AddGiftCardView: View {
+    var onSave: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = AddGiftCardViewModel()
 
@@ -833,6 +886,7 @@ struct AddGiftCardView: View {
                     Button("Create") {
                         Task {
                             if await viewModel.save() {
+                                onSave?()
                                 dismiss()
                             }
                         }

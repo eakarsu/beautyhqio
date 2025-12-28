@@ -43,27 +43,27 @@ actor AppointmentService {
     }
 
     func updateAppointment(id: String, _ request: UpdateAppointmentRequest) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)", body: request)
+        try await APIClient.shared.put("/appointments/\(id)", body: request)
     }
 
     func cancelAppointment(id: String, reason: String? = nil) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/cancel", body: CancelAppointmentRequest(reason: reason))
+        try await APIClient.shared.post("/appointments/\(id)/cancel", body: CancelAppointmentRequest(reason: reason))
     }
 
     func checkIn(id: String) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/check-in", body: EmptyBody())
+        try await APIClient.shared.post("/appointments/\(id)/check-in", body: EmptyBody())
     }
 
     func startService(id: String) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/start", body: EmptyBody())
+        try await APIClient.shared.post("/appointments/\(id)/start", body: EmptyBody())
     }
 
     func complete(id: String) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/complete", body: EmptyBody())
+        try await APIClient.shared.post("/appointments/\(id)/complete", body: EmptyBody())
     }
 
     func markNoShow(id: String) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/no-show", body: EmptyBody())
+        try await APIClient.shared.post("/appointments/\(id)/no-show", body: EmptyBody())
     }
 
     func getAvailableSlots(staffId: String, serviceId: String, date: Date) async throws -> [String] {
