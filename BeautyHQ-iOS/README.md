@@ -58,8 +58,57 @@ BeautyHQ-iOS/
 | Architecture | MVVM |
 | Networking | URLSession + async/await |
 | State Management | @StateObject, @Published |
-| Authentication | Keychain + JWT |
+| Authentication | Keychain + JWT + Sign in with Apple |
 | Push Notifications | UserNotifications |
+
+## Sign in with Apple
+
+The app supports Sign in with Apple for authentication.
+
+### Setup in Xcode
+
+1. Select your project in Xcode
+2. Go to "Signing & Capabilities" tab
+3. Click "+ Capability"
+4. Add "Sign in with Apple"
+
+### Setup in Apple Developer Portal
+
+1. Go to [Apple Developer Portal](https://developer.apple.com)
+2. Navigate to Certificates, Identifiers & Profiles
+3. Select your App ID
+4. Enable "Sign in with Apple" capability
+5. Configure the App ID for Sign in with Apple
+
+### Backend Integration
+
+The app sends Apple credentials to your backend at `POST /api/auth/apple`:
+
+```json
+{
+  "identityToken": "eyJ...",
+  "authorizationCode": "abc123...",
+  "nonce": "random_nonce",
+  "userIdentifier": "001234.abc...",
+  "email": "user@email.com",
+  "firstName": "John",
+  "lastName": "Doe"
+}
+```
+
+Your backend should:
+1. Verify the `identityToken` with Apple's servers
+2. Create or update the user account
+3. Return a JWT token for the app
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `AppleSignInManager.swift` | Handles Sign in with Apple flow |
+| `AuthManager.swift` | Orchestrates authentication |
+| `LoginView.swift` | UI with Apple Sign In button |
+| `BeautyHQ.entitlements` | App entitlements for Apple Sign In |
 
 ## Getting Started
 
