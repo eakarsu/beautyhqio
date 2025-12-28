@@ -3,6 +3,7 @@ import SwiftUI
 struct ClientsView: View {
     @StateObject private var viewModel = ClientsViewModel()
     @State private var searchText = ""
+    @State private var showingAddClient = false
 
     var body: some View {
         NavigationStack {
@@ -17,7 +18,7 @@ struct ClientsView: View {
                         message: "Add your first client to get started.",
                         actionTitle: "Add Client"
                     ) {
-                        // Add client
+                        showingAddClient = true
                     }
                 } else {
                     clientsList
@@ -28,11 +29,14 @@ struct ClientsView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        // Add client
+                        showingAddClient = true
                     } label: {
                         Image(systemName: "person.badge.plus")
                     }
                 }
+            }
+            .sheet(isPresented: $showingAddClient) {
+                AddClientView()
             }
         }
         .task {
@@ -88,11 +92,9 @@ struct ClientRow: View {
                 Text(client.fullName)
                     .font(.headline)
 
-                if let phone = client.formattedPhone {
-                    Label(phone, systemImage: "phone")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                Label(client.formattedPhone, systemImage: "phone")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
                 if let email = client.email {
                     Label(email, systemImage: "envelope")
@@ -103,9 +105,9 @@ struct ClientRow: View {
 
                 // Stats
                 HStack(spacing: 16) {
-                    StatItem(value: "\(client.visitCount)", label: "Visits")
-                    StatItem(value: formatCurrency(client.totalSpent), label: "Spent")
-                    StatItem(value: "\(client.loyaltyPoints)", label: "Points")
+                    StatItem(value: "\(client.totalVisits ?? 0)", label: "Visits")
+                    StatItem(value: formatCurrency(client.totalSpent ?? 0), label: "Spent")
+                    StatItem(value: "\(client.loyaltyPoints ?? 0)", label: "Points")
                 }
                 .padding(.top, 4)
             }

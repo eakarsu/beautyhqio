@@ -3,7 +3,7 @@ import Foundation
 enum Config {
     static let apiBaseURL: String = {
         #if DEBUG
-        return ProcessInfo.processInfo.environment["API_URL"] ?? "http://localhost:3000/api"
+        return ProcessInfo.processInfo.environment["API_URL"] ?? "http://127.0.0.1:3000/api"
         #else
         return "https://api.beautyhq.io/api"
         #endif

@@ -627,15 +627,18 @@ async function main() {
 
     const sourceKey = ["online", "phone", "walk_in", "app"][Math.floor(Math.random() * 4)];
 
-    appointmentsData.push({
+    const aptEntry: any = {
       clientId: clients[Math.floor(Math.random() * clients.length)].id,
       locationId: locations[0].id,
-      staffId: staffMembers.length > 0 ? staffMembers[Math.floor(Math.random() * staffMembers.length)].id : undefined,
       scheduledStart: appointmentDate,
       scheduledEnd: endDate,
       status: statusMap[status] as any,
       source: sourceMap[sourceKey] as any,
-    });
+    };
+    if (staffMembers.length > 0) {
+      aptEntry.staffId = staffMembers[Math.floor(Math.random() * staffMembers.length)].id;
+    }
+    appointmentsData.push(aptEntry);
   }
 
   for (const aptData of appointmentsData) {
@@ -673,7 +676,7 @@ async function main() {
         transactionNumber: `TXN-${Date.now()}-${i}`,
         locationId: locations[0].id,
         clientId: clients[Math.floor(Math.random() * clients.length)].id,
-        staffId: staffMembers.length > 0 ? staffMembers[Math.floor(Math.random() * staffMembers.length)].id : undefined,
+        ...(staffMembers.length > 0 ? { staffId: staffMembers[Math.floor(Math.random() * staffMembers.length)].id } : {}),
         subtotal,
         taxAmount: tax,
         discountAmount: discount,

@@ -49,6 +49,6 @@ class AppState: ObservableObject {
         case appointments = 1
         case clients = 2
         case pos = 3
-        case settings = 4
+        case more = 4
     }
 }

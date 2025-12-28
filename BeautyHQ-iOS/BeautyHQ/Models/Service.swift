@@ -1,20 +1,45 @@
 import Foundation
 
-struct Service: Codable, Identifiable {
+struct Service: Codable, Identifiable, Hashable {
     let id: String
-    let businessId: String
+    let businessId: String?
     let categoryId: String?
     let name: String
     let description: String?
     let duration: Int
     let price: Double
-    let pricingType: PricingType
-    let depositAmount: Double?
-    let bufferTime: Int?
-    let isActive: Bool
+    let priceType: PricingType?
+    let color: String?
+    let allowOnline: Bool?
+    let sortOrder: Int?
+    let isActive: Bool?
     let category: ServiceCategory?
-    let createdAt: Date
-    let updatedAt: Date
+
+    // Custom decoder to handle Prisma Decimal (returns string)
+    enum CodingKeys: String, CodingKey {
+        case id, businessId, categoryId, name, description, duration, price
+        case priceType, color, allowOnline, sortOrder, isActive, category
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        businessId = try container.decodeIfPresent(String.self, forKey: .businessId)
+        categoryId = try container.decodeIfPresent(String.self, forKey: .categoryId)
+        name = try container.decode(String.self, forKey: .name)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        duration = try container.decode(Int.self, forKey: .duration)
+        price = try container.decodeFlexibleDouble(forKey: .price)
+        priceType = try container.decodeIfPresent(PricingType.self, forKey: .priceType)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        allowOnline = try container.decodeIfPresent(Bool.self, forKey: .allowOnline)
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder)
+        isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive)
+        category = try container.decodeIfPresent(ServiceCategory.self, forKey: .category)
+    }
+
+    // Convenience for backward compatibility
+    var pricingType: PricingType { priceType ?? .fixed }
 
     var formattedPrice: String {
         let formatter = NumberFormatter()
@@ -52,13 +77,12 @@ enum PricingType: String, Codable, CaseIterable {
     }
 }
 
-struct ServiceCategory: Codable, Identifiable {
+struct ServiceCategory: Codable, Identifiable, Hashable {
     let id: String
-    let businessId: String
     let name: String
     let description: String?
     let color: String?
     let icon: String?
-    let sortOrder: Int
-    let isActive: Bool
+    let sortOrder: Int?
+    let isActive: Bool?
 }

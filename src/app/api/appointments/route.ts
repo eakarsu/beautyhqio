@@ -15,10 +15,9 @@ export async function GET(request: NextRequest) {
     const where: any = {};
 
     if (date) {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Use UTC to avoid timezone issues - appointments are stored in UTC
+      const startOfDay = new Date(date + 'T00:00:00.000Z');
+      const endOfDay = new Date(date + 'T23:59:59.999Z');
       where.scheduledStart = {
         gte: startOfDay,
         lte: endOfDay,

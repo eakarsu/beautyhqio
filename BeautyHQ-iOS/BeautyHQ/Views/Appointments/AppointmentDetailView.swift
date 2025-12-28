@@ -19,7 +19,7 @@ struct AppointmentDetailView: View {
                 serviceCard
 
                 // Notes Card
-                if appointment.notes != nil || appointment.internalNotes != nil {
+                if appointment.notes != nil {
                     notesCard
                 }
 
@@ -98,11 +98,9 @@ struct AppointmentDetailView: View {
                         Text(client.fullName)
                             .font(.headline)
 
-                        if let phone = client.formattedPhone {
-                            Text(phone)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
+                        Text(client.formattedPhone)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
 
                         if let email = client.email {
                             Text(email)
@@ -173,16 +171,6 @@ struct AppointmentDetailView: View {
                 }
             }
 
-            if let internalNotes = appointment.internalNotes {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Internal Notes")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                    Text(internalNotes)
-                        .font(.subheadline)
-                }
-            }
         }
         .padding()
         .background(Color(.systemBackground))
@@ -197,19 +185,11 @@ struct AppointmentDetailView: View {
             VStack(spacing: 12) {
                 PaymentRow(label: "Service", value: formatCurrency(appointment.totalPrice))
 
-                if appointment.depositPaid > 0 {
-                    PaymentRow(
-                        label: "Deposit Paid",
-                        value: "-\(formatCurrency(appointment.depositPaid))",
-                        valueColor: .green
-                    )
-                }
-
                 Divider()
 
                 PaymentRow(
-                    label: "Balance Due",
-                    value: formatCurrency(appointment.balanceDue),
+                    label: "Total",
+                    value: formatCurrency(appointment.totalPrice),
                     isTotal: true
                 )
             }

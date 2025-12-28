@@ -15,10 +15,11 @@ class ClientsViewModel: ObservableObject {
 
         do {
             let response = try await ClientService.shared.getClients(page: 1, pageSize: 100)
-            clients = response.data
+            clients = response.clients
             filterClients(query: searchQuery)
         } catch {
             self.error = error.localizedDescription
+            print("Failed to load clients: \(error)")
         }
 
         isLoading = false
@@ -33,9 +34,9 @@ class ClientsViewModel: ObservableObject {
             let lowercasedQuery = query.lowercased()
             filteredClients = clients.filter { client in
                 client.firstName.lowercased().contains(lowercasedQuery) ||
-                (client.lastName?.lowercased().contains(lowercasedQuery) ?? false) ||
+                client.lastName.lowercased().contains(lowercasedQuery) ||
                 (client.email?.lowercased().contains(lowercasedQuery) ?? false) ||
-                (client.phone?.contains(query) ?? false)
+                client.phone.contains(query)
             }
         }
     }

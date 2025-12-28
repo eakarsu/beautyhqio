@@ -81,19 +81,19 @@ struct ClientDetailView: View {
         HStack(spacing: 12) {
             StatCard(
                 title: "Visits",
-                value: "\(client.visitCount)",
+                value: "\(client.totalVisits ?? 0)",
                 icon: "calendar",
                 color: .purple
             )
             StatCard(
                 title: "Spent",
-                value: formatCurrency(client.totalSpent),
+                value: formatCurrency(client.totalSpent ?? 0),
                 icon: "dollarsign.circle",
                 color: .green
             )
             StatCard(
                 title: "Points",
-                value: "\(client.loyaltyPoints)",
+                value: "\(client.loyaltyPoints ?? 0)",
                 icon: "star.fill",
                 color: .orange
             )
@@ -102,10 +102,8 @@ struct ClientDetailView: View {
 
     private var quickActions: some View {
         HStack(spacing: 24) {
-            if client.phone != nil {
-                QuickActionCircle(icon: "phone.fill", color: .green, title: "Call") {}
-                QuickActionCircle(icon: "message.fill", color: .blue, title: "Text") {}
-            }
+            QuickActionCircle(icon: "phone.fill", color: .green, title: "Call") {}
+            QuickActionCircle(icon: "message.fill", color: .blue, title: "Text") {}
             if client.email != nil {
                 QuickActionCircle(icon: "envelope.fill", color: .purple, title: "Email") {}
             }
@@ -117,16 +115,14 @@ struct ClientDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             SectionHeader(icon: "person.fill", title: "Contact Info")
 
-            if let phone = client.formattedPhone {
-                ContactRow(icon: "phone", value: phone)
-            }
+            ContactRow(icon: "phone", value: client.formattedPhone)
 
             if let email = client.email {
                 ContactRow(icon: "envelope", value: email)
             }
 
-            if let dob = client.dateOfBirth {
-                ContactRow(icon: "gift", value: "Birthday: \(dob, format: .dateTime.month().day())")
+            if let dob = client.birthday {
+                ContactRow(icon: "gift", value: "Birthday: \(dob.formatted(.dateTime.month().day()))")
             }
         }
         .padding()

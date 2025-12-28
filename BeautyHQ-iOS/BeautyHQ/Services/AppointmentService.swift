@@ -1,5 +1,9 @@
 import Foundation
 
+struct CancelAppointmentRequest: Encodable {
+    let reason: String?
+}
+
 actor AppointmentService {
     static let shared = AppointmentService()
     private init() {}
@@ -17,8 +21,8 @@ actor AppointmentService {
             queryItems.append(URLQueryItem(name: "status", value: status.rawValue))
         }
 
-        let response: PaginatedResponse<Appointment> = try await APIClient.shared.get("/appointments", queryItems: queryItems.isEmpty ? nil : queryItems)
-        return response.data
+        // Backend returns array directly, not paginated
+        return try await APIClient.shared.get("/appointments", queryItems: queryItems.isEmpty ? nil : queryItems)
     }
 
     func getAppointment(id: String) async throws -> Appointment {
@@ -43,7 +47,7 @@ actor AppointmentService {
     }
 
     func cancelAppointment(id: String, reason: String? = nil) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/cancel", body: ["reason": reason as Any])
+        try await APIClient.shared.patch("/appointments/\(id)/cancel", body: CancelAppointmentRequest(reason: reason))
     }
 
     func checkIn(id: String) async throws -> Appointment {

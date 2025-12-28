@@ -3,6 +3,7 @@ import SwiftUI
 struct AppointmentsView: View {
     @StateObject private var viewModel = AppointmentsViewModel()
     @State private var selectedDate = Date()
+    @State private var showingAddAppointment = false
 
     var body: some View {
         NavigationStack {
@@ -21,7 +22,9 @@ struct AppointmentsView: View {
                     EmptyStateView(
                         icon: "calendar",
                         title: "No Appointments",
-                        message: "There are no appointments scheduled for this day."
+                        message: viewModel.showingAllDates
+                            ? "No appointments scheduled yet."
+                            : "No appointments for this day. Tap 'All' to see all appointments."
                     )
                 } else {
                     appointmentsList
@@ -29,17 +32,31 @@ struct AppointmentsView: View {
             }
             .navigationTitle("Appointments")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        Task {
+                            await viewModel.loadAllAppointments()
+                        }
+                    } label: {
+                        Text("All")
+                            .font(.subheadline)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        // New booking
+                        showingAddAppointment = true
                     } label: {
                         Image(systemName: "plus")
                     }
                 }
             }
+            .sheet(isPresented: $showingAddAppointment) {
+                AddAppointmentView()
+            }
         }
         .task {
-            await viewModel.loadAppointments(for: selectedDate)
+            // Load all appointments initially to show seeded data
+            await viewModel.loadAllAppointments()
         }
         .onChange(of: selectedDate) { _, newDate in
             Task {
@@ -58,15 +75,25 @@ struct AppointmentsView: View {
                     .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
+            .opacity(viewModel.showingAllDates ? 0.3 : 1)
+            .disabled(viewModel.showingAllDates)
 
             Spacer()
 
             VStack(spacing: 2) {
-                Text(relativeDay)
-                    .font(.headline)
-                Text(selectedDate, format: .dateTime.month().day().year())
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if viewModel.showingAllDates {
+                    Text("All Dates")
+                        .font(.headline)
+                    Text("\(viewModel.appointments.count) appointments")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text(relativeDay)
+                        .font(.headline)
+                    Text(selectedDate, format: .dateTime.month().day().year())
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Spacer()
@@ -79,6 +106,8 @@ struct AppointmentsView: View {
                     .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
+            .opacity(viewModel.showingAllDates ? 0.3 : 1)
+            .disabled(viewModel.showingAllDates)
         }
         .padding()
         .background(Color(.systemBackground))

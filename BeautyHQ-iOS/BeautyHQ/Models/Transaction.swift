@@ -1,23 +1,78 @@
 import Foundation
 import SwiftUI
 
+// Line item from backend
+struct TransactionLineItem: Codable, Identifiable {
+    var id: String { "\(type)-\(name)" }
+    let type: String
+    let name: String
+    let quantity: Int
+    let unitPrice: Double
+    let totalPrice: Double
+
+    // Custom decoder for Prisma Decimal fields
+    enum CodingKeys: String, CodingKey {
+        case type, name, quantity, unitPrice, totalPrice
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        name = try container.decode(String.self, forKey: .name)
+        quantity = try container.decode(Int.self, forKey: .quantity)
+        unitPrice = try container.decodeFlexibleDouble(forKey: .unitPrice)
+        totalPrice = try container.decodeFlexibleDouble(forKey: .totalPrice)
+    }
+}
+
 struct Transaction: Codable, Identifiable {
     let id: String
-    let businessId: String
-    let clientId: String?
-    let staffId: String?
-    let appointmentId: String?
-    let type: TransactionType
-    let status: TransactionStatus
-    let subtotal: Double
-    let tax: Double
-    let discount: Double
-    let tip: Double
-    let total: Double
-    let paymentMethod: PaymentMethod
-    let items: [TransactionItem]
-    let createdAt: Date
-    let updatedAt: Date
+    let transactionNumber: String?
+    let date: Date?
+    let createdAt: Date?
+    let clientName: String?
+    let staffName: String?
+    let subtotal: Double?
+    let taxAmount: Double?
+    let tipAmount: Double?
+    let discountAmount: Double?
+    let totalAmount: Double?
+    let paymentMethod: String?
+    let status: TransactionStatus?
+    let type: TransactionType?
+    let lineItems: [TransactionLineItem]?
+
+    // Custom decoder for Prisma Decimal fields
+    enum CodingKeys: String, CodingKey {
+        case id, transactionNumber, date, createdAt, clientName, staffName
+        case subtotal, taxAmount, tipAmount, discountAmount, totalAmount
+        case paymentMethod, status, type, lineItems
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        transactionNumber = try container.decodeIfPresent(String.self, forKey: .transactionNumber)
+        date = try container.decodeIfPresent(Date.self, forKey: .date)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        clientName = try container.decodeIfPresent(String.self, forKey: .clientName)
+        staffName = try container.decodeIfPresent(String.self, forKey: .staffName)
+        subtotal = try container.decodeFlexibleDoubleIfPresent(forKey: .subtotal)
+        taxAmount = try container.decodeFlexibleDoubleIfPresent(forKey: .taxAmount)
+        tipAmount = try container.decodeFlexibleDoubleIfPresent(forKey: .tipAmount)
+        discountAmount = try container.decodeFlexibleDoubleIfPresent(forKey: .discountAmount)
+        totalAmount = try container.decodeFlexibleDoubleIfPresent(forKey: .totalAmount)
+        paymentMethod = try container.decodeIfPresent(String.self, forKey: .paymentMethod)
+        status = try container.decodeIfPresent(TransactionStatus.self, forKey: .status)
+        type = try container.decodeIfPresent(TransactionType.self, forKey: .type)
+        lineItems = try container.decodeIfPresent([TransactionLineItem].self, forKey: .lineItems)
+    }
+
+    // Convenience computed properties
+    var total: Double { totalAmount ?? 0 }
+    var tax: Double { taxAmount ?? 0 }
+    var tip: Double { tipAmount ?? 0 }
+    var discount: Double { discountAmount ?? 0 }
 
     var formattedTotal: String {
         let formatter = NumberFormatter()
@@ -25,23 +80,9 @@ struct Transaction: Codable, Identifiable {
         formatter.currencyCode = "USD"
         return formatter.string(from: NSNumber(value: total)) ?? "$\(total)"
     }
-}
 
-struct TransactionItem: Codable, Identifiable {
-    let id: String
-    let transactionId: String
-    let type: ItemType
-    let itemId: String
-    let name: String
-    let quantity: Int
-    let unitPrice: Double
-    let discount: Double
-    let total: Double
-
-    enum ItemType: String, Codable {
-        case service = "SERVICE"
-        case product = "PRODUCT"
-        case giftCard = "GIFT_CARD"
+    var paymentMethodDisplay: String {
+        paymentMethod ?? "Unknown"
     }
 }
 
@@ -127,8 +168,14 @@ struct CreateTransactionRequest: Codable {
     let notes: String?
 }
 
+enum TransactionItemType: String, Codable {
+    case service = "SERVICE"
+    case product = "PRODUCT"
+    case giftCard = "GIFT_CARD"
+}
+
 struct CreateTransactionItem: Codable {
-    let type: TransactionItem.ItemType
+    let type: TransactionItemType
     let itemId: String
     let quantity: Int
     let unitPrice: Double

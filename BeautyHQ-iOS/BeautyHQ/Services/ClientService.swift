@@ -1,14 +1,26 @@
 import Foundation
 
+// Response model matching backend format
+struct ClientsResponse: Decodable {
+    let clients: [Client]
+    let pagination: ClientsPagination
+}
+
+struct ClientsPagination: Decodable {
+    let page: Int
+    let limit: Int
+    let total: Int
+    let totalPages: Int
+}
+
 actor ClientService {
     static let shared = ClientService()
     private init() {}
 
-    func getClients(search: String? = nil, page: Int = 1, pageSize: Int = 50) async throws -> PaginatedResponse<Client> {
+    func getClients(search: String? = nil, page: Int = 1, pageSize: Int = 50) async throws -> ClientsResponse {
         var queryItems = [
             URLQueryItem(name: "page", value: String(page)),
-            URLQueryItem(name: "pageSize", value: String(pageSize)),
-            URLQueryItem(name: "isActive", value: "true")
+            URLQueryItem(name: "limit", value: String(pageSize))
         ]
 
         if let search = search, !search.isEmpty {

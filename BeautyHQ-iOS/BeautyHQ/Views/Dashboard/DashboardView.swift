@@ -7,32 +7,41 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Header
+                VStack(spacing: Spacing.lg) {
+                    // Gradient Header
                     headerSection
 
                     // Stats Grid
                     statsGrid
+                        .padding(.horizontal, Spacing.lg)
 
                     // Quick Actions
                     quickActions
+                        .padding(.horizontal, Spacing.lg)
 
                     // Upcoming Appointments
                     upcomingAppointments
+                        .padding(.horizontal, Spacing.lg)
                 }
-                .padding()
+                .padding(.bottom, Spacing.xl)
             }
+            .background(Color.screenBackground)
             .refreshable {
                 await viewModel.loadData()
             }
-            .navigationTitle("Dashboard")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Text("Dashboard")
+                        .font(.appTitle2)
+                        .foregroundColor(.charcoal)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         // Notifications
                     } label: {
                         Image(systemName: "bell.fill")
-                            .foregroundColor(.primary)
+                            .foregroundStyle(LinearGradient.roseGoldGradient)
                     }
                 }
             }
@@ -43,17 +52,21 @@ struct DashboardView: View {
     }
 
     private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(greeting)
-                    .font(.title)
-                    .fontWeight(.bold)
-                Text("Here's your salon overview")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text(greeting)
+                .font(.appLargeTitle)
+                .foregroundColor(.white)
+            Text("Here's your salon overview")
+                .font(.appSubheadline)
+                .foregroundColor(.white.opacity(0.9))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Spacing.xl)
+        .padding(.top, Spacing.lg)
+        .background(
+            LinearGradient.roseGoldGradient
+                .ignoresSafeArea(edges: .top)
+        )
     }
 
     private var greeting: String {
@@ -71,50 +84,51 @@ struct DashboardView: View {
         LazyVGrid(columns: [
             GridItem(.flexible()),
             GridItem(.flexible())
-        ], spacing: 12) {
-            StatCard(
+        ], spacing: Spacing.md) {
+            DashboardStatCard(
                 title: "Today's Appts",
                 value: "\(viewModel.stats?.todayAppointments ?? 0)",
                 icon: "calendar",
-                color: .purple
+                gradient: .roseGoldGradient
             )
-            StatCard(
+            DashboardStatCard(
                 title: "Today's Revenue",
                 value: viewModel.stats?.formattedTodayRevenue ?? "$0",
                 icon: "dollarsign.circle.fill",
-                color: .green
+                gradient: .successGradient
             )
-            StatCard(
-                title: "This Week",
-                value: viewModel.stats?.formattedWeeklyRevenue ?? "$0",
-                icon: "chart.line.uptrend.xyaxis",
-                color: .pink
+            DashboardStatCard(
+                title: "Staff On Duty",
+                value: "\(viewModel.stats?.staffOnDuty ?? 0)",
+                icon: "person.2.fill",
+                gradient: .deepRoseGradient
             )
-            StatCard(
-                title: "New Clients",
-                value: "\(viewModel.stats?.newClients ?? 0)",
+            DashboardStatCard(
+                title: "Total Clients",
+                value: "\(viewModel.stats?.totalClients ?? 0)",
                 icon: "person.badge.plus",
-                color: .blue
+                gradient: .goldGradient
             )
         }
     }
 
     private var quickActions: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Text("Quick Actions")
-                .font(.headline)
+                .font(.appTitle3)
+                .foregroundColor(.charcoal)
 
-            HStack(spacing: 16) {
-                QuickActionButton(title: "New Booking", icon: "plus", color: .purple) {
+            HStack(spacing: Spacing.lg) {
+                AppQuickAction(icon: "plus", label: "New Booking", color: .roseGold) {
                     // New booking
                 }
-                QuickActionButton(title: "Add Client", icon: "person.badge.plus", color: .pink) {
+                AppQuickAction(icon: "person.badge.plus", label: "Add Client", color: .deepRose) {
                     // Add client
                 }
-                QuickActionButton(title: "Checkout", icon: "creditcard.fill", color: .green) {
+                AppQuickAction(icon: "creditcard.fill", label: "Checkout", color: .success) {
                     // Checkout
                 }
-                QuickActionButton(title: "Schedule", icon: "calendar", color: .blue) {
+                AppQuickAction(icon: "calendar", label: "Schedule", color: .champagneGold) {
                     // Schedule
                 }
             }
@@ -122,140 +136,142 @@ struct DashboardView: View {
     }
 
     private var upcomingAppointments: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Upcoming Appointments")
-                    .font(.headline)
-                Spacer()
-                Button("See All") {
-                    // Navigate to appointments
-                }
-                .font(.subheadline)
-                .foregroundColor(.purple)
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            AppSectionHeader(title: "Today's Appointments", subtitle: nil) {
+                // Navigate to appointments
             }
+            .padding(.horizontal, -Spacing.lg)
 
-            if viewModel.upcomingAppointments.isEmpty {
-                EmptyStateCard(
-                    icon: "calendar",
-                    message: "No upcoming appointments"
+            if viewModel.todayAppointments.isEmpty {
+                AppEmptyState(
+                    icon: "calendar.badge.clock",
+                    title: "No Appointments",
+                    message: "You have no appointments scheduled for today"
                 )
+                .cardStyle()
             } else {
-                ForEach(viewModel.upcomingAppointments) { appointment in
-                    AppointmentRow(appointment: appointment)
+                VStack(spacing: Spacing.sm) {
+                    ForEach(viewModel.todayAppointments) { appointment in
+                        DashboardAppointmentRow(appointment: appointment)
+                    }
                 }
             }
         }
     }
 }
 
-// MARK: - Stat Card
-struct StatCard: View {
+// MARK: - Dashboard Stat Card
+struct DashboardStatCard: View {
     let title: String
     let value: String
     let icon: String
-    let color: Color
+    let gradient: LinearGradient
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-                .frame(width: 40, height: 40)
-                .background(color.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(gradient)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+                .shadow(color: .roseGold.opacity(0.3), radius: 6, x: 0, y: 3)
 
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
-    }
-}
-
-// MARK: - Quick Action Button
-struct QuickActionButton: View {
-    let title: String
-    let icon: String
-    let color: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
-                    .frame(width: 50, height: 50)
-                    .background(color.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(value)
+                    .font(.appTitle2)
+                    .foregroundColor(.charcoal)
 
                 Text(title)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+                    .font(.appCaption)
+                    .foregroundColor(.softGray)
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
     }
 }
 
-// MARK: - Empty State Card
-struct EmptyStateCard: View {
-    let icon: String
-    let message: String
+// MARK: - Dashboard Appointment Row
+struct DashboardAppointmentRow: View {
+    let appointment: DashboardAppointment
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.largeTitle)
-                .foregroundColor(.gray)
-            Text(message)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        HStack(spacing: Spacing.md) {
+            // Rose Gold accent line
+            RoundedRectangle(cornerRadius: 2)
+                .fill(LinearGradient.roseGoldGradient)
+                .frame(width: 4)
+
+            // Time
+            VStack(spacing: 2) {
+                Text(appointment.time, style: .time)
+                    .font(.appHeadline)
+                    .foregroundColor(.charcoal)
+                Text("Today")
+                    .font(.appCaption2)
+                    .foregroundColor(.softGray)
+            }
+            .frame(width: 60)
+
+            AppDivider()
+                .frame(width: 1, height: 40)
+
+            // Client & Service
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(appointment.client)
+                    .font(.appHeadline)
+                    .foregroundColor(.charcoal)
+                Text(appointment.service)
+                    .font(.appCaption)
+                    .foregroundColor(.softGray)
+            }
+
+            Spacer()
+
+            // Status
+            AppStatusBadge(text: appointment.status.capitalized, status: appointment.status)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(Spacing.md)
+        .background(Color.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        .appShadow(.soft)
     }
 }
 
-// MARK: - Appointment Row
+// MARK: - Appointment Row (for full Appointment model)
 struct AppointmentRow: View {
     let appointment: Appointment
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.md) {
+            // Rose Gold accent line
+            RoundedRectangle(cornerRadius: 2)
+                .fill(LinearGradient.roseGoldGradient)
+                .frame(width: 4)
+
             // Time
             VStack(spacing: 2) {
                 Text(appointment.startTime, style: .time)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(.appHeadline)
+                    .foregroundColor(.charcoal)
                 Text(relativeDay)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .font(.appCaption2)
+                    .foregroundColor(.softGray)
             }
             .frame(width: 60)
 
-            Divider()
-                .frame(height: 40)
+            AppDivider()
+                .frame(width: 1, height: 40)
 
             // Client & Service
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(appointment.client?.fullName ?? "Unknown")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.appHeadline)
+                    .foregroundColor(.charcoal)
                 Text(appointment.service?.name ?? "Service")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.appCaption)
+                    .foregroundColor(.softGray)
             }
 
             Spacer()
@@ -263,10 +279,10 @@ struct AppointmentRow: View {
             // Status
             StatusBadge(status: appointment.status)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.03), radius: 4, y: 1)
+        .padding(Spacing.md)
+        .background(Color.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        .appShadow(.soft)
     }
 
     private var relativeDay: String {
@@ -288,13 +304,50 @@ struct StatusBadge: View {
 
     var body: some View {
         Text(status.displayName)
-            .font(.caption2)
+            .font(.appCaption)
             .fontWeight(.medium)
-            .foregroundColor(status.color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(status.color.opacity(0.15))
+            .foregroundColor(Color.statusColor(for: status.rawValue))
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.xs)
+            .background(Color.statusColor(for: status.rawValue).opacity(0.15))
             .clipShape(Capsule())
+    }
+}
+
+// Legacy support
+struct StatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        DashboardStatCard(
+            title: title,
+            value: value,
+            icon: icon,
+            gradient: LinearGradient(colors: [color, color.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+    }
+}
+
+struct QuickActionButton: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        AppQuickAction(icon: icon, label: title, color: color, action: action)
+    }
+}
+
+struct EmptyStateCard: View {
+    let icon: String
+    let message: String
+
+    var body: some View {
+        AppEmptyState(icon: icon, title: "No Data", message: message)
     }
 }
 

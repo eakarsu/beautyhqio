@@ -2,21 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
 
 // GET /api/business/leads - List marketplace leads
 export async function GET(request: NextRequest) {
   try {
+    let user = null;
+
+    // First try web session (NextAuth)
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (session?.user) {
+      user = await prisma.user.findUnique({
+        where: { email: session.user.email! },
+        include: { business: true },
+      });
+    }
+
+    // If no web session, try mobile JWT token
+    if (!user) {
+      const authHeader = request.headers.get("authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; businessId: string };
+          user = await prisma.user.findUnique({
+            where: { id: decoded.userId },
+            include: { business: true },
+          });
+        } catch {
+          // Invalid token, continue to unauthorized
+        }
+      }
+    }
+
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      include: { business: true },
-    });
-
-    if (!user?.business) {
+    if (!user.business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 
