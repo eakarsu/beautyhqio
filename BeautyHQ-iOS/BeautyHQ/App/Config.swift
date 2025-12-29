@@ -1,13 +1,7 @@
 import Foundation
 
 enum Config {
-    static let apiBaseURL: String = {
-        #if DEBUG
-        return ProcessInfo.processInfo.environment["API_URL"] ?? "http://127.0.0.1:3000/api"
-        #else
-        return "https://api.beautyhq.io/api"
-        #endif
-    }()
+    static let apiBaseURL: String = "https://beautyhq.io/api"
 
     static let appName = "BeautyHQ"
     static let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
