@@ -29,7 +29,7 @@ export async function POST(
       await prisma.activity.create({
         data: {
           clientId: appointment.clientId,
-          type: "NO_SHOW",
+          type: "APPOINTMENT_NO_SHOW",
           title: "No Show",
           description: "Client did not show up for appointment",
           metadata: { appointmentId: appointment.id },

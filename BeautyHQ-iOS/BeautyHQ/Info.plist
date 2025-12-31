@@ -60,5 +60,15 @@
 	<string>706714077163-mvim6udfob59qgi2rmkvl4mbrvmtdeql.apps.googleusercontent.com</string>
 	<key>MicrosoftClientID</key>
 	<string>88aa3c7c-5a2c-4839-93ba-ae2849f19739</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BeautyHQ needs camera access to scan payment cards and take client photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>BeautyHQ needs photo library access to save and select client photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>BeautyHQ needs permission to save photos to your library.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>BeautyHQ uses Face ID for secure authentication.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

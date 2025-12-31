@@ -7,6 +7,14 @@ struct BeautyHQApp: App {
 
     init() {
         setupAppearance()
+
+        // Log build configuration and API URL for debugging
+        #if DEBUG
+        print("🔧 BUILD: DEBUG")
+        #else
+        print("🚀 BUILD: RELEASE")
+        #endif
+        print("🌐 API URL: \(Config.apiBaseURL)")
     }
 
     var body: some Scene {
