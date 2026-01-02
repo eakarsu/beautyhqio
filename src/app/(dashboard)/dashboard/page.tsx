@@ -63,14 +63,30 @@ const alertIcons: Record<string, React.ElementType> = {
 };
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    // Redirect based on user role
+    if (status === "authenticated") {
+      if (session?.user?.isPlatformAdmin) {
+        router.replace("/admin");
+        return;
+      }
+      if (session?.user?.isClient) {
+        router.replace("/client");
+        return;
+      }
+      // Staff should go to their own portal, not the salon-wide dashboard
+      if (session?.user?.role === "STAFF") {
+        router.replace("/staff/schedule");
+        return;
+      }
+      fetchDashboardData();
+    }
+  }, [session, status, router]);
 
   const fetchDashboardData = async () => {
     try {

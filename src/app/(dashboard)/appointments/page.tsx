@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +64,7 @@ const statusColors: Record<string, string> = {
 
 export default function AppointmentsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -71,6 +73,9 @@ export default function AppointmentsPage() {
   const [activeTab, setActiveTab] = useState("today");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if user is staff or receptionist (limited permissions)
+  const isLimitedRole = session?.user?.role === "STAFF" || session?.user?.role === "RECEPTIONIST";
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
@@ -323,17 +328,19 @@ export default function AppointmentsPage() {
                         ${apt.services.reduce((sum, s) => sum + Number(s.service.price), 0).toFixed(2)}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteId(apt.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {!isLimitedRole && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteId(apt.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

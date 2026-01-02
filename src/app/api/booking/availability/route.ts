@@ -33,7 +33,10 @@ export async function GET(request: NextRequest) {
       select: { operatingHours: true },
     });
 
-    const dayOfWeek = new Date(date).toLocaleDateString("en-US", {
+    // Parse date for day of week - use local time parsing
+    const [yearForDay, monthForDay, dayForDay] = date.split("-").map(Number);
+    const dateObj = new Date(yearForDay, monthForDay - 1, dayForDay);
+    const dayOfWeek = dateObj.toLocaleDateString("en-US", {
       weekday: "long",
     }).toLowerCase();
     const operatingHours = location?.operatingHours as Record<string, { open: string; close: string }> | null;
@@ -42,8 +45,22 @@ export async function GET(request: NextRequest) {
       close: "18:00",
     };
 
-    // Get available staff
-    const staffWhere: Record<string, unknown> = { locationId, isActive: true };
+    // Get the business for this location
+    const locationData = await prisma.location.findUnique({
+      where: { id: locationId },
+      select: { businessId: true },
+    });
+
+    if (!locationData) {
+      return NextResponse.json({ error: "Location not found" }, { status: 404 });
+    }
+
+    // Get available staff - find by business (staff can serve any location in the business)
+    const staffWhere: Record<string, unknown> = {
+      isActive: true,
+      isBookableOnline: true,
+      user: { businessId: locationData.businessId },
+    };
     if (staffId) staffWhere.id = staffId;
 
     const availableStaff = await prisma.staff.findMany({
@@ -52,6 +69,7 @@ export async function GET(request: NextRequest) {
         id: true,
         displayName: true,
         photo: true,
+        color: true,
         user: {
           select: {
             firstName: true,
@@ -62,17 +80,19 @@ export async function GET(request: NextRequest) {
     });
 
     // Get existing appointments for the date
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Check ALL locations - staff can have appointments at any location in the business
+    // Parse date properly to avoid timezone issues
+    const [year, month, day] = date.split("-").map(Number);
+    const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+    const staffIds = availableStaff.map(s => s.id);
 
     const existingAppointments = await prisma.appointment.findMany({
       where: {
-        locationId,
+        staffId: { in: staffIds },
         scheduledStart: { gte: startOfDay, lte: endOfDay },
         status: { notIn: ["CANCELLED", "NO_SHOW"] },
-        ...(staffId && { staffId }),
       },
       select: {
         staffId: true,
@@ -82,10 +102,17 @@ export async function GET(request: NextRequest) {
     });
 
     // Generate time slots
+    type MappedStaff = {
+      id: string;
+      firstName: string;
+      lastName: string;
+      avatar: string | null;
+      color: string;
+    };
     const slots: Array<{
       time: string;
       available: boolean;
-      availableStaff: typeof availableStaff;
+      availableStaff: MappedStaff[];
     }> = [];
 
     const [openHour, openMin] = hours.open.split(":").map(Number);
@@ -94,25 +121,44 @@ export async function GET(request: NextRequest) {
     const openTime = openHour * 60 + openMin;
     const closeTime = closeHour * 60 + closeMin;
 
+    const now = new Date();
+
     for (let time = openTime; time + duration <= closeTime; time += 30) {
       const slotHour = Math.floor(time / 60);
       const slotMin = time % 60;
       const slotTime = `${String(slotHour).padStart(2, "0")}:${String(slotMin).padStart(2, "0")}`;
 
-      const slotStart = new Date(date);
-      slotStart.setHours(slotHour, slotMin, 0, 0);
+      const slotStart = new Date(year, month - 1, day, slotHour, slotMin, 0, 0);
       const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
-      // Check which staff are available at this time
-      const staffAvailable = availableStaff.filter((staff) => {
-        const hasConflict = existingAppointments.some((apt) => {
-          if (apt.staffId !== staff.id) return false;
-          const aptStart = new Date(apt.scheduledStart);
-          const aptEnd = new Date(apt.scheduledEnd);
-          return slotStart < aptEnd && slotEnd > aptStart;
+      // Skip time slots that have already passed
+      if (slotStart <= now) {
+        slots.push({
+          time: slotTime,
+          available: false,
+          availableStaff: [],
         });
-        return !hasConflict;
-      });
+        continue;
+      }
+
+      // Check which staff are available at this time
+      const staffAvailable = availableStaff
+        .filter((staff) => {
+          const hasConflict = existingAppointments.some((apt) => {
+            if (apt.staffId !== staff.id) return false;
+            const aptStart = new Date(apt.scheduledStart);
+            const aptEnd = new Date(apt.scheduledEnd);
+            return slotStart < aptEnd && slotEnd > aptStart;
+          });
+          return !hasConflict;
+        })
+        .map((staff) => ({
+          id: staff.id,
+          firstName: staff.user?.firstName || staff.displayName || "Staff",
+          lastName: staff.user?.lastName || "",
+          avatar: staff.photo,
+          color: staff.color || "#ec4899",
+        }));
 
       slots.push({
         time: slotTime,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,8 +26,11 @@ interface Service {
 
 interface Staff {
   id: string;
-  firstName: string;
-  lastName: string;
+  displayName?: string;
+  user?: {
+    firstName?: string;
+    lastName?: string;
+  };
 }
 
 interface Location {
@@ -50,6 +54,7 @@ export default function ConfirmBookingPage({
   const date = searchParams.get("date") || "";
   const time = searchParams.get("time") || "";
   const staffId = searchParams.get("staff") || "";
+  const rescheduleId = searchParams.get("reschedule") || "";
 
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff | null>(null);
@@ -59,6 +64,8 @@ export default function ConfirmBookingPage({
   const [confirmed, setConfirmed] = useState(false);
   const [confirmationNumber, setConfirmationNumber] = useState("");
 
+  const { data: session } = useSession();
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -66,6 +73,18 @@ export default function ConfirmBookingPage({
     phone: "",
     notes: "",
   });
+
+  // Pre-fill form with logged-in user data
+  useEffect(() => {
+    if (session?.user) {
+      setFormData((prev) => ({
+        ...prev,
+        firstName: session.user.firstName || prev.firstName,
+        lastName: session.user.lastName || prev.lastName,
+        email: session.user.email || prev.email,
+      }));
+    }
+  }, [session]);
 
   useEffect(() => {
     Promise.all([
@@ -78,7 +97,11 @@ export default function ConfirmBookingPage({
       .then(([locationData, staffData, ...servicesData]) => {
         setLocation(locationData);
         setStaff(staffData);
-        setServices(servicesData);
+        // Filter out any failed fetches (error responses)
+        const validServices = servicesData.filter(
+          (s) => s && s.id && !s.error
+        );
+        setServices(validServices);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -100,6 +123,7 @@ export default function ConfirmBookingPage({
           time,
           ...formData,
           source: "online",
+          rescheduleId: rescheduleId || undefined,
         }),
       });
 
@@ -118,8 +142,8 @@ export default function ConfirmBookingPage({
     }
   };
 
-  const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
-  const totalPrice = services.reduce((sum, s) => sum + s.price, 0);
+  const totalDuration = services.reduce((sum, s) => sum + (Number(s.duration) || 0), 0);
+  const totalPrice = services.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
 
   const formattedDate = date
     ? new Date(date).toLocaleDateString("en-US", {
@@ -170,7 +194,7 @@ export default function ConfirmBookingPage({
               <div className="flex items-center gap-3">
                 <User className="h-5 w-5 text-gray-400" />
                 <span>
-                  {staff?.firstName} {staff?.lastName}
+                  {staff?.displayName || `${staff?.user?.firstName || ''} ${staff?.user?.lastName || ''}`.trim() || 'Staff'}
                 </span>
               </div>
             </div>
@@ -179,12 +203,21 @@ export default function ConfirmBookingPage({
               A confirmation email has been sent to {formData.email}
             </p>
 
-            <Button
-              onClick={() => router.push("/book")}
-              className="w-full bg-pink-600 hover:bg-pink-700"
-            >
-              Book Another Appointment
-            </Button>
+            <div className="space-y-3">
+              <Button
+                onClick={() => router.push("/")}
+                className="w-full bg-pink-600 hover:bg-pink-700"
+              >
+                Return to Home
+              </Button>
+              <Button
+                onClick={() => router.push("/explore")}
+                variant="outline"
+                className="w-full"
+              >
+                Book Another Appointment
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -318,7 +351,7 @@ export default function ConfirmBookingPage({
                   <User className="h-5 w-5 text-gray-400" />
                   <div>
                     <p className="font-medium">
-                      {staff?.firstName} {staff?.lastName}
+                      {staff?.displayName || `${staff?.user?.firstName || ''} ${staff?.user?.lastName || ''}`.trim() || 'Staff'}
                     </p>
                   </div>
                 </div>
@@ -327,13 +360,13 @@ export default function ConfirmBookingPage({
 
                 <div className="space-y-2">
                   <p className="font-medium">Services</p>
-                  {services.map((service) => (
+                  {services.map((service, index) => (
                     <div
-                      key={service.id}
+                      key={service.id || `service-${index}`}
                       className="flex justify-between text-sm"
                     >
-                      <span>{service.name}</span>
-                      <span>${service.price}</span>
+                      <span>{service.name || "Service"}</span>
+                      <span>${(Number(service.price) || 0).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,11 +61,15 @@ interface ClientsData {
 
 export default function ClientsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const [clientsData, setClientsData] = useState<ClientsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if user is staff or receptionist (limited permissions)
+  const isLimitedRole = session?.user?.role === "STAFF" || session?.user?.role === "RECEPTIONIST";
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
@@ -303,19 +308,25 @@ export default function ClientsPage() {
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/calendar?client=${client.id}`); }}>
                             Book Appointment
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/marketing?action=message&client=${client.id}`); }}>
-                            Send Message
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/clients/${client.id}?edit=true`); }}>
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => { e.stopPropagation(); setDeleteId(client.id); }}
-                            className="text-red-600 focus:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                          {!isLimitedRole && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/marketing?action=message&client=${client.id}`); }}>
+                              Send Message
+                            </DropdownMenuItem>
+                          )}
+                          {!isLimitedRole && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/clients/${client.id}?edit=true`); }}>
+                              Edit
+                            </DropdownMenuItem>
+                          )}
+                          {!isLimitedRole && (
+                            <DropdownMenuItem
+                              onClick={(e) => { e.stopPropagation(); setDeleteId(client.id); }}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

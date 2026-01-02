@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -14,6 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Search,
   Plus,
@@ -24,6 +33,9 @@ import {
   Gift,
   Percent,
   User,
+  X,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { formatCurrency, getInitials } from "@/lib/utils";
 
@@ -49,6 +61,14 @@ interface Staff {
   user?: { firstName: string; lastName: string };
 }
 
+interface Client {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+}
+
 interface CartItem {
   id: string;
   name: string;
@@ -62,8 +82,9 @@ const STAFF_COLORS = ["#F43F5E", "#8B5CF6", "#EC4899", "#3B82F6", "#10B981", "#F
 
 export default function POSPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<string>("");
   const [tipAmount, setTipAmount] = useState<number>(0);
   const [tipPercent, setTipPercent] = useState<string>("");
@@ -74,15 +95,48 @@ export default function POSPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Modal states
+  const [showClientSelect, setShowClientSelect] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [showGiftCardModal, setShowGiftCardModal] = useState(false);
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+
+  // Discount state
+  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
+  const [discountValue, setDiscountValue] = useState("");
+
+  // Gift card state
+  const [giftCardCode, setGiftCardCode] = useState("");
+  const [giftCardBalance, setGiftCardBalance] = useState<number | null>(null);
+  const [giftCardAmount, setGiftCardAmount] = useState("");
+  const [giftCardError, setGiftCardError] = useState("");
+  const [giftCardApplied, setGiftCardApplied] = useState<number>(0);
+
+  // Cash payment state
+  const [cashReceived, setCashReceived] = useState("");
+
+  // Processing states
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  // Client payment methods
+  const [clientPaymentMethods, setClientPaymentMethods] = useState<any[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
+  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [servicesRes, productsRes, staffRes] = await Promise.all([
+        const [servicesRes, productsRes, staffRes, clientsRes] = await Promise.all([
           fetch("/api/services"),
           fetch("/api/products"),
           fetch("/api/staff"),
+          fetch("/api/clients"),
         ]);
 
         if (servicesRes.ok) {
@@ -99,6 +153,10 @@ export default function POSPage() {
           if (staffData.length > 0) {
             setSelectedStaff(staffData[0].id);
           }
+        }
+        if (clientsRes.ok) {
+          const clientsData = await clientsRes.json();
+          setClients(clientsData.clients || clientsData);
         }
       } catch (error) {
         console.error("Error fetching POS data:", error);
@@ -194,6 +252,230 @@ export default function POSPage() {
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const filteredClients = clients.filter((c) =>
+    `${c.firstName} ${c.lastName}`.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+    c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+    c.phone?.includes(clientSearchQuery)
+  );
+
+  // Fetch client payment methods when client is selected
+  useEffect(() => {
+    if (selectedClient) {
+      fetchClientPaymentMethods(selectedClient.id);
+    } else {
+      setClientPaymentMethods([]);
+      setSelectedPaymentMethod("");
+    }
+  }, [selectedClient]);
+
+  const fetchClientPaymentMethods = async (clientId: string) => {
+    setLoadingPaymentMethods(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/payment-methods`);
+      if (res.ok) {
+        const data = await res.json();
+        setClientPaymentMethods(data.paymentMethods || []);
+        if (data.paymentMethods?.length > 0) {
+          setSelectedPaymentMethod(data.paymentMethods[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+    } finally {
+      setLoadingPaymentMethods(false);
+    }
+  };
+
+  // Apply discount
+  const applyDiscount = () => {
+    const value = parseFloat(discountValue);
+    if (isNaN(value) || value <= 0) return;
+
+    if (discountType === "percent") {
+      setDiscount(subtotal * (value / 100));
+    } else {
+      setDiscount(value);
+    }
+    setShowDiscountModal(false);
+    setDiscountValue("");
+  };
+
+  // Check gift card balance
+  const checkGiftCard = async () => {
+    setGiftCardError("");
+    setGiftCardBalance(null);
+
+    try {
+      const res = await fetch(`/api/gift-cards/check?code=${giftCardCode}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.currentBalance > 0) {
+          setGiftCardBalance(data.currentBalance);
+        } else {
+          setGiftCardError("Gift card has no balance");
+        }
+      } else {
+        setGiftCardError("Gift card not found");
+      }
+    } catch {
+      setGiftCardError("Error checking gift card");
+    }
+  };
+
+  // Apply gift card
+  const applyGiftCard = () => {
+    const amount = parseFloat(giftCardAmount);
+    if (isNaN(amount) || amount <= 0 || !giftCardBalance) return;
+
+    const maxApply = Math.min(amount, giftCardBalance, total - giftCardApplied);
+    setGiftCardApplied(prev => prev + maxApply);
+    setShowGiftCardModal(false);
+    setGiftCardCode("");
+    setGiftCardBalance(null);
+    setGiftCardAmount("");
+  };
+
+  // Process cash payment
+  const processCashPayment = async () => {
+    if (!selectedClient) {
+      setShowClientSelect(true);
+      return;
+    }
+
+    const received = parseFloat(cashReceived);
+    if (isNaN(received) || received < finalTotal) return;
+
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: selectedClient.id,
+          staffId: selectedStaff,
+          subtotal,
+          discount,
+          tax,
+          tip: tipAmount,
+          giftCardAmount: giftCardApplied,
+          total: finalTotal,
+          paymentMethod: "CASH",
+          items: cart.map(item => ({
+            type: item.type,
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+          })),
+        }),
+      });
+
+      if (res.ok) {
+        setPaymentSuccess(true);
+        setTimeout(() => {
+          resetTransaction();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Payment error:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Process card payment with Stripe using saved payment method
+  const processCardPayment = async () => {
+    if (!selectedClient) {
+      setShowClientSelect(true);
+      return;
+    }
+
+    if (!selectedPaymentMethod) {
+      alert("Please select a payment method");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/payments/charge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: Math.round(finalTotal * 100), // Convert to cents
+          clientId: selectedClient.id,
+          paymentMethodId: selectedPaymentMethod,
+          staffId: selectedStaff,
+          metadata: {
+            subtotal,
+            discount,
+            tax,
+            tip: tipAmount,
+            giftCardAmount: giftCardApplied,
+          },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        // Create transaction record
+        await fetch("/api/transactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientId: selectedClient.id,
+            staffId: selectedStaff,
+            subtotal,
+            discount,
+            tax,
+            tip: tipAmount,
+            giftCardAmount: giftCardApplied,
+            total: finalTotal,
+            paymentMethod: "CARD",
+            stripePaymentIntentId: data.paymentIntentId,
+            items: cart.map(item => ({
+              type: item.type,
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+            })),
+          }),
+        });
+
+        setPaymentSuccess(true);
+        setTimeout(() => {
+          resetTransaction();
+        }, 2000);
+      } else {
+        alert(data.error || "Payment failed");
+      }
+    } catch (error) {
+      console.error("Payment error:", error);
+      alert("Payment failed. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Reset transaction
+  const resetTransaction = () => {
+    setCart([]);
+    setSelectedClient(null);
+    setTipAmount(0);
+    setTipPercent("");
+    setDiscount(0);
+    setGiftCardApplied(0);
+    setCashReceived("");
+    setPaymentSuccess(false);
+    setShowCashModal(false);
+    setShowCardModal(false);
+  };
+
+  // Calculate final total after gift card
+  const finalTotal = Math.max(0, total - giftCardApplied);
+  const cashChange = parseFloat(cashReceived) - finalTotal;
 
   return (
     <div className="h-[calc(100vh-140px)] flex gap-6">
@@ -299,12 +581,17 @@ export default function POSPage() {
             {selectedClient ? (
               <div className="flex items-center gap-2">
                 <Avatar className="h-6 w-6">
-                  <AvatarFallback className="text-xs">SJ</AvatarFallback>
+                  <AvatarFallback className="text-xs bg-rose-100 text-rose-600">
+                    {getInitials(selectedClient.firstName, selectedClient.lastName)}
+                  </AvatarFallback>
                 </Avatar>
-                <span className="text-sm">Sarah Johnson</span>
+                <span className="text-sm">{selectedClient.firstName} {selectedClient.lastName}</span>
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setSelectedClient(null)}>
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
             ) : (
-              <Button variant="outline" size="sm" onClick={() => router.push("/clients?select=true")}>
+              <Button variant="outline" size="sm" onClick={() => setShowClientSelect(true)}>
                 <User className="h-4 w-4 mr-1" />
                 Add Client
               </Button>
@@ -413,7 +700,12 @@ export default function POSPage() {
             </div>
             {discount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
-                <span>Discount</span>
+                <span className="flex items-center gap-1">
+                  Discount
+                  <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => setDiscount(0)}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </span>
                 <span>-{formatCurrency(discount)}</span>
               </div>
             )}
@@ -427,22 +719,30 @@ export default function POSPage() {
                 <span>{formatCurrency(tipAmount)}</span>
               </div>
             )}
+            {giftCardApplied > 0 && (
+              <div className="flex justify-between text-sm text-purple-600">
+                <span className="flex items-center gap-1">
+                  Gift Card
+                  <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => setGiftCardApplied(0)}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </span>
+                <span>-{formatCurrency(giftCardApplied)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-lg font-bold pt-2 border-t">
               <span>Total</span>
-              <span>{formatCurrency(total)}</span>
+              <span>{formatCurrency(finalTotal)}</span>
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex gap-2 mt-4">
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => {
-              const discountInput = prompt("Enter discount amount ($):", "10");
-              if (discountInput) setDiscount(parseFloat(discountInput) || 0);
-            }}>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowDiscountModal(true)}>
               <Percent className="h-4 w-4 mr-1" />
               Discount
             </Button>
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => router.push("/gift-cards/check-balance")}>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowGiftCardModal(true)}>
               <Gift className="h-4 w-4 mr-1" />
               Gift Card
             </Button>
@@ -450,17 +750,333 @@ export default function POSPage() {
 
           {/* Payment Buttons */}
           <div className="grid grid-cols-2 gap-2 mt-3">
-            <Button variant="outline" className="h-12" onClick={() => alert(`Processing cash payment of ${formatCurrency(total)}`)}>
+            <Button
+              variant="outline"
+              className="h-12"
+              disabled={cart.length === 0}
+              onClick={() => {
+                if (!selectedClient) {
+                  setShowClientSelect(true);
+                } else {
+                  setShowCashModal(true);
+                }
+              }}
+            >
               <Banknote className="h-4 w-4 mr-2" />
               Cash
             </Button>
-            <Button className="h-12" onClick={() => alert(`Processing card payment of ${formatCurrency(total)}`)}>
+            <Button
+              className="h-12"
+              disabled={cart.length === 0}
+              onClick={() => {
+                if (!selectedClient) {
+                  setShowClientSelect(true);
+                } else {
+                  setShowCardModal(true);
+                }
+              }}
+            >
               <CreditCard className="h-4 w-4 mr-2" />
               Card
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Client Selection Modal */}
+      <Dialog open={showClientSelect} onOpenChange={setShowClientSelect}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Client</DialogTitle>
+            <DialogDescription>Choose a client for this transaction</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Search by name, email, or phone..."
+                value={clientSearchQuery}
+                onChange={(e) => setClientSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto space-y-2">
+              {filteredClients.map((client) => (
+                <button
+                  key={client.id}
+                  onClick={() => {
+                    setSelectedClient(client);
+                    setShowClientSelect(false);
+                    setClientSearchQuery("");
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-slate-50 text-left"
+                >
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-rose-100 text-rose-600">
+                      {getInitials(client.firstName, client.lastName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{client.firstName} {client.lastName}</p>
+                    <p className="text-sm text-slate-500">{client.email || client.phone}</p>
+                  </div>
+                </button>
+              ))}
+              {filteredClients.length === 0 && (
+                <p className="text-center text-slate-500 py-4">No clients found</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discount Modal */}
+      <Dialog open={showDiscountModal} onOpenChange={setShowDiscountModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Apply Discount</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                variant={discountType === "amount" ? "default" : "outline"}
+                className="flex-1"
+                onClick={() => setDiscountType("amount")}
+              >
+                $ Amount
+              </Button>
+              <Button
+                variant={discountType === "percent" ? "default" : "outline"}
+                className="flex-1"
+                onClick={() => setDiscountType("percent")}
+              >
+                % Percent
+              </Button>
+            </div>
+            <div>
+              <Label>Discount {discountType === "percent" ? "%" : "$"}</Label>
+              <Input
+                type="number"
+                placeholder={discountType === "percent" ? "Enter percentage" : "Enter amount"}
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+              />
+            </div>
+            {discountType === "percent" && discountValue && (
+              <p className="text-sm text-slate-500">
+                Discount: {formatCurrency(subtotal * (parseFloat(discountValue) / 100))}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDiscountModal(false)}>Cancel</Button>
+            <Button onClick={applyDiscount}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Gift Card Modal */}
+      <Dialog open={showGiftCardModal} onOpenChange={setShowGiftCardModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Redeem Gift Card</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Gift Card Code</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter code"
+                  value={giftCardCode}
+                  onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                />
+                <Button variant="outline" onClick={checkGiftCard}>Check</Button>
+              </div>
+            </div>
+            {giftCardError && (
+              <p className="text-sm text-red-500">{giftCardError}</p>
+            )}
+            {giftCardBalance !== null && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-700">Available Balance: {formatCurrency(giftCardBalance)}</p>
+                <div className="mt-2">
+                  <Label>Amount to Apply</Label>
+                  <Input
+                    type="number"
+                    placeholder="Enter amount"
+                    value={giftCardAmount}
+                    onChange={(e) => setGiftCardAmount(e.target.value)}
+                    max={Math.min(giftCardBalance, finalTotal)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowGiftCardModal(false);
+              setGiftCardCode("");
+              setGiftCardBalance(null);
+              setGiftCardError("");
+            }}>Cancel</Button>
+            <Button onClick={applyGiftCard} disabled={!giftCardBalance || !giftCardAmount}>
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cash Payment Modal */}
+      <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cash Payment</DialogTitle>
+            <DialogDescription>Total: {formatCurrency(finalTotal)}</DialogDescription>
+          </DialogHeader>
+          {paymentSuccess ? (
+            <div className="text-center py-8">
+              <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="h-8 w-8 text-green-600" />
+              </div>
+              <p className="text-lg font-semibold text-green-600">Payment Successful!</p>
+              {cashChange > 0 && (
+                <p className="text-slate-500 mt-2">Change: {formatCurrency(cashChange)}</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <Label>Cash Received</Label>
+                <Input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value)}
+                />
+              </div>
+              {parseFloat(cashReceived) >= finalTotal && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-700">Change: {formatCurrency(parseFloat(cashReceived) - finalTotal)}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2">
+                {[20, 50, 100].map((amount) => (
+                  <Button
+                    key={amount}
+                    variant="outline"
+                    onClick={() => setCashReceived(String(amount))}
+                  >
+                    ${amount}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setCashReceived(String(Math.ceil(finalTotal)))}
+              >
+                Exact Amount ({formatCurrency(Math.ceil(finalTotal))})
+              </Button>
+            </div>
+          )}
+          {!paymentSuccess && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCashModal(false)}>Cancel</Button>
+              <Button
+                onClick={processCashPayment}
+                disabled={isProcessing || parseFloat(cashReceived) < finalTotal}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Complete Payment"
+                )}
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Card Payment Modal */}
+      <Dialog open={showCardModal} onOpenChange={setShowCardModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Card Payment</DialogTitle>
+            <DialogDescription>Total: {formatCurrency(finalTotal)}</DialogDescription>
+          </DialogHeader>
+          {paymentSuccess ? (
+            <div className="text-center py-8">
+              <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="h-8 w-8 text-green-600" />
+              </div>
+              <p className="text-lg font-semibold text-green-600">Payment Successful!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {loadingPaymentMethods ? (
+                <div className="text-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400" />
+                  <p className="text-sm text-slate-500 mt-2">Loading payment methods...</p>
+                </div>
+              ) : clientPaymentMethods.length > 0 ? (
+                <div className="space-y-2">
+                  <Label>Select Card</Label>
+                  {clientPaymentMethods.map((pm) => (
+                    <button
+                      key={pm.id}
+                      onClick={() => setSelectedPaymentMethod(pm.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+                        selectedPaymentMethod === pm.id
+                          ? "border-rose-500 bg-rose-50"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <CreditCard className="h-5 w-5 text-slate-400" />
+                      <div>
+                        <p className="font-medium capitalize">{pm.card?.brand} •••• {pm.card?.last4}</p>
+                        <p className="text-sm text-slate-500">Expires {pm.card?.exp_month}/{pm.card?.exp_year}</p>
+                      </div>
+                      {selectedPaymentMethod === pm.id && (
+                        <Check className="h-5 w-5 text-rose-500 ml-auto" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 border-2 border-dashed rounded-lg text-center">
+                  <CreditCard className="h-12 w-12 mx-auto text-slate-400 mb-3" />
+                  <p className="text-slate-600">No saved cards found</p>
+                  <p className="text-sm text-slate-400 mt-1">Client needs to add a payment method</p>
+                </div>
+              )}
+            </div>
+          )}
+          {!paymentSuccess && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCardModal(false)}>Cancel</Button>
+              <Button
+                onClick={processCardPayment}
+                disabled={isProcessing || !selectedPaymentMethod || clientPaymentMethods.length === 0}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Charge {formatCurrency(finalTotal)}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

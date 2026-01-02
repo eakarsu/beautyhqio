@@ -1,16 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser, getBusinessIdFilter, AuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/staff - List staff
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const locationId = searchParams.get("locationId");
     const isActive = searchParams.get("isActive");
+    const requestedBusinessId = searchParams.get("businessId");
 
-    const where: any = {};
+    // Build where clause
+    const where: Record<string, unknown> = {};
     if (locationId) where.locationId = locationId;
     if (isActive !== null) where.isActive = isActive === "true";
+
+    // Apply business filter - filter staff by their location's businessId
+    const businessIdFilter = getBusinessIdFilter(user as AuthenticatedUser, requestedBusinessId);
+    if (businessIdFilter) {
+      where.location = {
+        businessId: businessIdFilter,
+      };
+    }
 
     const staff = await prisma.staff.findMany({
       where,
@@ -39,6 +56,17 @@ export async function GET(request: NextRequest) {
 // POST /api/staff - Create staff member
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only OWNER, MANAGER, or PLATFORM_ADMIN can create staff
+    if (!user.isPlatformAdmin && !["OWNER", "MANAGER"].includes(user.role)) {
+      return NextResponse.json({ error: "Forbidden - insufficient permissions" }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       userId,
@@ -61,6 +89,12 @@ export async function POST(request: NextRequest) {
     let finalUserId = userId;
     let finalLocationId = locationId;
 
+    // Determine the target business
+    const targetBusinessId = user.isPlatformAdmin ? body.businessId || user.businessId : user.businessId;
+    if (!targetBusinessId) {
+      return NextResponse.json({ error: "Business ID is required" }, { status: 400 });
+    }
+
     // If no userId provided, find existing user or create a new one
     if (!finalUserId && email && firstName && lastName) {
       // First check if user with this email already exists
@@ -71,9 +105,6 @@ export async function POST(request: NextRequest) {
       if (existingUser) {
         finalUserId = existingUser.id;
       } else {
-        // Get the first business for the new user
-        const firstBusiness = await prisma.business.findFirst();
-
         // Generate a temporary password (should be changed on first login)
         const tempPassword = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
@@ -85,29 +116,35 @@ export async function POST(request: NextRequest) {
             phone: phone || null,
             password: tempPassword, // Temporary password - user should reset on first login
             role: "STAFF",
-            businessId: firstBusiness?.id ?? "",
+            businessId: targetBusinessId,
           },
         });
         finalUserId = newUser.id;
       }
     }
 
-    // If still no userId, get the first user
+    // If still no userId, return error
     if (!finalUserId) {
-      const firstUser = await prisma.user.findFirst();
-      if (!firstUser) {
-        return NextResponse.json(
-          { error: "No user found. Please provide user details." },
-          { status: 400 }
-        );
-      }
-      finalUserId = firstUser.id;
+      return NextResponse.json(
+        { error: "User ID or user details (email, firstName, lastName) required" },
+        { status: 400 }
+      );
     }
 
-    // If no locationId provided, get the first location
+    // If no locationId provided, get the first location for this business
     if (!finalLocationId) {
-      const firstLocation = await prisma.location.findFirst();
-      finalLocationId = firstLocation?.id || null;
+      const businessLocation = await prisma.location.findFirst({
+        where: { businessId: targetBusinessId },
+      });
+      finalLocationId = businessLocation?.id || null;
+    } else {
+      // Verify the location belongs to the user's business
+      const location = await prisma.location.findUnique({
+        where: { id: finalLocationId },
+      });
+      if (!user.isPlatformAdmin && location?.businessId !== targetBusinessId) {
+        return NextResponse.json({ error: "Location does not belong to your business" }, { status: 403 });
+      }
     }
 
     // Check if staff already exists for this user

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmationEmail } from "@/lib/email";
 import { sendAppointmentConfirmationSMS } from "@/lib/twilio";
@@ -19,13 +21,34 @@ export async function POST(request: NextRequest) {
       phone,
       notes,
       source = "online",
+      rescheduleId,
     } = body;
 
-    // Validate required fields
-    if (!locationId || !serviceId || !date || !time || !firstName || !phone) {
+    // Validate required fields (phone is optional if email is provided)
+    if (!locationId || !serviceId || !date || !time || !firstName) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
+      );
+    }
+
+    // Need at least one contact method
+    if (!phone && !email) {
+      return NextResponse.json(
+        { error: "Please provide a phone number or email" },
+        { status: 400 }
+      );
+    }
+
+    // Get location to find businessId
+    const location = await prisma.location.findUnique({
+      where: { id: locationId },
+    });
+
+    if (!location) {
+      return NextResponse.json(
+        { error: "Location not found" },
+        { status: 404 }
       );
     }
 
@@ -41,16 +64,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse date and time
+    // Parse date and time - use explicit local time to avoid timezone issues
     const [hour, min] = time.split(":").map(Number);
-    const scheduledStart = new Date(date);
-    scheduledStart.setHours(hour, min, 0, 0);
+    const [year, month, day] = date.split("-").map(Number);
+    const scheduledStart = new Date(year, month - 1, day, hour, min, 0, 0);
     const scheduledEnd = new Date(scheduledStart.getTime() + service.duration * 60000);
 
-    // Find or create client
+    // Check if user is logged in
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+
+    // Find or create client for this business
     let client = await prisma.client.findFirst({
       where: {
+        businessId: location.businessId,
         OR: [
+          ...(userId ? [{ userId }] : []),
           ...(email ? [{ email }] : []),
           { phone },
         ],
@@ -65,7 +94,15 @@ export async function POST(request: NextRequest) {
           email,
           phone,
           referralSource: source,
+          businessId: location.businessId,
+          userId: userId || null,
         },
+      });
+    } else if (userId && !client.userId) {
+      // Link existing client to logged-in user
+      client = await prisma.client.update({
+        where: { id: client.id },
+        data: { userId },
       });
     }
 
@@ -169,6 +206,28 @@ export async function POST(request: NextRequest) {
         metadata: { appointmentId: appointment.id, source },
       },
     });
+
+    // If this is a reschedule, cancel the old appointment
+    if (rescheduleId) {
+      await prisma.appointment.update({
+        where: { id: rescheduleId },
+        data: { status: "CANCELLED" },
+      });
+
+      await prisma.activity.create({
+        data: {
+          clientId: client.id,
+          type: "APPOINTMENT_CANCELLED",
+          title: "Appointment Rescheduled",
+          description: `Rescheduled to ${scheduledStart.toLocaleDateString()} at ${time}`,
+          metadata: {
+            oldAppointmentId: rescheduleId,
+            newAppointmentId: appointment.id,
+            isReschedule: true,
+          },
+        },
+      });
+    }
 
     // Send confirmation email if client has email
     if (client.email) {

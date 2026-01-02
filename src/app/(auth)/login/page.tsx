@@ -204,6 +204,58 @@ export default function LoginPage() {
               Register
             </Link>
           </p>
+
+          {/* Demo Credentials with Role Summary */}
+          <div className="w-full bg-slate-50 rounded-lg p-4 space-y-3">
+            <p className="text-xs font-semibold text-slate-700 text-center uppercase tracking-wide">
+              Demo Accounts & Role Access
+            </p>
+            <div className="space-y-2 text-xs">
+              <div
+                className="p-2 bg-blue-50 rounded cursor-pointer hover:bg-blue-100 transition-colors"
+                onClick={() => { setEmail("admin@luxebeauty.com"); setPassword("admin123"); }}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-blue-700">Owner</span>
+                  <span className="text-blue-600">admin@luxebeauty.com</span>
+                </div>
+                <p className="text-[10px] text-blue-600 mt-1">Full dashboard with all features</p>
+              </div>
+              <div
+                className="p-2 bg-purple-50 rounded cursor-pointer hover:bg-purple-100 transition-colors"
+                onClick={() => { setEmail("jennifer@luxebeauty.com"); setPassword("password123"); }}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-purple-700">Manager</span>
+                  <span className="text-purple-600">jennifer@luxebeauty.com</span>
+                </div>
+                <p className="text-[10px] text-purple-600 mt-1">Same as Owner (minus Billing/Subscription)</p>
+              </div>
+              <div
+                className="p-2 bg-amber-50 rounded cursor-pointer hover:bg-amber-100 transition-colors"
+                onClick={() => { setEmail("lisa@luxebeauty.com"); setPassword("password123"); }}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-amber-700">Receptionist</span>
+                  <span className="text-amber-600">lisa@luxebeauty.com</span>
+                </div>
+                <p className="text-[10px] text-amber-600 mt-1">Limited dashboard (no Services, Staff, Products)</p>
+              </div>
+              <div
+                className="p-2 bg-green-50 rounded cursor-pointer hover:bg-green-100 transition-colors"
+                onClick={() => { setEmail("sarah@luxebeauty.com"); setPassword("password123"); }}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-green-700">Staff</span>
+                  <span className="text-green-600">sarah@luxebeauty.com</span>
+                </div>
+                <p className="text-[10px] text-green-600 mt-1">Staff portal (My Schedule, Clients, Earnings)</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500 text-center">
+              Click any row to auto-fill credentials
+            </p>
+          </div>
         </CardFooter>
       </Card>
     </div>

@@ -1,16 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser, getBusinessIdFilter, AuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/services - List services
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const businessId = searchParams.get("businessId");
+    const requestedBusinessId = searchParams.get("businessId");
+    const locationId = searchParams.get("locationId");
     const categoryId = searchParams.get("categoryId");
     const isActive = searchParams.get("isActive");
 
-    const where: any = {};
-    if (businessId) where.businessId = businessId;
+    const where: Record<string, unknown> = {};
+
+    // If locationId is provided (public booking flow), get businessId from location
+    if (locationId) {
+      const location = await prisma.location.findUnique({
+        where: { id: locationId },
+        select: { businessId: true },
+      });
+      if (location) {
+        where.businessId = location.businessId;
+      }
+    } else {
+      // Authenticate user for non-public access
+      const user = await getAuthenticatedUser();
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      // Apply business filter
+      const businessIdFilter = getBusinessIdFilter(user as AuthenticatedUser, requestedBusinessId);
+      if (businessIdFilter) {
+        where.businessId = businessIdFilter;
+      }
+    }
+
     if (categoryId) where.categoryId = categoryId;
     if (isActive !== null) where.isActive = isActive === "true";
 
@@ -39,6 +64,17 @@ export async function GET(request: NextRequest) {
 // POST /api/services - Create service
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only OWNER, MANAGER, or PLATFORM_ADMIN can create services
+    if (!user.isPlatformAdmin && !["OWNER", "MANAGER"].includes(user.role)) {
+      return NextResponse.json({ error: "Forbidden - insufficient permissions" }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       businessId,
@@ -52,17 +88,13 @@ export async function POST(request: NextRequest) {
       allowOnline,
     } = body;
 
-    // Get businessId from body or find the first business
-    let finalBusinessId = businessId;
+    // Determine target business
+    let finalBusinessId = user.isPlatformAdmin ? (businessId || user.businessId) : user.businessId;
     if (!finalBusinessId) {
-      const firstBusiness = await prisma.business.findFirst();
-      if (!firstBusiness) {
-        return NextResponse.json(
-          { error: "No business found. Please create a business first." },
-          { status: 400 }
-        );
-      }
-      finalBusinessId = firstBusiness.id;
+      return NextResponse.json(
+        { error: "Business ID is required" },
+        { status: 400 }
+      );
     }
 
     const service = await prisma.service.create({

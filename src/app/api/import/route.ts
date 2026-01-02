@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 interface ImportRow {
   firstName: string;
@@ -13,6 +14,12 @@ interface ImportRow {
 
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { locationId, type, data, options } = body;
 
@@ -21,6 +28,20 @@ export async function POST(request: NextRequest) {
         { error: "locationId, type, and data are required" },
         { status: 400 }
       );
+    }
+
+    // Get location to find businessId
+    const location = await prisma.location.findUnique({
+      where: { id: locationId },
+    });
+
+    if (!location) {
+      return NextResponse.json({ error: "Location not found" }, { status: 404 });
+    }
+
+    // Verify user has access to this business
+    if (!user.isPlatformAdmin && user.businessId !== location.businessId) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     const results = {
@@ -84,6 +105,7 @@ export async function POST(request: NextRequest) {
                 birthday: row.birthDate ? new Date(row.birthDate) : undefined,
                 notes: row.notes,
                 referralSource: "IMPORT",
+                businessId: location.businessId,
               },
             });
             results.imported++;

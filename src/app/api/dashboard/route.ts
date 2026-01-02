@@ -1,10 +1,41 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { startOfDay, endOfDay, subDays, startOfWeek, endOfWeek } from "date-fns";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/dashboard - Get dashboard data
 export async function GET() {
   try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Clients and Platform Admin get redirected to their respective dashboards
+    if (user.role === "CLIENT") {
+      return NextResponse.json({ error: "Use /api/client/dashboard for client dashboard" }, { status: 400 });
+    }
+
+    // Get locations for the user's business (for filtering)
+    let locationIds: string[] = [];
+    if (!user.isPlatformAdmin && user.businessId) {
+      const locations = await prisma.location.findMany({
+        where: { businessId: user.businessId },
+        select: { id: true },
+      });
+      locationIds = locations.map((l) => l.id);
+    }
+
+    // Build filter based on user role
+    const locationFilter = !user.isPlatformAdmin && locationIds.length > 0
+      ? { locationId: { in: locationIds } }
+      : {};
+
+    const businessFilter = !user.isPlatformAdmin && user.businessId
+      ? { businessId: user.businessId }
+      : {};
+
     const today = new Date();
     const todayStart = startOfDay(today);
     const todayEnd = endOfDay(today);
@@ -13,13 +44,14 @@ export async function GET() {
     const weekStart = startOfWeek(today);
     const weekEnd = endOfWeek(today);
 
-    // Get today's appointments
+    // Get today's appointments (filtered by business)
     const todayAppointments = await prisma.appointment.findMany({
       where: {
         scheduledStart: {
           gte: todayStart,
           lte: todayEnd,
         },
+        ...locationFilter,
       },
       include: {
         client: {
@@ -54,17 +86,18 @@ export async function GET() {
       },
     });
 
-    // Count yesterday's appointments for comparison
+    // Count yesterday's appointments for comparison (filtered by business)
     const yesterdayAppointmentCount = await prisma.appointment.count({
       where: {
         scheduledStart: {
           gte: yesterdayStart,
           lte: yesterdayEnd,
         },
+        ...locationFilter,
       },
     });
 
-    // Get today's revenue from completed transactions
+    // Get today's revenue from completed transactions (filtered by business)
     const todayTransactions = await prisma.transaction.findMany({
       where: {
         createdAt: {
@@ -72,6 +105,7 @@ export async function GET() {
           lte: todayEnd,
         },
         status: "COMPLETED",
+        ...locationFilter,
       },
       select: {
         totalAmount: true,
@@ -83,7 +117,7 @@ export async function GET() {
       0
     );
 
-    // Get average daily revenue for comparison (last 7 days)
+    // Get average daily revenue for comparison (last 7 days) (filtered by business)
     const last7DaysStart = subDays(todayStart, 7);
     const last7DaysTransactions = await prisma.transaction.findMany({
       where: {
@@ -92,6 +126,7 @@ export async function GET() {
           lt: todayStart,
         },
         status: "COMPLETED",
+        ...locationFilter,
       },
       select: {
         totalAmount: true,
@@ -103,13 +138,14 @@ export async function GET() {
         ? last7DaysTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0) / 7
         : 0;
 
-    // Get walk-in queue (waitlist entries)
+    // Get walk-in queue (waitlist entries) (filtered by business)
     const waitlistEntries = await prisma.waitlistEntry.findMany({
       where: {
         seatedAt: null, // Not yet seated = waiting
         addedAt: {
           gte: todayStart,
         },
+        ...locationFilter,
       },
       select: {
         id: true,
@@ -117,24 +153,28 @@ export async function GET() {
       },
     });
 
-    // Get staff on duty today
+    // Get staff on duty today (filtered by business)
     const dayOfWeek = today.getDay();
-    const staffOnDuty = await prisma.staff.findMany({
-      where: {
-        isActive: true,
-        schedules: {
-          some: {
-            dayOfWeek: dayOfWeek,
-            isWorking: true,
-          },
+    const staffOnDutyWhere: Record<string, unknown> = {
+      isActive: true,
+      schedules: {
+        some: {
+          dayOfWeek: dayOfWeek,
+          isWorking: true,
         },
       },
+    };
+    if (!user.isPlatformAdmin && locationIds.length > 0) {
+      staffOnDutyWhere.locationId = { in: locationIds };
+    }
+    const staffOnDuty = await prisma.staff.findMany({
+      where: staffOnDutyWhere,
       select: {
         id: true,
       },
     });
 
-    // Get alerts
+    // Get alerts (filtered by business)
     // 1. Low stock products
     const lowStockProducts = await prisma.product.findMany({
       where: {
@@ -142,6 +182,7 @@ export async function GET() {
           lte: 5,
         },
         isActive: true,
+        ...businessFilter,
       },
       select: {
         name: true,
@@ -150,7 +191,7 @@ export async function GET() {
       take: 3,
     });
 
-    // 2. Birthdays this week
+    // 2. Birthdays this week (filtered by business)
     const currentMonth = today.getMonth() + 1;
     const currentDay = today.getDate();
     const weekEndDay = endOfWeek(today).getDate();
@@ -163,16 +204,21 @@ export async function GET() {
           lte: weekEndDay,
         },
         status: "ACTIVE",
+        ...businessFilter,
       },
     });
 
-    // 3. Recent reviews
-    const recentReviews = await prisma.review.findMany({
-      where: {
-        createdAt: {
-          gte: subDays(today, 7),
-        },
+    // 3. Recent reviews (filtered by business through client)
+    const reviewWhere: Record<string, unknown> = {
+      createdAt: {
+        gte: subDays(today, 7),
       },
+    };
+    if (!user.isPlatformAdmin && user.businessId) {
+      reviewWhere.client = { businessId: user.businessId };
+    }
+    const recentReviews = await prisma.review.findMany({
+      where: reviewWhere,
       include: {
         client: {
           select: {
@@ -187,8 +233,9 @@ export async function GET() {
       take: 3,
     });
 
-    // Get ALL clients
+    // Get recent clients (filtered by business)
     const recentClients = await prisma.client.findMany({
+      where: businessFilter,
       orderBy: {
         createdAt: "desc",
       },
@@ -201,10 +248,13 @@ export async function GET() {
         status: true,
         createdAt: true,
       },
+      take: 50, // Limit to recent 50
     });
 
-    // Get total client count
-    const totalClients = await prisma.client.count();
+    // Get total client count (filtered by business)
+    const totalClients = await prisma.client.count({
+      where: businessFilter,
+    });
 
     // Calculate stats
     const appointmentChange = todayAppointments.length - yesterdayAppointmentCount;

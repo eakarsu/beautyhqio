@@ -22,6 +22,8 @@ import {
   Calendar,
   ChevronRight,
   Building2,
+  Home,
+  ArrowLeft,
 } from "lucide-react";
 
 interface SalonData {
@@ -221,6 +223,22 @@ export default function SalonProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Navigation */}
+      <div className="bg-white border-b px-4 py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Button variant="ghost" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Link href="/">
+            <Button variant="outline">
+              <Home className="h-4 w-4 mr-2" />
+              Home
+            </Button>
+          </Link>
+        </div>
+      </div>
+
       {/* Cover Image */}
       <div className="relative h-64 md:h-80 bg-gray-200">
         {profile.coverImage ? (

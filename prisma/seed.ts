@@ -466,6 +466,7 @@ async function main() {
         allowSms: true,
         allowEmail: true,
         tags: clientData.status === "VIP" ? ["VIP", "Regular"] : ["Regular"],
+        businessId: business.id,
       },
     });
     clients.push(client);
@@ -592,73 +593,88 @@ async function main() {
     take: 5,
   });
 
-  // Create Sample Appointments (30+ appointments)
+  // Create Sample Appointments
   const today = new Date();
-  const appointmentsData = [];
+  let appointmentCount = 0;
 
-  for (let i = 0; i < 35; i++) {
-    const dayOffset = Math.floor(Math.random() * 14) - 7; // -7 to +7 days
-    const hour = 9 + Math.floor(Math.random() * 9); // 9am to 6pm
+  // First, create 15+ COMPLETED appointments for EACH staff member with unique clients
+  for (const staff of staffMembers) {
+    // Each staff gets appointments with first 18 clients (ensuring at least 15 unique)
+    for (let i = 0; i < 18; i++) {
+      const client = clients[i];
+      const dayOffset = -1 - Math.floor(Math.random() * 30); // Past 30 days
+      const hour = 9 + Math.floor(Math.random() * 9); // 9am to 6pm
+      const appointmentDate = new Date(today);
+      appointmentDate.setDate(today.getDate() + dayOffset);
+      appointmentDate.setHours(hour, 0, 0, 0);
+
+      const service = services[Math.floor(Math.random() * Math.min(10, services.length))];
+      const endDate = new Date(appointmentDate);
+      endDate.setMinutes(endDate.getMinutes() + service.duration);
+
+      const apt = await prisma.appointment.create({
+        data: {
+          clientId: client.id,
+          staffId: staff.id,
+          locationId: locations[0].id,
+          scheduledStart: appointmentDate,
+          scheduledEnd: endDate,
+          status: "COMPLETED",
+          source: ["ONLINE", "PHONE", "WALK_IN", "APP"][Math.floor(Math.random() * 4)] as any,
+        },
+      });
+
+      await prisma.appointmentService.create({
+        data: {
+          appointmentId: apt.id,
+          serviceId: service.id,
+          price: service.price,
+          duration: service.duration,
+        },
+      });
+      appointmentCount++;
+    }
+  }
+
+  // Add appointments for TODAY and upcoming days (more visible on calendar)
+  for (let i = 0; i < 50; i++) {
+    const dayOffset = Math.floor(Math.random() * 7); // 0 to 6 days (today + next 6 days)
+    const hour = 9 + Math.floor(Math.random() * 9);
     const appointmentDate = new Date(today);
     appointmentDate.setDate(today.getDate() + dayOffset);
     appointmentDate.setHours(hour, 0, 0, 0);
 
+    const service = services[Math.floor(Math.random() * Math.min(10, services.length))];
     const endDate = new Date(appointmentDate);
-    endDate.setMinutes(endDate.getMinutes() + services[Math.floor(Math.random() * 10)].duration);
+    endDate.setMinutes(endDate.getMinutes() + service.duration);
 
-    const status = dayOffset < 0
-      ? (Math.random() > 0.2 ? "completed" : (Math.random() > 0.5 ? "cancelled" : "no_show"))
-      : (Math.random() > 0.3 ? "confirmed" : "booked");
+    const status = Math.random() > 0.3 ? "CONFIRMED" : "BOOKED";
 
-    const statusMap: Record<string, string> = {
-      completed: "COMPLETED",
-      cancelled: "CANCELLED",
-      no_show: "NO_SHOW",
-      confirmed: "CONFIRMED",
-      booked: "BOOKED",
-    };
-
-    const sourceMap: Record<string, string> = {
-      online: "ONLINE",
-      phone: "PHONE",
-      walk_in: "WALK_IN",
-      app: "APP",
-    };
-
-    const sourceKey = ["online", "phone", "walk_in", "app"][Math.floor(Math.random() * 4)];
-
-    const aptEntry: any = {
-      clientId: clients[Math.floor(Math.random() * clients.length)].id,
-      locationId: locations[0].id,
-      scheduledStart: appointmentDate,
-      scheduledEnd: endDate,
-      status: statusMap[status] as any,
-      source: sourceMap[sourceKey] as any,
-    };
     if (staffMembers.length > 0) {
-      aptEntry.staffId = staffMembers[Math.floor(Math.random() * staffMembers.length)].id;
-    }
-    appointmentsData.push(aptEntry);
-  }
-
-  for (const aptData of appointmentsData) {
-    if (aptData.staffId) {
       const apt = await prisma.appointment.create({
-        data: aptData,
+        data: {
+          clientId: clients[Math.floor(Math.random() * clients.length)].id,
+          staffId: staffMembers[Math.floor(Math.random() * staffMembers.length)].id,
+          locationId: locations[0].id,
+          scheduledStart: appointmentDate,
+          scheduledEnd: endDate,
+          status: status as any,
+          source: ["ONLINE", "PHONE", "WALK_IN", "APP"][Math.floor(Math.random() * 4)] as any,
+        },
       });
 
-      // Add service to appointment
       await prisma.appointmentService.create({
         data: {
           appointmentId: apt.id,
-          serviceId: services[Math.floor(Math.random() * 10)].id,
-          price: services[Math.floor(Math.random() * 10)].price,
-          duration: services[Math.floor(Math.random() * 10)].duration,
+          serviceId: service.id,
+          price: service.price,
+          duration: service.duration,
         },
       });
+      appointmentCount++;
     }
   }
-  console.log("Created appointments:", appointmentsData.length);
+  console.log("Created appointments:", appointmentCount);
 
   // Create Sample Transactions (50+ transactions)
   for (let i = 0; i < 50; i++) {
@@ -1236,7 +1252,311 @@ async function main() {
   console.log(`   - Services: ${services.length} (36 services)`);
   console.log(`   - Products: ${productsData.length} (23 products)`);
   console.log(`   - Clients: ${clients.length} (25 clients)`);
-  console.log(`   - Appointments: ${appointmentsData.length} (35 appointments)`);
+  // ============ SALES CRM LEADS ============
+  // Create 18 leads for Sales CRM (potential salon owners)
+  const salesLeadsData = [
+    {
+      salonName: "Glamour Studio NYC",
+      ownerName: "Maria Santos",
+      email: "maria@glamourstudio.com",
+      phone: "(212) 555-0101",
+      website: "https://glamourstudio.com",
+      address: "456 5th Avenue",
+      city: "New York",
+      state: "NY",
+      zip: "10018",
+      source: "GOOGLE_MAPS" as const,
+      status: "NEW" as const,
+      priority: "HIGH" as const,
+      notes: "Found on Google Maps, 4.8 star rating, 200+ reviews. Currently using paper scheduling.",
+    },
+    {
+      salonName: "Bella Rosa Spa",
+      ownerName: "Isabella Rodriguez",
+      email: "isabella@bellarosa.com",
+      phone: "(305) 555-0202",
+      website: "https://bellarosaspa.com",
+      address: "789 Ocean Drive",
+      city: "Miami",
+      state: "FL",
+      zip: "33139",
+      source: "YELP" as const,
+      status: "CONTACTED" as const,
+      priority: "MEDIUM" as const,
+      notes: "Spoke on phone, interested in demo. Has 3 stylists.",
+      lastContactAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "The Hair Lounge",
+      ownerName: "David Kim",
+      email: "david@thehairlounge.com",
+      phone: "(415) 555-0303",
+      address: "123 Market Street",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94102",
+      source: "REFERRAL" as const,
+      status: "DEMO_SCHEDULED" as const,
+      priority: "URGENT" as const,
+      notes: "Referred by Luxe Beauty Studio. Demo scheduled for next Tuesday.",
+      lastContactAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Sunset Nails & Spa",
+      ownerName: "Linda Tran",
+      email: "linda@sunsetnails.com",
+      phone: "(714) 555-0404",
+      website: "https://sunsetnailsspa.com",
+      address: "555 Beach Blvd",
+      city: "Huntington Beach",
+      state: "CA",
+      zip: "92648",
+      source: "TRADE_SHOW" as const,
+      status: "DEMO_COMPLETED" as const,
+      priority: "HIGH" as const,
+      notes: "Met at Beauty Expo LA. Very impressed with POS features. Following up on pricing.",
+      lastContactAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Urban Cuts Barbershop",
+      ownerName: "Marcus Johnson",
+      email: "marcus@urbancuts.com",
+      phone: "(312) 555-0505",
+      address: "888 Michigan Ave",
+      city: "Chicago",
+      state: "IL",
+      zip: "60611",
+      source: "COLD_CALL" as const,
+      status: "TRIAL" as const,
+      priority: "HIGH" as const,
+      notes: "Started 14-day trial. Has 5 barbers. Looking for walk-in management.",
+      lastContactAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Serenity Day Spa",
+      ownerName: "Jennifer Walsh",
+      email: "jennifer@serenityds.com",
+      phone: "(512) 555-0606",
+      website: "https://serenitydayspa.com",
+      address: "321 Congress Ave",
+      city: "Austin",
+      state: "TX",
+      zip: "78701",
+      source: "WEBSITE" as const,
+      status: "NEGOTIATING" as const,
+      priority: "URGENT" as const,
+      notes: "Wants annual plan discount. Has 8 treatment rooms and 12 staff.",
+      lastContactAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Polished Perfection",
+      ownerName: "Amanda Foster",
+      email: "amanda@polishedperfection.com",
+      phone: "(602) 555-0707",
+      address: "999 Camelback Rd",
+      city: "Phoenix",
+      state: "AZ",
+      zip: "85014",
+      source: "SOCIAL_MEDIA" as const,
+      status: "CONVERTED" as const,
+      priority: "MEDIUM" as const,
+      notes: "Signed up for Growth plan! Onboarding completed.",
+      lastContactAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+      convertedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Classic Barbers",
+      ownerName: "Robert Martinez",
+      email: "robert@classicbarbers.com",
+      phone: "(303) 555-0808",
+      address: "444 Larimer St",
+      city: "Denver",
+      state: "CO",
+      zip: "80202",
+      source: "GOOGLE_MAPS" as const,
+      status: "LOST" as const,
+      priority: "LOW" as const,
+      notes: "Decided to go with competitor. Price was main concern.",
+      lastContactAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+      lostReason: "Chose competitor due to lower pricing",
+    },
+    {
+      salonName: "Mane Attraction",
+      ownerName: "Sophia Lee",
+      email: "sophia@maneattraction.com",
+      phone: "(206) 555-0909",
+      website: "https://maneattractionsalon.com",
+      address: "777 Pike Street",
+      city: "Seattle",
+      state: "WA",
+      zip: "98101",
+      source: "REFERRAL" as const,
+      status: "NEW" as const,
+      priority: "HIGH" as const,
+      notes: "Referred by Jennifer Walsh. High-end salon, 6 stylists.",
+    },
+    {
+      salonName: "The Beauty Bar",
+      ownerName: "Nicole Brown",
+      email: "nicole@thebeautybar.com",
+      phone: "(404) 555-1010",
+      address: "222 Peachtree St",
+      city: "Atlanta",
+      state: "GA",
+      zip: "30303",
+      source: "YELP" as const,
+      status: "CONTACTED" as const,
+      priority: "MEDIUM" as const,
+      notes: "Left voicemail, waiting for callback. Has 4 stations.",
+      lastContactAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Luxe Lashes & Brows",
+      ownerName: "Emily Chen",
+      email: "emily@luxelashes.com",
+      phone: "(213) 555-1111",
+      website: "https://luxelashesla.com",
+      address: "333 Rodeo Drive",
+      city: "Beverly Hills",
+      state: "CA",
+      zip: "90210",
+      source: "WEBSITE" as const,
+      status: "DEMO_SCHEDULED" as const,
+      priority: "URGENT" as const,
+      notes: "High-value lead. Celebrity clientele. Demo tomorrow at 2pm.",
+      lastContactAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Zen Wellness Spa",
+      ownerName: "Michael Park",
+      email: "michael@zenwellness.com",
+      phone: "(503) 555-1212",
+      address: "111 Pearl District",
+      city: "Portland",
+      state: "OR",
+      zip: "97209",
+      source: "TRADE_SHOW" as const,
+      status: "TRIAL" as const,
+      priority: "MEDIUM" as const,
+      notes: "On day 5 of trial. Loving the appointment reminders feature.",
+      lastContactAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Scissor Sisters Salon",
+      ownerName: "Rachel Green",
+      email: "rachel@scissorsisters.com",
+      phone: "(617) 555-1313",
+      address: "666 Newbury St",
+      city: "Boston",
+      state: "MA",
+      zip: "02115",
+      source: "COLD_CALL" as const,
+      status: "NEW" as const,
+      priority: "LOW" as const,
+      notes: "Initial contact made. Small salon with 2 stylists.",
+    },
+    {
+      salonName: "Glow Up Studio",
+      ownerName: "Taylor Swift",
+      email: "taylor@glowupstudio.com",
+      phone: "(702) 555-1414",
+      website: "https://glowupstudio.com",
+      address: "888 Las Vegas Blvd",
+      city: "Las Vegas",
+      state: "NV",
+      zip: "89109",
+      source: "SOCIAL_MEDIA" as const,
+      status: "DEMO_COMPLETED" as const,
+      priority: "HIGH" as const,
+      notes: "Very interested in marketplace feature. Wants to increase online bookings.",
+      lastContactAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Elite Hair Design",
+      ownerName: "Christopher Davis",
+      email: "chris@elitehair.com",
+      phone: "(619) 555-1515",
+      address: "555 Gaslamp Quarter",
+      city: "San Diego",
+      state: "CA",
+      zip: "92101",
+      source: "GOOGLE_MAPS" as const,
+      status: "CONVERTED" as const,
+      priority: "MEDIUM" as const,
+      notes: "Signed up for Pro plan. Very happy customer!",
+      lastContactAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      convertedAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Fresh Fades Barbershop",
+      ownerName: "Andre Williams",
+      email: "andre@freshfades.com",
+      phone: "(215) 555-1616",
+      address: "123 South Street",
+      city: "Philadelphia",
+      state: "PA",
+      zip: "19147",
+      source: "REFERRAL" as const,
+      status: "NEGOTIATING" as const,
+      priority: "HIGH" as const,
+      notes: "Wants multi-location support. Has 3 locations. Discussing enterprise plan.",
+      lastContactAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      nextFollowUp: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+    },
+    {
+      salonName: "Posh Pedicures",
+      ownerName: "Karen Mitchell",
+      email: "karen@poshpedicures.com",
+      phone: "(480) 555-1717",
+      address: "777 Scottsdale Rd",
+      city: "Scottsdale",
+      state: "AZ",
+      zip: "85251",
+      source: "YELP" as const,
+      status: "LOST" as const,
+      priority: "LOW" as const,
+      notes: "Not ready to switch from current system.",
+      lastContactAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+      lostReason: "Happy with current provider, not looking to switch",
+    },
+    {
+      salonName: "Studio 54 Hair",
+      ownerName: "Diana Ross",
+      email: "diana@studio54hair.com",
+      phone: "(212) 555-1818",
+      website: "https://studio54hair.nyc",
+      address: "54 W 54th Street",
+      city: "New York",
+      state: "NY",
+      zip: "10019",
+      source: "WALK_IN" as const,
+      status: "CONTACTED" as const,
+      priority: "URGENT" as const,
+      notes: "Met owner at industry event. Very interested. Upscale salon with 10 stylists.",
+      lastContactAt: new Date(),
+      nextFollowUp: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+    },
+  ];
+
+  const salesLeads = [];
+  for (const leadData of salesLeadsData) {
+    const lead = await prisma.lead.create({
+      data: leadData,
+    });
+    salesLeads.push(lead);
+  }
+  console.log("Created Sales CRM leads:", salesLeads.length);
+
+  console.log(`   - Appointments: 110+ (18 per staff member + extras)`);
   console.log(`   - Sales: 50 transactions`);
   console.log(`   - Gift Cards: ${giftCardCodes.length} (25 gift cards)`);
   console.log(`   - Reviews: 25 reviews`);
@@ -1248,6 +1568,8 @@ async function main() {
   console.log(`   - Public Salon Profiles: ${profiles.length}`);
   console.log(`   - Marketplace Leads: ${leads.length}`);
   console.log(`   - Business Invoices: ${invoices.length}`);
+  console.log("\n📊 Sales CRM Data:");
+  console.log(`   - Sales Leads: ${salesLeads.length}`);
   console.log("\n🔑 Login credentials:");
   console.log("   Admin: admin@luxebeauty.com / admin123");
   console.log("   Staff: any staff email / password123");

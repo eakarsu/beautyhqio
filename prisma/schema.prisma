@@ -49,6 +49,7 @@ model Business {
   // Relations
   locations     Location[]
   users         User[]
+  clients       Client[]
   services      Service[]
   serviceCategories ServiceCategory[]
   products      Product[]
@@ -141,9 +142,10 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  business      Business  @relation(fields: [businessId], references: [id])
-  businessId    String
+  business      Business?  @relation(fields: [businessId], references: [id])
+  businessId    String?    // Optional for PLATFORM_ADMIN and CLIENT roles
   staff         Staff?
+  client        Client?    // Link to client profile (for CLIENT role users)
   auditLogs     AuditLog[]
   savedFilters  SavedFilter[]
   accounts      Account[]
@@ -170,10 +172,12 @@ model Account {
 }
 
 enum UserRole {
-  OWNER
-  MANAGER
-  RECEPTIONIST
-  STAFF
+  PLATFORM_ADMIN  // Platform owner - sees all salons, revenues, subscribers
+  OWNER           // Salon owner - full access to their salon only
+  MANAGER         // Day-to-day operations
+  RECEPTIONIST    // Front desk & check-in
+  STAFF           // Service providers/stylists
+  CLIENT          // Customer - books appointments, pays for services
 }
 
 model Staff {
@@ -220,6 +224,17 @@ model Staff {
   stripeAccountId     String?
   stripeAccountStatus String?   @default("not_connected") // not_connected, pending, active, restricted
 
+  // Bank Account (for manual payouts)
+  bankAccountHolder   String?   // Account holder name
+  bankName            String?   // Bank name
+  bankAccountLast4    String?   // Last 4 digits only (for display)
+  bankRoutingNumber   String?   // Routing number (consider encrypting in production)
+  bankAccountNumber   String?   // Account number (consider encrypting in production)
+  bankAccountType     String?   @default("checking") // checking, savings
+
+  // Payout preference
+  payoutMethod        String?   @default("manual") // stripe_connect, bank_transfer, check, manual
+
   // Working hours (JSON)
   workingHours  Json?
 
@@ -257,14 +272,23 @@ model StaffSchedule {
   dayOfWeek     Int
   startTime     String
   endTime       String
-  breakStart    String?
-  breakEnd      String?
   isWorking     Boolean   @default(true)
 
   staff         Staff     @relation(fields: [staffId], references: [id])
   staffId       String
+  breaks        ScheduleBreak[]
 
-  @@unique([staffId, dayOfWeek])
+  @@index([staffId, dayOfWeek])
+}
+
+model ScheduleBreak {
+  id            String    @id @default(cuid())
+  startTime     String
+  endTime       String
+  label         String?   // Optional label like "Lunch", "Short break"
+
+  schedule      StaffSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId    String
 }
 
 model TimeOff {
@@ -293,6 +317,14 @@ model Client {
   email         String?
   phone         String
   mobile        String?
+
+  // Business association - clients belong to a specific salon
+  business      Business      @relation(fields: [businessId], references: [id])
+  businessId    String
+
+  // Link to User account (for authenticated clients)
+  user          User?         @relation(fields: [userId], references: [id])
+  userId        String?       @unique
 
   // Preferences
   preferredLanguage String?  @default("en")

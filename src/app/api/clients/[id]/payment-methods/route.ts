@@ -43,6 +43,12 @@ export async function GET(
       last4: pm.card?.last4,
       expMonth: pm.card?.exp_month,
       expYear: pm.card?.exp_year,
+      card: {
+        brand: pm.card?.brand,
+        last4: pm.card?.last4,
+        exp_month: pm.card?.exp_month,
+        exp_year: pm.card?.exp_year,
+      },
     }));
 
     return NextResponse.json({ paymentMethods: formattedMethods });

@@ -91,9 +91,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if referred person is already a client
+    // Check if referred person is already a client in the same business
     const existingClient = await prisma.client.findFirst({
       where: {
+        businessId: referrer.businessId,
         OR: [
           { phone: referredPhone },
           ...(referredEmail ? [{ email: referredEmail }] : []),
@@ -126,6 +127,7 @@ export async function POST(request: NextRequest) {
           phone: referredPhone,
           referralSource: "referral",
           referredById: referrerId,
+          businessId: referrer.businessId,
         },
       });
     }
