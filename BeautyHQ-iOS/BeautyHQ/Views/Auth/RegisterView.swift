@@ -155,7 +155,7 @@ struct RegisterView: View {
 
         Task {
             isLoading = true
-            await authManager.register(
+            _ = await authManager.register(
                 name: name,
                 email: email,
                 password: password,

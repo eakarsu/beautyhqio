@@ -17,9 +17,19 @@ export async function POST(request: NextRequest) {
       // Confirm booking
       const startTime = new Date(timeStr);
 
-      // Get or create client
+      // Get service for duration and businessId
+      const service = await prisma.service.findUnique({
+        where: { id: serviceId },
+      });
+
+      if (!service) {
+        throw new Error("Service not found");
+      }
+
+      // Get or create client for this business
       let client = await prisma.client.findFirst({
         where: {
+          businessId: service.businessId,
           phone: {
             contains: from.replace(/\D/g, "").slice(-10),
           },
@@ -34,17 +44,9 @@ export async function POST(request: NextRequest) {
             lastName: "Customer",
             phone: from,
             referralSource: "Phone Call",
+            businessId: service.businessId,
           },
         });
-      }
-
-      // Get service for duration
-      const service = await prisma.service.findUnique({
-        where: { id: serviceId },
-      });
-
-      if (!service) {
-        throw new Error("Service not found");
       }
 
       // Find an available staff member

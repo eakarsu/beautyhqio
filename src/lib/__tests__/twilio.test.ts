@@ -8,8 +8,10 @@ dotenv.config();
 const TWILIO_PHONE = process.env.TWILIO_PHONE_NUMBER || '+18043601129';
 
 // Mock twilio before importing the module
-const mockMessagesCreate = jest.fn();
-const mockCallsCreate = jest.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockMessagesCreate = jest.fn() as jest.Mock<any>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockCallsCreate = jest.fn() as jest.Mock<any>;
 
 // Mock VoiceResponse class
 class MockVoiceResponse {
@@ -254,14 +256,12 @@ describe('Twilio SMS Functions', () => {
         'Haircut'
       );
 
-      expect(mockMessagesCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.stringContaining('Hi John'),
-          body: expect.stringContaining('Haircut'),
-          body: expect.stringContaining('Dec 25'),
-          body: expect.stringContaining('2:00 PM'),
-        })
-      );
+      expect(mockMessagesCreate).toHaveBeenCalled();
+      const callArg = (mockMessagesCreate.mock.calls[0] as unknown[])[0] as { body: string };
+      expect(callArg.body).toContain('Hi John');
+      expect(callArg.body).toContain('Haircut');
+      expect(callArg.body).toContain('Dec 25');
+      expect(callArg.body).toContain('2:00 PM');
     });
 
     it('should send reminder in Spanish', async () => {
@@ -303,12 +303,10 @@ describe('Twilio SMS Functions', () => {
         'BeautyHQ Salon'
       );
 
-      expect(mockMessagesCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.stringContaining('Jane'),
-          body: expect.stringContaining('BeautyHQ Salon'),
-        })
-      );
+      expect(mockMessagesCreate).toHaveBeenCalled();
+      const callArg = (mockMessagesCreate.mock.calls[0] as unknown[])[0] as { body: string };
+      expect(callArg.body).toContain('Jane');
+      expect(callArg.body).toContain('BeautyHQ Salon');
     });
   });
 });

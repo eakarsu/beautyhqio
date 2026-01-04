@@ -2,23 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmationEmail } from "@/lib/email";
 import { sendAppointmentConfirmationSMS } from "@/lib/twilio";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/appointments - List appointments
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
     const staffId = searchParams.get("staffId");
     const locationId = searchParams.get("locationId");
     const status = searchParams.get("status");
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (date) {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Use UTC to avoid timezone issues - appointments are stored in UTC
+      const startOfDay = new Date(date + 'T00:00:00.000Z');
+      const endOfDay = new Date(date + 'T23:59:59.999Z');
       where.scheduledStart = {
         gte: startOfDay,
         lte: endOfDay,
@@ -28,6 +34,18 @@ export async function GET(request: NextRequest) {
     if (staffId) where.staffId = staffId;
     if (locationId) where.locationId = locationId;
     if (status) where.status = status;
+
+    // Apply business filter - filter appointments by their location's businessId
+    if (!user.isPlatformAdmin && user.businessId) {
+      const locations = await prisma.location.findMany({
+        where: { businessId: user.businessId },
+        select: { id: true },
+      });
+      const locationIds = locations.map((l) => l.id);
+      if (locationIds.length > 0) {
+        where.locationId = locationId ? locationId : { in: locationIds };
+      }
+    }
 
     const appointments = await prisma.appointment.findMany({
       where,
@@ -68,6 +86,12 @@ export async function GET(request: NextRequest) {
 // POST /api/appointments - Create appointment
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       clientId,
@@ -80,10 +104,15 @@ export async function POST(request: NextRequest) {
       source = "PHONE",
     } = body;
 
-    // Get locationId - use provided or get default location
+    // Get locationId - use provided or get default location for this business
     let finalLocationId = locationId;
     if (!finalLocationId) {
+      const locationWhere: Record<string, unknown> = {};
+      if (!user.isPlatformAdmin && user.businessId) {
+        locationWhere.businessId = user.businessId;
+      }
       const defaultLocation = await prisma.location.findFirst({
+        where: locationWhere,
         orderBy: { createdAt: "asc" },
       });
       if (defaultLocation) {
@@ -93,6 +122,16 @@ export async function POST(request: NextRequest) {
           { error: "No location found. Please create a location first." },
           { status: 400 }
         );
+      }
+    } else {
+      // Verify the location belongs to the user's business
+      if (!user.isPlatformAdmin && user.businessId) {
+        const location = await prisma.location.findUnique({
+          where: { id: finalLocationId },
+        });
+        if (location?.businessId !== user.businessId) {
+          return NextResponse.json({ error: "Location does not belong to your business" }, { status: 403 });
+        }
       }
     }
 

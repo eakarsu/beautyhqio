@@ -21,21 +21,55 @@ struct ContentView: View {
 // MARK: - Loading View
 struct LoadingView: View {
     var body: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
+        VStack(spacing: Spacing.lg) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient.roseGoldGradient.opacity(0.2))
+                    .frame(width: 100, height: 100)
+
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .roseGold))
+                    .scaleEffect(1.5)
+            }
+
             Text("Loading...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(.appSubheadline)
+                .foregroundColor(.softGray)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.screenBackground)
     }
 }
 
 // MARK: - Main Tab View
 struct MainTabView: View {
     @EnvironmentObject var appState: AppState
+
+    init() {
+        // Configure tab bar appearance
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.systemBackground
+
+        // Selected state with rose gold
+        let roseGoldColor = UIColor(Color.roseGold)
+        appearance.stackedLayoutAppearance.selected.iconColor = roseGoldColor
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            .foregroundColor: roseGoldColor,
+            .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+        ]
+
+        // Normal state
+        let softGrayColor = UIColor(Color.softGray)
+        appearance.stackedLayoutAppearance.normal.iconColor = softGrayColor
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            .foregroundColor: softGrayColor,
+            .font: UIFont.systemFont(ofSize: 10, weight: .medium)
+        ]
+
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
@@ -63,13 +97,13 @@ struct MainTabView: View {
                 }
                 .tag(AppState.Tab.pos)
 
-            SettingsView()
+            MoreView()
                 .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
+                    Label("More", systemImage: "ellipsis.circle.fill")
                 }
-                .tag(AppState.Tab.settings)
+                .tag(AppState.Tab.more)
         }
-        .tint(Color.accentColor)
+        .tint(.roseGold)
     }
 }
 

@@ -2,25 +2,32 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import AzureADProvider from "next-auth/providers/azure-ad";
+import AppleProvider from "next-auth/providers/apple";
 import bcrypt from "bcryptjs";
 import prisma from "./prisma";
 
+// Roles that require email/password login (no OAuth)
+const STAFF_ROLES = ["PLATFORM_ADMIN", "OWNER", "MANAGER", "RECEPTIONIST", "STAFF"];
+
 export const authOptions: NextAuthOptions = {
   providers: [
-    // Google OAuth (Gmail users)
+    // Google OAuth (for CLIENTS only)
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      allowDangerousEmailAccountLinking: true,
     }),
-    // Microsoft OAuth (Hotmail, Outlook users)
+    // Microsoft OAuth (for CLIENTS only)
     AzureADProvider({
       clientId: process.env.MICROSOFT_CLIENT_ID || "",
       clientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
-      tenantId: "common", // Allows any Microsoft account
-      allowDangerousEmailAccountLinking: true,
+      tenantId: "common",
     }),
-    // Email/Password credentials
+    // Apple OAuth (for CLIENTS only)
+    AppleProvider({
+      clientId: process.env.APPLE_CLIENT_ID || "",
+      clientSecret: process.env.APPLE_CLIENT_SECRET || "",
+    }),
+    // Email/Password credentials (for ALL users)
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -37,6 +44,7 @@ export const authOptions: NextAuthOptions = {
           include: {
             business: true,
             staff: true,
+            client: true,
           },
         });
 
@@ -64,81 +72,73 @@ export const authOptions: NextAuthOptions = {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
-          businessId: user.businessId,
-          businessName: user.business.name,
+          businessId: user.businessId || null,
+          businessName: user.business?.name || null,
           staffId: user.staff?.id || null,
+          clientId: user.client?.id || null,
           avatar: user.avatar,
+          isPlatformAdmin: user.role === "PLATFORM_ADMIN",
+          isClient: user.role === "CLIENT",
         };
       },
     }),
   ],
   callbacks: {
     async signIn({ user, account }) {
-      // For OAuth providers, check if user exists or create new one
+      // For OAuth providers (Google, Microsoft, Apple)
       if (account?.provider && account.provider !== "credentials") {
         const email = user.email;
         if (!email) return false;
 
-        let existingUser = await prisma.user.findUnique({
+        // Check if user exists
+        const existingUser = await prisma.user.findUnique({
           where: { email },
-          include: { business: true },
         });
 
-        if (!existingUser) {
-          // Create a default business for new OAuth users
-          const business = await prisma.business.create({
-            data: {
-              name: `${user.name || "My"}'s Business`,
-              type: "MULTI_SERVICE",
-            },
-          });
-
-          // Extract first and last name from OAuth profile
-          const nameParts = (user.name || "User").split(" ");
-          const firstName = nameParts[0] || "User";
-          const lastName = nameParts.slice(1).join(" ") || "";
-
-          existingUser = await prisma.user.create({
-            data: {
-              email,
-              firstName,
-              lastName,
-              role: "OWNER",
-              businessId: business.id,
-              avatar: user.image || null,
-              emailVerified: new Date(),
-            },
-            include: { business: true },
-          });
+        if (existingUser) {
+          // If existing user is STAFF/OWNER/etc, block OAuth login
+          if (STAFF_ROLES.includes(existingUser.role)) {
+            throw new Error("Staff members must use email and password to login");
+          }
+          // Allow OAuth for existing CLIENT users
+          return true;
         }
 
-        // Link the OAuth account to the user
-        const existingAccount = await prisma.account.findUnique({
-          where: {
-            provider_providerAccountId: {
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
-            },
+        // New user via OAuth - create as CLIENT
+        const nameParts = (user.name || "User").split(" ");
+        const firstName = nameParts[0] || "User";
+        const lastName = nameParts.slice(1).join(" ") || "";
+
+        const newUser = await prisma.user.create({
+          data: {
+            email,
+            firstName,
+            lastName,
+            role: "CLIENT",
+            avatar: user.image || null,
+            emailVerified: new Date(),
+            // No businessId - clients don't belong to a specific business
           },
         });
 
-        if (!existingAccount) {
-          await prisma.account.create({
-            data: {
-              userId: existingUser.id,
-              type: account.type,
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
-              access_token: account.access_token,
-              refresh_token: account.refresh_token,
-              expires_at: account.expires_at,
-              token_type: account.token_type,
-              scope: account.scope,
-              id_token: account.id_token,
-              session_state: account.session_state as string | null,
-            },
-          });
-        }
+        // Link the OAuth account
+        await prisma.account.create({
+          data: {
+            userId: newUser.id,
+            type: account.type,
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+            access_token: account.access_token,
+            refresh_token: account.refresh_token,
+            expires_at: account.expires_at,
+            token_type: account.token_type,
+            scope: account.scope,
+            id_token: account.id_token,
+            session_state: account.session_state as string | null,
+          },
+        });
+
+        return true;
       }
       return true;
     },
@@ -147,17 +147,20 @@ export const authOptions: NextAuthOptions = {
       if (account && account.provider !== "credentials") {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email! },
-          include: { business: true, staff: true },
+          include: { business: true, staff: true, client: true },
         });
 
         if (dbUser) {
           token.id = dbUser.id;
           token.role = dbUser.role;
-          token.businessId = dbUser.businessId;
-          token.businessName = dbUser.business.name;
+          token.businessId = dbUser.businessId || null;
+          token.businessName = dbUser.business?.name || null;
           token.staffId = dbUser.staff?.id || null;
+          token.clientId = dbUser.client?.id || null;
           token.firstName = dbUser.firstName;
           token.lastName = dbUser.lastName;
+          token.isPlatformAdmin = dbUser.role === "PLATFORM_ADMIN";
+          token.isClient = dbUser.role === "CLIENT";
         }
       } else if (user) {
         // For credentials sign-in
@@ -166,8 +169,11 @@ export const authOptions: NextAuthOptions = {
         token.businessId = user.businessId;
         token.businessName = user.businessName;
         token.staffId = user.staffId;
+        token.clientId = user.clientId;
         token.firstName = user.firstName;
         token.lastName = user.lastName;
+        token.isPlatformAdmin = user.isPlatformAdmin;
+        token.isClient = user.isClient;
       }
       return token;
     },
@@ -175,11 +181,14 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
-        session.user.businessId = token.businessId as string;
-        session.user.businessName = token.businessName as string;
+        session.user.businessId = token.businessId as string | null;
+        session.user.businessName = token.businessName as string | null;
         session.user.staffId = token.staffId as string | null;
+        session.user.clientId = token.clientId as string | null;
         session.user.firstName = token.firstName as string;
         session.user.lastName = token.lastName as string;
+        session.user.isPlatformAdmin = token.isPlatformAdmin as boolean;
+        session.user.isClient = token.isClient as boolean;
       }
       return session;
     },

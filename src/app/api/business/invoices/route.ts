@@ -3,19 +3,48 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { InvoiceStatus } from "@prisma/client";
+import jwt from "jsonwebtoken";
 
-// GET /api/business/invoices - List invoices
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
 
+// Helper to get user from either web session or mobile JWT
+async function getAuthenticatedUser(request: NextRequest) {
+  // First try web session (NextAuth)
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email! },
       include: { business: true },
     });
+    return user;
+  }
+
+  // If no web session, try mobile JWT token
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; businessId: string };
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: { business: true },
+      });
+      return user;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+// GET /api/business/invoices - List invoices
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     if (!user?.business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });

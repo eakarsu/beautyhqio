@@ -1,28 +1,53 @@
 import Foundation
 import SwiftUI
 
-struct Appointment: Codable, Identifiable {
+// Nested service in appointment
+struct AppointmentServiceItem: Codable, Hashable {
     let id: String
-    let businessId: String
-    let clientId: String
-    let staffId: String
     let serviceId: String
-    let startTime: Date
-    let endTime: Date
+    let price: Double?
+    let duration: Int?
+    let service: Service?
+
+    // Custom decoder for Prisma Decimal fields
+    enum CodingKeys: String, CodingKey {
+        case id, serviceId, price, duration, service
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        serviceId = try container.decode(String.self, forKey: .serviceId)
+        price = try container.decodeFlexibleDoubleIfPresent(forKey: .price)
+        duration = try container.decodeIfPresent(Int.self, forKey: .duration)
+        service = try container.decodeIfPresent(Service.self, forKey: .service)
+    }
+}
+
+struct Appointment: Codable, Identifiable, Hashable {
+    let id: String
+    let clientId: String?
+    let staffId: String?
+    let locationId: String?
+    let scheduledStart: Date
+    let scheduledEnd: Date
     let status: AppointmentStatus
-    let source: BookingSource
+    let source: BookingSource?
     let notes: String?
-    let internalNotes: String?
-    let depositPaid: Double
-    let totalPrice: Double
     let client: Client?
     let staff: Staff?
-    let service: Service?
-    let createdAt: Date
-    let updatedAt: Date
+    let services: [AppointmentServiceItem]?
+
+    // Convenience computed properties
+    var startTime: Date { scheduledStart }
+    var endTime: Date { scheduledEnd }
+
+    var service: Service? {
+        services?.first?.service
+    }
 
     var duration: Int {
-        Calendar.current.dateComponents([.minute], from: startTime, to: endTime).minute ?? 0
+        Calendar.current.dateComponents([.minute], from: scheduledStart, to: scheduledEnd).minute ?? 0
     }
 
     var durationFormatted: String {
@@ -38,8 +63,8 @@ struct Appointment: Codable, Identifiable {
         return "\(hours) hr \(remainingMinutes) min"
     }
 
-    var balanceDue: Double {
-        totalPrice - depositPaid
+    var totalPrice: Double {
+        services?.reduce(0) { $0 + ($1.price ?? 0) } ?? 0
     }
 }
 
@@ -136,5 +161,4 @@ struct UpdateAppointmentRequest: Codable {
     let startTime: Date?
     let status: AppointmentStatus?
     let notes: String?
-    let internalNotes: String?
 }

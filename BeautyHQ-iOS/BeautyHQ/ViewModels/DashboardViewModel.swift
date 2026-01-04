@@ -3,7 +3,9 @@ import Foundation
 @MainActor
 class DashboardViewModel: ObservableObject {
     @Published var stats: DashboardStats?
-    @Published var upcomingAppointments: [Appointment] = []
+    @Published var todayAppointments: [DashboardAppointment] = []
+    @Published var recentClients: [DashboardClient] = []
+    @Published var alerts: [DashboardAlert] = []
     @Published var isLoading = false
     @Published var error: String?
 
@@ -12,15 +14,14 @@ class DashboardViewModel: ObservableObject {
         error = nil
 
         do {
-            async let statsTask = DashboardService.shared.getStats()
-            async let appointmentsTask = AppointmentService.shared.getUpcomingAppointments(limit: 5)
-
-            let (fetchedStats, fetchedAppointments) = try await (statsTask, appointmentsTask)
-
-            stats = fetchedStats
-            upcomingAppointments = fetchedAppointments
+            let dashboard = try await DashboardService.shared.getDashboard()
+            stats = dashboard.stats
+            todayAppointments = dashboard.appointments
+            recentClients = dashboard.recentClients
+            alerts = dashboard.alerts
         } catch {
             self.error = error.localizedDescription
+            print("Dashboard error: \(error)")
         }
 
         isLoading = false

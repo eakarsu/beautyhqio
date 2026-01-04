@@ -24,7 +24,14 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(service);
+    return NextResponse.json({
+      id: service.id,
+      name: service.name,
+      description: service.description,
+      price: Number(service.price),
+      duration: service.duration,
+      category: service.category,
+    });
   } catch (error) {
     console.error("Error fetching service:", error);
     return NextResponse.json(

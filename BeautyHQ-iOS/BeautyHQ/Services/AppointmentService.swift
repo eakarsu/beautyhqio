@@ -1,5 +1,9 @@
 import Foundation
 
+struct CancelAppointmentRequest: Encodable {
+    let reason: String?
+}
+
 actor AppointmentService {
     static let shared = AppointmentService()
     private init() {}
@@ -17,8 +21,8 @@ actor AppointmentService {
             queryItems.append(URLQueryItem(name: "status", value: status.rawValue))
         }
 
-        let response: PaginatedResponse<Appointment> = try await APIClient.shared.get("/appointments", queryItems: queryItems.isEmpty ? nil : queryItems)
-        return response.data
+        // Backend returns array directly, not paginated
+        return try await APIClient.shared.get("/appointments", queryItems: queryItems.isEmpty ? nil : queryItems)
     }
 
     func getAppointment(id: String) async throws -> Appointment {
@@ -39,27 +43,27 @@ actor AppointmentService {
     }
 
     func updateAppointment(id: String, _ request: UpdateAppointmentRequest) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)", body: request)
+        try await APIClient.shared.put("/appointments/\(id)", body: request)
     }
 
     func cancelAppointment(id: String, reason: String? = nil) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/cancel", body: ["reason": reason as Any])
+        try await APIClient.shared.post("/appointments/\(id)/cancel", body: CancelAppointmentRequest(reason: reason))
     }
 
     func checkIn(id: String) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/check-in", body: EmptyBody())
+        try await APIClient.shared.post("/appointments/\(id)/check-in", body: EmptyBody())
     }
 
     func startService(id: String) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/start", body: EmptyBody())
+        try await APIClient.shared.post("/appointments/\(id)/start", body: EmptyBody())
     }
 
     func complete(id: String) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/complete", body: EmptyBody())
+        try await APIClient.shared.post("/appointments/\(id)/complete", body: EmptyBody())
     }
 
     func markNoShow(id: String) async throws -> Appointment {
-        try await APIClient.shared.patch("/appointments/\(id)/no-show", body: EmptyBody())
+        try await APIClient.shared.post("/appointments/\(id)/no-show", body: EmptyBody())
     }
 
     func getAvailableSlots(staffId: String, serviceId: String, date: Date) async throws -> [String] {

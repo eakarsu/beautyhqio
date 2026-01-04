@@ -78,9 +78,10 @@ export async function POST(request: NextRequest) {
     scheduledStart.setHours(hours, minutes, 0, 0);
     const scheduledEnd = new Date(scheduledStart.getTime() + service.duration * 60000);
 
-    // Find or create client
+    // Find or create client for this business
     let client = await prisma.client.findFirst({
       where: {
+        businessId: location.businessId,
         OR: [
           ...(email ? [{ email }] : []),
           { phone },
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
           email,
           phone,
           referralSource: "marketplace",
+          businessId: location.businessId,
         },
       });
     }

@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/transactions - List transactions
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -22,7 +29,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (locationId) where.locationId = locationId;
+    // Apply business filter - filter transactions by their location's businessId
+    if (!user.isPlatformAdmin && user.businessId) {
+      const locations = await prisma.location.findMany({
+        where: { businessId: user.businessId },
+        select: { id: true },
+      });
+      const locationIds = locations.map((l) => l.id);
+      if (locationIds.length > 0) {
+        where.locationId = locationId ? locationId : { in: locationIds };
+      }
+    } else if (locationId) {
+      where.locationId = locationId;
+    }
 
     const transactions = await prisma.transaction.findMany({
       where,

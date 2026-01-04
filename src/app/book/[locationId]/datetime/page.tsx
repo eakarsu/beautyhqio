@@ -14,6 +14,7 @@ interface TimeSlot {
     firstName: string;
     lastName: string;
     avatar: string | null;
+    color: string;
   }>;
 }
 
@@ -26,6 +27,7 @@ export default function SelectDateTimePage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const serviceIds = searchParams.get("services")?.split(",") || [];
+  const rescheduleId = searchParams.get("reschedule") || "";
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -51,10 +53,16 @@ export default function SelectDateTimePage({
 
   const handleContinue = () => {
     if (selectedTime && selectedStaff) {
-      const dateStr = selectedDate.toISOString().split("T")[0];
-      router.push(
-        `/book/${locationId}/confirm?services=${serviceIds.join(",")}&date=${dateStr}&time=${selectedTime}&staff=${selectedStaff}`
-      );
+      // Format date in local time (YYYY-MM-DD) to avoid timezone issues
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const day = String(selectedDate.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+      let url = `/book/${locationId}/confirm?services=${serviceIds.join(",")}&date=${dateStr}&time=${selectedTime}&staff=${selectedStaff}`;
+      if (rescheduleId) {
+        url += `&reschedule=${rescheduleId}`;
+      }
+      router.push(url);
     }
   };
 
@@ -245,14 +253,21 @@ export default function SelectDateTimePage({
                   <button
                     key={staff.id}
                     onClick={() => setSelectedStaff(staff.id)}
-                    className={`p-4 rounded-lg border-2 transition-colors ${
+                    className={`p-4 rounded-lg border-2 transition-all ${
                       selectedStaff === staff.id
-                        ? "border-pink-600 bg-pink-50"
-                        : "border-gray-200 hover:border-pink-300"
+                        ? "shadow-md"
+                        : "border-gray-200 hover:shadow-sm"
                     }`}
+                    style={{
+                      borderColor: selectedStaff === staff.id ? staff.color : undefined,
+                      backgroundColor: selectedStaff === staff.id ? `${staff.color}15` : undefined,
+                    }}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center">
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: `${staff.color}20` }}
+                      >
                         {staff.avatar ? (
                           <img
                             src={staff.avatar}
@@ -260,13 +275,17 @@ export default function SelectDateTimePage({
                             className="w-12 h-12 rounded-full"
                           />
                         ) : (
-                          <User className="h-6 w-6 text-pink-600" />
+                          <User className="h-6 w-6" style={{ color: staff.color }} />
                         )}
                       </div>
                       <div className="text-left">
                         <p className="font-medium">
                           {staff.firstName} {staff.lastName}
                         </p>
+                        <div
+                          className="w-3 h-3 rounded-full mt-1"
+                          style={{ backgroundColor: staff.color }}
+                        />
                       </div>
                     </div>
                   </button>

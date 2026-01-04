@@ -4,13 +4,18 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Clock, DollarSign, Check } from "lucide-react";
+import { ArrowLeft, Clock, Check } from "lucide-react";
+
+interface ServiceCategory {
+  id: string;
+  name: string;
+}
 
 interface Service {
   id: string;
   name: string;
   description: string;
-  category: string;
+  category: ServiceCategory | null;
   price: number;
   duration: number;
 }
@@ -52,11 +57,11 @@ export default function SelectServicesPage({
   };
 
   const selectedServiceData = services.filter((s) => selectedServices.includes(s.id));
-  const totalDuration = selectedServiceData.reduce((sum, s) => sum + s.duration, 0);
-  const totalPrice = selectedServiceData.reduce((sum, s) => sum + s.price, 0);
+  const totalDuration = selectedServiceData.reduce((sum, s) => sum + Number(s.duration), 0);
+  const totalPrice = selectedServiceData.reduce((sum, s) => sum + Number(s.price), 0);
 
-  // Group services by category
-  const categories = [...new Set(services.map((s) => s.category || "Other"))];
+  // Group services by category name
+  const categories = [...new Set(services.map((s) => s.category?.name || "Other"))];
 
   if (loading) {
     return (
@@ -89,6 +94,14 @@ export default function SelectServicesPage({
         </div>
 
         {/* Services by Category */}
+        {services.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">No services available at this location.</p>
+            <Button variant="outline" onClick={() => router.back()} className="mt-4">
+              Go Back
+            </Button>
+          </div>
+        ) : (
         <div className="space-y-8">
           {categories.map((category) => (
             <div key={category}>
@@ -97,7 +110,7 @@ export default function SelectServicesPage({
               </h2>
               <div className="grid gap-4 md:grid-cols-2">
                 {services
-                  .filter((s) => (s.category || "Other") === category)
+                  .filter((s) => (s.category?.name || "Other") === category)
                   .map((service) => {
                     const isSelected = selectedServices.includes(service.id);
                     return (
@@ -126,9 +139,8 @@ export default function SelectServicesPage({
                                   <Clock className="h-4 w-4" />
                                   {service.duration} min
                                 </span>
-                                <span className="flex items-center gap-1">
-                                  <DollarSign className="h-4 w-4" />
-                                  ${service.price}
+                                <span className="font-medium text-pink-600">
+                                  ${Number(service.price).toFixed(2)}
                                 </span>
                               </div>
                             </div>
@@ -152,6 +164,7 @@ export default function SelectServicesPage({
             </div>
           ))}
         </div>
+        )}
 
         {/* Summary Footer */}
         {selectedServices.length > 0 && (

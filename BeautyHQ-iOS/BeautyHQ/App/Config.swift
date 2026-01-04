@@ -3,9 +3,10 @@ import Foundation
 enum Config {
     static let apiBaseURL: String = {
         #if DEBUG
-        return ProcessInfo.processInfo.environment["API_URL"] ?? "http://localhost:3000/api"
+        // Use production URL for testing; set API_URL env var for local dev
+        return ProcessInfo.processInfo.environment["API_URL"] ?? "https://beautyhq.io/api"
         #else
-        return "https://api.beautyhq.io/api"
+        return "https://beautyhq.io/api"
         #endif
     }()
 
@@ -25,6 +26,15 @@ enum Config {
     // Cache settings
     static let tokenCacheKey = "auth_token"
     static let userCacheKey = "current_user"
+
+    // Stripe Configuration
+    static let stripePublishableKey: String = {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["STRIPE_PUBLISHABLE_KEY"] ?? "pk_test_517dTUvI61ZON1HDDm3DatTWR4BsHImmaWbEynNFMr1HNEFoQSoPF8biwQwYEC4bijPFgKA5TkSHNIJfZSv4a4v1W00HJtHCs2o"
+        #else
+        return "pk_test_517dTUvI61ZON1HDDm3DatTWR4BsHImmaWbEynNFMr1HNEFoQSoPF8biwQwYEC4bijPFgKA5TkSHNIJfZSv4a4v1W00HJtHCs2o"
+        #endif
+    }()
 }
 
 // MARK: - Brand Colors

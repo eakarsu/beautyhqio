@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+interface BreakInput {
+  startTime: string;
+  endTime: string;
+  label?: string;
+}
+
+interface ScheduleInput {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isWorking: boolean;
+  breaks?: BreakInput[];
+}
+
 // GET /api/staff/[id]/schedule - Get staff schedule
 export async function GET(
   request: NextRequest,
@@ -11,6 +25,9 @@ export async function GET(
 
     const schedules = await prisma.staffSchedule.findMany({
       where: { staffId: id },
+      include: {
+        breaks: true,
+      },
       orderBy: { dayOfWeek: "asc" },
     });
 
@@ -32,28 +49,41 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { schedules } = body;
+    const { schedules }: { schedules: ScheduleInput[] } = body;
 
-    // Delete existing schedules
-    await prisma.staffSchedule.deleteMany({
-      where: { staffId: id },
-    });
+    // Use transaction to delete existing and create new schedules with breaks
+    await prisma.$transaction(async (tx) => {
+      // Delete existing schedules (cascades to breaks due to onDelete: Cascade)
+      await tx.staffSchedule.deleteMany({
+        where: { staffId: id },
+      });
 
-    // Create new schedules
-    const created = await prisma.staffSchedule.createMany({
-      data: schedules.map((s: any) => ({
-        staffId: id,
-        dayOfWeek: s.dayOfWeek,
-        scheduledStart: s.startTime,
-        endTime: s.endTime,
-        breakStart: s.breakStart,
-        breakEnd: s.breakEnd,
-        isWorking: s.isWorking,
-      })),
+      // Create new schedules with breaks
+      for (const schedule of schedules) {
+        await tx.staffSchedule.create({
+          data: {
+            staffId: id,
+            dayOfWeek: schedule.dayOfWeek,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            isWorking: schedule.isWorking,
+            breaks: {
+              create: (schedule.breaks || []).map((b) => ({
+                startTime: b.startTime,
+                endTime: b.endTime,
+                label: b.label || null,
+              })),
+            },
+          },
+        });
+      }
     });
 
     const newSchedules = await prisma.staffSchedule.findMany({
       where: { staffId: id },
+      include: {
+        breaks: true,
+      },
       orderBy: { dayOfWeek: "asc" },
     });
 

@@ -1,5 +1,84 @@
 import Foundation
 
+// MARK: - Flexible Decimal Decoder
+// Prisma returns Decimal fields as strings, but we need Double in Swift
+struct FlexibleDouble: Codable {
+    let value: Double
+
+    init(_ value: Double) {
+        self.value = value
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        // Try decoding as Double first
+        if let doubleValue = try? container.decode(Double.self) {
+            self.value = doubleValue
+            return
+        }
+
+        // Try decoding as Int
+        if let intValue = try? container.decode(Int.self) {
+            self.value = Double(intValue)
+            return
+        }
+
+        // Try decoding as String (Prisma Decimal format)
+        if let stringValue = try? container.decode(String.self),
+           let doubleValue = Double(stringValue) {
+            self.value = doubleValue
+            return
+        }
+
+        // Default to 0
+        self.value = 0
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(value)
+    }
+}
+
+// Helper extension to decode Prisma Decimal from any decoder container
+extension KeyedDecodingContainer {
+    func decodeFlexibleDouble(forKey key: Key) throws -> Double {
+        // Try Double
+        if let value = try? decode(Double.self, forKey: key) {
+            return value
+        }
+        // Try Int
+        if let value = try? decode(Int.self, forKey: key) {
+            return Double(value)
+        }
+        // Try String (Prisma Decimal)
+        if let value = try? decode(String.self, forKey: key),
+           let doubleValue = Double(value) {
+            return doubleValue
+        }
+        return 0
+    }
+
+    func decodeFlexibleDoubleIfPresent(forKey key: Key) throws -> Double? {
+        guard contains(key) else { return nil }
+        // Try Double
+        if let value = try? decode(Double.self, forKey: key) {
+            return value
+        }
+        // Try Int
+        if let value = try? decode(Int.self, forKey: key) {
+            return Double(value)
+        }
+        // Try String (Prisma Decimal)
+        if let value = try? decode(String.self, forKey: key),
+           let doubleValue = Double(value) {
+            return doubleValue
+        }
+        return nil
+    }
+}
+
 // MARK: - API Error
 enum APIError: LocalizedError {
     case invalidURL
@@ -63,12 +142,47 @@ actor APIClient {
         self.session = URLSession(configuration: config)
 
         self.decoder = JSONDecoder()
-        self.decoder.dateDecodingStrategy = .iso8601
-        self.decoder.keyDecodingStrategy = .convertFromSnakeCase
+        // Use custom date decoding to handle ISO8601 with milliseconds from Prisma
+        self.decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+
+            // Try different ISO8601 formats
+            let formatters: [ISO8601DateFormatter] = {
+                let withFractionalSeconds = ISO8601DateFormatter()
+                withFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+                let standard = ISO8601DateFormatter()
+                standard.formatOptions = [.withInternetDateTime]
+
+                return [withFractionalSeconds, standard]
+            }()
+
+            for formatter in formatters {
+                if let date = formatter.date(from: dateString) {
+                    return date
+                }
+            }
+
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
+        }
 
         self.encoder = JSONEncoder()
         self.encoder.dateEncodingStrategy = .iso8601
-        self.encoder.keyEncodingStrategy = .convertToSnakeCase
+    }
+
+    // Helper to decode Prisma Decimal (returned as string) to Double
+    static func decodeDecimal(_ value: Any?) -> Double {
+        if let str = value as? String, let num = Double(str) {
+            return num
+        }
+        if let num = value as? Double {
+            return num
+        }
+        if let num = value as? Int {
+            return Double(num)
+        }
+        return 0
     }
 
     // MARK: - Request Methods
@@ -98,6 +212,12 @@ actor APIClient {
 
     func delete<T: Decodable>(_ endpoint: String) async throws -> T {
         let request = try await buildRequest(endpoint: endpoint, method: "DELETE")
+        return try await execute(request)
+    }
+
+    func delete<T: Decodable, B: Encodable>(_ endpoint: String, body: B) async throws -> T {
+        var request = try await buildRequest(endpoint: endpoint, method: "DELETE")
+        request.httpBody = try encoder.encode(body)
         return try await execute(request)
     }
 
@@ -136,6 +256,13 @@ actor APIClient {
             case 200...299:
                 do {
                     return try decoder.decode(T.self, from: data)
+                } catch let decodingError as DecodingError {
+                    // Print detailed decoding error for debugging
+                    print("Decoding error: \(decodingError)")
+                    if let jsonString = String(data: data, encoding: .utf8) {
+                        print("Response data: \(jsonString.prefix(1000))...")
+                    }
+                    throw APIError.decodingError(decodingError)
                 } catch {
                     throw APIError.decodingError(error)
                 }

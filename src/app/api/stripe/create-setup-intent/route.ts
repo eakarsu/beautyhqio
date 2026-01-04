@@ -28,6 +28,10 @@ export async function POST() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    if (!user.business) {
+      return NextResponse.json({ error: "Business not found" }, { status: 404 });
+    }
+
     // Check if business already has a Stripe customer ID
     let customerId = user.business.stripeCustomerId;
 
@@ -39,7 +43,7 @@ export async function POST() {
         email: user.email,
         name: `${user.firstName} ${user.lastName}`,
         metadata: {
-          businessId: user.businessId,
+          businessId: user.businessId || "",
           userId: user.id,
         },
       });
@@ -47,7 +51,7 @@ export async function POST() {
 
       // Save customer ID to database
       await prisma.business.update({
-        where: { id: user.businessId },
+        where: { id: user.businessId! },
         data: { stripeCustomerId: customerId },
       });
     }
@@ -57,7 +61,7 @@ export async function POST() {
       customer: customerId,
       payment_method_types: ["card"],
       metadata: {
-        businessId: user.businessId,
+        businessId: user.businessId || "",
         userId: user.id,
       },
     });

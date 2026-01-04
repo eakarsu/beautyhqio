@@ -3,375 +3,599 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 90;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B8000001201 /* BeautyHQApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000001101 /* BeautyHQApp.swift */; };
-		B8000001202 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000001102 /* Config.swift */; };
-		B8000001203 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000001103 /* ContentView.swift */; };
-		B8000002201 /* Appointment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000002101 /* Appointment.swift */; };
-		B8000002202 /* Business.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000002102 /* Business.swift */; };
-		B8000002203 /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000002103 /* Client.swift */; };
-		B8000002204 /* Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000002104 /* Dashboard.swift */; };
-		B8000002205 /* Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000002105 /* Service.swift */; };
-		B8000002206 /* Staff.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000002106 /* Staff.swift */; };
-		B8000002207 /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000002107 /* Transaction.swift */; };
-		B8000002208 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000002108 /* User.swift */; };
-		B8000003201 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003101 /* APIClient.swift */; };
-		B8000003202 /* AppleSignInManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003102 /* AppleSignInManager.swift */; };
-		B8000003203 /* AppointmentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003103 /* AppointmentService.swift */; };
-		B8000003204 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003104 /* AuthManager.swift */; };
-		B8000003205 /* ClientService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003105 /* ClientService.swift */; };
-		B8000003206 /* DashboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003106 /* DashboardService.swift */; };
-		B8000003207 /* ServiceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003107 /* ServiceService.swift */; };
-		B8000003208 /* StaffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003108 /* StaffService.swift */; };
-		B8000003209 /* TransactionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000003109 /* TransactionService.swift */; };
-		B8000004201 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000004101 /* NotificationManager.swift */; };
-		B8000005201 /* AppointmentsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000005101 /* AppointmentsViewModel.swift */; };
-		B8000005202 /* ClientsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000005102 /* ClientsViewModel.swift */; };
-		B8000005203 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000005103 /* DashboardViewModel.swift */; };
-		B8000005204 /* POSViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000005104 /* POSViewModel.swift */; };
-		B8000006201 /* AppointmentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006101 /* AppointmentDetailView.swift */; };
-		B8000006202 /* AppointmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006102 /* AppointmentsView.swift */; };
-		B8000006203 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006103 /* ForgotPasswordView.swift */; };
-		B8000006204 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006104 /* LoginView.swift */; };
-		B8000006205 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006105 /* RegisterView.swift */; };
-		B8000006206 /* ClientDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006106 /* ClientDetailView.swift */; };
-		B8000006207 /* ClientsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006107 /* ClientsView.swift */; };
-		B8000006208 /* CustomTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006108 /* CustomTextField.swift */; };
-		B8000006209 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006109 /* DashboardView.swift */; };
-		B8000006210 /* POSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006110 /* POSView.swift */; };
-		B8000006211 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8000006111 /* SettingsView.swift */; };
+		978EC1822F01A3BB00E2D3CE /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = 978EC1812F01A3BB00E2D3CE /* StripePaymentSheet */; };
+		F001000001 /* BeautyHQApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000001 /* BeautyHQApp.swift */; };
+		F001000002 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000002 /* Config.swift */; };
+		F001000003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000003 /* ContentView.swift */; };
+		F001000004 /* Appointment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000004 /* Appointment.swift */; };
+		F001000005 /* Business.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000005 /* Business.swift */; };
+		F001000006 /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000006 /* Client.swift */; };
+		F001000007 /* Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000007 /* Dashboard.swift */; };
+		F001000008 /* Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000008 /* Service.swift */; };
+		F001000009 /* Staff.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000009 /* Staff.swift */; };
+		F001000010 /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000010 /* Transaction.swift */; };
+		F001000011 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000011 /* User.swift */; };
+		F001000012 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000012 /* APIClient.swift */; };
+		F001000013 /* AppointmentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000013 /* AppointmentService.swift */; };
+		F001000014 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000014 /* AuthManager.swift */; };
+		F001000015 /* ClientService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000015 /* ClientService.swift */; };
+		F001000016 /* DashboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000016 /* DashboardService.swift */; };
+		F001000017 /* ServiceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000017 /* ServiceService.swift */; };
+		F001000018 /* StaffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000018 /* StaffService.swift */; };
+		F001000019 /* TransactionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000019 /* TransactionService.swift */; };
+		F001000020 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000020 /* NotificationManager.swift */; };
+		F001000021 /* AppointmentsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000021 /* AppointmentsViewModel.swift */; };
+		F001000022 /* ClientsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000022 /* ClientsViewModel.swift */; };
+		F001000023 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000023 /* DashboardViewModel.swift */; };
+		F001000024 /* POSViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000024 /* POSViewModel.swift */; };
+		F001000025 /* AppointmentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000025 /* AppointmentDetailView.swift */; };
+		F001000026 /* AppointmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000026 /* AppointmentsView.swift */; };
+		F001000027 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000027 /* ForgotPasswordView.swift */; };
+		F001000028 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000028 /* LoginView.swift */; };
+		F001000029 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000029 /* RegisterView.swift */; };
+		F001000030 /* ClientDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000030 /* ClientDetailView.swift */; };
+		F001000031 /* ClientsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000031 /* ClientsView.swift */; };
+		F001000032 /* CustomTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000032 /* CustomTextField.swift */; };
+		F001000033 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000033 /* DashboardView.swift */; };
+		F001000034 /* POSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000034 /* POSView.swift */; };
+		F001000035 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000035 /* SettingsView.swift */; };
+		F001000036 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F002000036 /* Assets.xcassets */; };
+		F001000037 /* SocialAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000037 /* SocialAuthManager.swift */; };
+		F001000040 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000040 /* CalendarView.swift */; };
+		F001000041 /* ServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000041 /* ServicesView.swift */; };
+		F001000042 /* StaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000042 /* StaffView.swift */; };
+		F001000043 /* ProductsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000043 /* ProductsView.swift */; };
+		F001000044 /* LoyaltyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000044 /* LoyaltyView.swift */; };
+		F001000045 /* GiftCardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000045 /* GiftCardsView.swift */; };
+		F001000046 /* BillingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000046 /* BillingView.swift */; };
+		F001000047 /* MarketingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000047 /* MarketingView.swift */; };
+		F001000048 /* ReviewsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000048 /* ReviewsView.swift */; };
+		F001000049 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000049 /* ReportsView.swift */; };
+		F001000050 /* MarketplaceLeadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000050 /* MarketplaceLeadsView.swift */; };
+		F001000051 /* AIFeaturesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000051 /* AIFeaturesView.swift */; };
+		F001000052 /* SalesCRMView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000052 /* SalesCRMView.swift */; };
+		F001000053 /* MarketplaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000053 /* MarketplaceView.swift */; };
+		F001000054 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000054 /* MoreView.swift */; };
+		F001000055 /* SubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000055 /* SubscriptionsView.swift */; };
+		F001000056 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000056 /* Theme.swift */; };
+		F001000057 /* AppComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000057 /* AppComponents.swift */; };
+		F001000058 /* AddForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000058 /* AddForms.swift */; };
+		F001000059 /* AppleSignInManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000059 /* AppleSignInManager.swift */; };
+		F001000060 /* StripeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000060 /* StripeManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B8000000001 /* BeautyHQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeautyHQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B8000000002 /* BeautyHQ.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeautyHQ.entitlements; sourceTree = "<group>"; };
-		B8000001101 /* BeautyHQApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautyHQApp.swift; sourceTree = "<group>"; };
-		B8000001102 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
-		B8000001103 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		B8000002101 /* Appointment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appointment.swift; sourceTree = "<group>"; };
-		B8000002102 /* Business.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Business.swift; sourceTree = "<group>"; };
-		B8000002103 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
-		B8000002104 /* Dashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dashboard.swift; sourceTree = "<group>"; };
-		B8000002105 /* Service.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Service.swift; sourceTree = "<group>"; };
-		B8000002106 /* Staff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Staff.swift; sourceTree = "<group>"; };
-		B8000002107 /* Transaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transaction.swift; sourceTree = "<group>"; };
-		B8000002108 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
-		B8000003101 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
-		B8000003102 /* AppleSignInManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInManager.swift; sourceTree = "<group>"; };
-		B8000003103 /* AppointmentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentService.swift; sourceTree = "<group>"; };
-		B8000003104 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
-		B8000003105 /* ClientService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientService.swift; sourceTree = "<group>"; };
-		B8000003106 /* DashboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardService.swift; sourceTree = "<group>"; };
-		B8000003107 /* ServiceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceService.swift; sourceTree = "<group>"; };
-		B8000003108 /* StaffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffService.swift; sourceTree = "<group>"; };
-		B8000003109 /* TransactionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionService.swift; sourceTree = "<group>"; };
-		B8000004101 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
-		B8000005101 /* AppointmentsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentsViewModel.swift; sourceTree = "<group>"; };
-		B8000005102 /* ClientsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientsViewModel.swift; sourceTree = "<group>"; };
-		B8000005103 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
-		B8000005104 /* POSViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSViewModel.swift; sourceTree = "<group>"; };
-		B8000006101 /* AppointmentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentDetailView.swift; sourceTree = "<group>"; };
-		B8000006102 /* AppointmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentsView.swift; sourceTree = "<group>"; };
-		B8000006103 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
-		B8000006104 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		B8000006105 /* RegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
-		B8000006106 /* ClientDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientDetailView.swift; sourceTree = "<group>"; };
-		B8000006107 /* ClientsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientsView.swift; sourceTree = "<group>"; };
-		B8000006108 /* CustomTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomTextField.swift; sourceTree = "<group>"; };
-		B8000006109 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
-		B8000006110 /* POSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSView.swift; sourceTree = "<group>"; };
-		B8000006111 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F002000000 /* BeautyHQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeautyHQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F002000001 /* BeautyHQApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautyHQApp.swift; sourceTree = "<group>"; };
+		F002000002 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
+		F002000003 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F002000004 /* Appointment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appointment.swift; sourceTree = "<group>"; };
+		F002000005 /* Business.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Business.swift; sourceTree = "<group>"; };
+		F002000006 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
+		F002000007 /* Dashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dashboard.swift; sourceTree = "<group>"; };
+		F002000008 /* Service.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Service.swift; sourceTree = "<group>"; };
+		F002000009 /* Staff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Staff.swift; sourceTree = "<group>"; };
+		F002000010 /* Transaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transaction.swift; sourceTree = "<group>"; };
+		F002000011 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		F002000012 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		F002000013 /* AppointmentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentService.swift; sourceTree = "<group>"; };
+		F002000014 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		F002000015 /* ClientService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientService.swift; sourceTree = "<group>"; };
+		F002000016 /* DashboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardService.swift; sourceTree = "<group>"; };
+		F002000017 /* ServiceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceService.swift; sourceTree = "<group>"; };
+		F002000018 /* StaffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffService.swift; sourceTree = "<group>"; };
+		F002000019 /* TransactionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionService.swift; sourceTree = "<group>"; };
+		F002000020 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		F002000021 /* AppointmentsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentsViewModel.swift; sourceTree = "<group>"; };
+		F002000022 /* ClientsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientsViewModel.swift; sourceTree = "<group>"; };
+		F002000023 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		F002000024 /* POSViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSViewModel.swift; sourceTree = "<group>"; };
+		F002000025 /* AppointmentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentDetailView.swift; sourceTree = "<group>"; };
+		F002000026 /* AppointmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppointmentsView.swift; sourceTree = "<group>"; };
+		F002000027 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
+		F002000028 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		F002000029 /* RegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
+		F002000030 /* ClientDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientDetailView.swift; sourceTree = "<group>"; };
+		F002000031 /* ClientsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientsView.swift; sourceTree = "<group>"; };
+		F002000032 /* CustomTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomTextField.swift; sourceTree = "<group>"; };
+		F002000033 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		F002000034 /* POSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSView.swift; sourceTree = "<group>"; };
+		F002000035 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F002000036 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F002000037 /* SocialAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialAuthManager.swift; sourceTree = "<group>"; };
+		F002000038 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F002000040 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		F002000041 /* ServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServicesView.swift; sourceTree = "<group>"; };
+		F002000042 /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
+		F002000043 /* ProductsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductsView.swift; sourceTree = "<group>"; };
+		F002000044 /* LoyaltyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoyaltyView.swift; sourceTree = "<group>"; };
+		F002000045 /* GiftCardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftCardsView.swift; sourceTree = "<group>"; };
+		F002000046 /* BillingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillingView.swift; sourceTree = "<group>"; };
+		F002000047 /* MarketingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketingView.swift; sourceTree = "<group>"; };
+		F002000048 /* ReviewsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewsView.swift; sourceTree = "<group>"; };
+		F002000049 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		F002000050 /* MarketplaceLeadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceLeadsView.swift; sourceTree = "<group>"; };
+		F002000051 /* AIFeaturesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIFeaturesView.swift; sourceTree = "<group>"; };
+		F002000052 /* SalesCRMView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalesCRMView.swift; sourceTree = "<group>"; };
+		F002000053 /* MarketplaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceView.swift; sourceTree = "<group>"; };
+		F002000054 /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
+		F002000055 /* SubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionsView.swift; sourceTree = "<group>"; };
+		F002000056 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		F002000057 /* AppComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppComponents.swift; sourceTree = "<group>"; };
+		F002000058 /* AddForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddForms.swift; sourceTree = "<group>"; };
+		F002000059 /* AppleSignInManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInManager.swift; sourceTree = "<group>"; };
+		F002000060 /* StripeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripeManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		B8000000101 /* Frameworks */ = {
+		F003000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
+				978EC1822F01A3BB00E2D3CE /* StripePaymentSheet in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		B8000000010 /* Main */ = {
+		F004000001 = {
 			isa = PBXGroup;
 			children = (
-				B8000000020 /* BeautyHQ */,
-				B8000000030 /* Products */,
+				F004000002 /* BeautyHQ */,
+				F004000003 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		B8000000020 /* BeautyHQ */ = {
+		F004000002 /* BeautyHQ */ = {
 			isa = PBXGroup;
 			children = (
-				B8000000002 /* BeautyHQ.entitlements */,
-				B8000000021 /* App */,
-				B8000000022 /* Models */,
-				B8000000023 /* Services */,
-				B8000000024 /* Utils */,
-				B8000000025 /* ViewModels */,
-				B8000000026 /* Views */,
+				F004000004 /* App */,
+				F004000005 /* Models */,
+				F004000006 /* Services */,
+				F004000033 /* Theme */,
+				F004000007 /* Utils */,
+				F004000008 /* ViewModels */,
+				F004000009 /* Views */,
+				F002000036 /* Assets.xcassets */,
+				F002000038 /* Info.plist */,
 			);
 			path = BeautyHQ;
 			sourceTree = "<group>";
 		};
-		B8000000021 /* App */ = {
+		F004000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B8000001101 /* BeautyHQApp.swift */,
-				B8000001102 /* Config.swift */,
-				B8000001103 /* ContentView.swift */,
+				F002000000 /* BeautyHQ.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F004000004 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F002000001 /* BeautyHQApp.swift */,
+				F002000002 /* Config.swift */,
+				F002000003 /* ContentView.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
 		};
-		B8000000022 /* Models */ = {
+		F004000005 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				B8000002101 /* Appointment.swift */,
-				B8000002102 /* Business.swift */,
-				B8000002103 /* Client.swift */,
-				B8000002104 /* Dashboard.swift */,
-				B8000002105 /* Service.swift */,
-				B8000002106 /* Staff.swift */,
-				B8000002107 /* Transaction.swift */,
-				B8000002108 /* User.swift */,
+				F002000004 /* Appointment.swift */,
+				F002000005 /* Business.swift */,
+				F002000006 /* Client.swift */,
+				F002000007 /* Dashboard.swift */,
+				F002000008 /* Service.swift */,
+				F002000009 /* Staff.swift */,
+				F002000010 /* Transaction.swift */,
+				F002000011 /* User.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
 		};
-		B8000000023 /* Services */ = {
+		F004000006 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				B8000003101 /* APIClient.swift */,
-				B8000003102 /* AppleSignInManager.swift */,
-				B8000003103 /* AppointmentService.swift */,
-				B8000003104 /* AuthManager.swift */,
-				B8000003105 /* ClientService.swift */,
-				B8000003106 /* DashboardService.swift */,
-				B8000003107 /* ServiceService.swift */,
-				B8000003108 /* StaffService.swift */,
-				B8000003109 /* TransactionService.swift */,
+				F002000012 /* APIClient.swift */,
+				F002000059 /* AppleSignInManager.swift */,
+				F002000013 /* AppointmentService.swift */,
+				F002000014 /* AuthManager.swift */,
+				F002000015 /* ClientService.swift */,
+				F002000016 /* DashboardService.swift */,
+				F002000017 /* ServiceService.swift */,
+				F002000037 /* SocialAuthManager.swift */,
+				F002000018 /* StaffService.swift */,
+				F002000060 /* StripeManager.swift */,
+				F002000019 /* TransactionService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
 		};
-		B8000000024 /* Utils */ = {
+		F004000007 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
-				B8000004101 /* NotificationManager.swift */,
+				F002000020 /* NotificationManager.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
 		};
-		B8000000025 /* ViewModels */ = {
+		F004000008 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
-				B8000005101 /* AppointmentsViewModel.swift */,
-				B8000005102 /* ClientsViewModel.swift */,
-				B8000005103 /* DashboardViewModel.swift */,
-				B8000005104 /* POSViewModel.swift */,
+				F002000021 /* AppointmentsViewModel.swift */,
+				F002000022 /* ClientsViewModel.swift */,
+				F002000023 /* DashboardViewModel.swift */,
+				F002000024 /* POSViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
 		};
-		B8000000026 /* Views */ = {
+		F004000009 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				B8000000027 /* Appointments */,
-				B8000000028 /* Auth */,
-				B8000000029 /* Clients */,
-				B800000002A /* Components */,
-				B800000002B /* Dashboard */,
-				B800000002C /* POS */,
-				B800000002D /* Settings */,
+				F004000010 /* Appointments */,
+				F004000011 /* Auth */,
+				F004000017 /* Calendar */,
+				F004000012 /* Clients */,
+				F004000013 /* Components */,
+				F004000014 /* Dashboard */,
+				F004000018 /* Services */,
+				F004000019 /* Staff */,
+				F004000020 /* Products */,
+				F004000021 /* Loyalty */,
+				F004000022 /* GiftCards */,
+				F004000023 /* Billing */,
+				F004000024 /* Marketing */,
+				F004000025 /* Reviews */,
+				F004000026 /* Reports */,
+				F004000027 /* MarketplaceLeads */,
+				F004000028 /* AIFeatures */,
+				F004000029 /* SalesCRM */,
+				F004000030 /* Marketplace */,
+				F004000031 /* More */,
+				F004000032 /* Subscriptions */,
+				F004000015 /* POS */,
+				F004000016 /* Settings */,
 			);
 			path = Views;
 			sourceTree = "<group>";
 		};
-		B8000000027 /* Appointments */ = {
+		F004000010 /* Appointments */ = {
 			isa = PBXGroup;
 			children = (
-				B8000006101 /* AppointmentDetailView.swift */,
-				B8000006102 /* AppointmentsView.swift */,
+				F002000025 /* AppointmentDetailView.swift */,
+				F002000026 /* AppointmentsView.swift */,
 			);
 			path = Appointments;
 			sourceTree = "<group>";
 		};
-		B8000000028 /* Auth */ = {
+		F004000011 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
-				B8000006103 /* ForgotPasswordView.swift */,
-				B8000006104 /* LoginView.swift */,
-				B8000006105 /* RegisterView.swift */,
+				F002000027 /* ForgotPasswordView.swift */,
+				F002000028 /* LoginView.swift */,
+				F002000029 /* RegisterView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
 		};
-		B8000000029 /* Clients */ = {
+		F004000012 /* Clients */ = {
 			isa = PBXGroup;
 			children = (
-				B8000006106 /* ClientDetailView.swift */,
-				B8000006107 /* ClientsView.swift */,
+				F002000030 /* ClientDetailView.swift */,
+				F002000031 /* ClientsView.swift */,
 			);
 			path = Clients;
 			sourceTree = "<group>";
 		};
-		B800000002A /* Components */ = {
+		F004000013 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				B8000006108 /* CustomTextField.swift */,
+				F002000058 /* AddForms.swift */,
+				F002000057 /* AppComponents.swift */,
+				F002000032 /* CustomTextField.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
 		};
-		B800000002B /* Dashboard */ = {
+		F004000014 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
-				B8000006109 /* DashboardView.swift */,
+				F002000033 /* DashboardView.swift */,
 			);
 			path = Dashboard;
 			sourceTree = "<group>";
 		};
-		B800000002C /* POS */ = {
+		F004000015 /* POS */ = {
 			isa = PBXGroup;
 			children = (
-				B8000006110 /* POSView.swift */,
+				F002000034 /* POSView.swift */,
 			);
 			path = POS;
 			sourceTree = "<group>";
 		};
-		B800000002D /* Settings */ = {
+		F004000016 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
-				B8000006111 /* SettingsView.swift */,
+				F002000035 /* SettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
 		};
-		B8000000030 /* Products */ = {
+		F004000017 /* Calendar */ = {
 			isa = PBXGroup;
 			children = (
-				B8000000001 /* BeautyHQ.app */,
+				F002000040 /* CalendarView.swift */,
 			);
-			name = Products;
+			path = Calendar;
+			sourceTree = "<group>";
+		};
+		F004000018 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F002000041 /* ServicesView.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		F004000019 /* Staff */ = {
+			isa = PBXGroup;
+			children = (
+				F002000042 /* StaffView.swift */,
+			);
+			path = Staff;
+			sourceTree = "<group>";
+		};
+		F004000020 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F002000043 /* ProductsView.swift */,
+			);
+			path = Products;
+			sourceTree = "<group>";
+		};
+		F004000021 /* Loyalty */ = {
+			isa = PBXGroup;
+			children = (
+				F002000044 /* LoyaltyView.swift */,
+			);
+			path = Loyalty;
+			sourceTree = "<group>";
+		};
+		F004000022 /* GiftCards */ = {
+			isa = PBXGroup;
+			children = (
+				F002000045 /* GiftCardsView.swift */,
+			);
+			path = GiftCards;
+			sourceTree = "<group>";
+		};
+		F004000023 /* Billing */ = {
+			isa = PBXGroup;
+			children = (
+				F002000046 /* BillingView.swift */,
+			);
+			path = Billing;
+			sourceTree = "<group>";
+		};
+		F004000024 /* Marketing */ = {
+			isa = PBXGroup;
+			children = (
+				F002000047 /* MarketingView.swift */,
+			);
+			path = Marketing;
+			sourceTree = "<group>";
+		};
+		F004000025 /* Reviews */ = {
+			isa = PBXGroup;
+			children = (
+				F002000048 /* ReviewsView.swift */,
+			);
+			path = Reviews;
+			sourceTree = "<group>";
+		};
+		F004000026 /* Reports */ = {
+			isa = PBXGroup;
+			children = (
+				F002000049 /* ReportsView.swift */,
+			);
+			path = Reports;
+			sourceTree = "<group>";
+		};
+		F004000027 /* MarketplaceLeads */ = {
+			isa = PBXGroup;
+			children = (
+				F002000050 /* MarketplaceLeadsView.swift */,
+			);
+			path = MarketplaceLeads;
+			sourceTree = "<group>";
+		};
+		F004000028 /* AIFeatures */ = {
+			isa = PBXGroup;
+			children = (
+				F002000051 /* AIFeaturesView.swift */,
+			);
+			path = AIFeatures;
+			sourceTree = "<group>";
+		};
+		F004000029 /* SalesCRM */ = {
+			isa = PBXGroup;
+			children = (
+				F002000052 /* SalesCRMView.swift */,
+			);
+			path = SalesCRM;
+			sourceTree = "<group>";
+		};
+		F004000030 /* Marketplace */ = {
+			isa = PBXGroup;
+			children = (
+				F002000053 /* MarketplaceView.swift */,
+			);
+			path = Marketplace;
+			sourceTree = "<group>";
+		};
+		F004000031 /* More */ = {
+			isa = PBXGroup;
+			children = (
+				F002000054 /* MoreView.swift */,
+			);
+			path = More;
+			sourceTree = "<group>";
+		};
+		F004000032 /* Subscriptions */ = {
+			isa = PBXGroup;
+			children = (
+				F002000055 /* SubscriptionsView.swift */,
+			);
+			path = Subscriptions;
+			sourceTree = "<group>";
+		};
+		F004000033 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				F002000056 /* Theme.swift */,
+			);
+			path = Theme;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B8000000100 /* BeautyHQ */ = {
+		F005000001 /* BeautyHQ */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B8000000500 /* Build configuration list for PBXNativeTarget "BeautyHQ" */;
+			buildConfigurationList = F007000002 /* Build configuration list for PBXNativeTarget "BeautyHQ" */;
 			buildPhases = (
-				B8000000102 /* Sources */,
-				B8000000101 /* Frameworks */,
-				B8000000103 /* Resources */,
+				F006000001 /* Sources */,
+				F003000001 /* Frameworks */,
+				F006000002 /* Resources */,
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			name = BeautyHQ;
+			packageProductDependencies = (
+				978EC1812F01A3BB00E2D3CE /* StripePaymentSheet */,
+			);
 			productName = BeautyHQ;
-			productReference = B8000000001 /* BeautyHQ.app */;
+			productReference = F002000000 /* BeautyHQ.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		B8000000000 /* Project object */ = {
+		F005000002 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1500;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
-					B8000000100 = {
+					F005000001 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
 			};
-			buildConfigurationList = B8000000400 /* Build configuration list for PBXProject "BeautyHQ" */;
-			compatibilityVersion = "Xcode 14.0";
+			buildConfigurationList = F007000001 /* Build configuration list for PBXProject "BeautyHQ" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = B8000000010 /* Main */;
-			productRefGroup = B8000000030 /* Products */;
+			mainGroup = F004000001;
+			packageReferences = (
+				978EC1802F01A3BB00E2D3CE /* XCRemoteSwiftPackageReference "stripe-ios" */,
+			);
+			preferredProjectObjectVersion = 90;
+			productRefGroup = F004000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				B8000000100 /* BeautyHQ */,
+				F005000001 /* BeautyHQ */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		B8000000103 /* Resources */ = {
+		F006000002 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
+				F001000036 /* Assets.xcassets in Resources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		B8000000102 /* Sources */ = {
+		F006000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
-				B8000001201 /* BeautyHQApp.swift in Sources */,
-				B8000001202 /* Config.swift in Sources */,
-				B8000001203 /* ContentView.swift in Sources */,
-				B8000002201 /* Appointment.swift in Sources */,
-				B8000002202 /* Business.swift in Sources */,
-				B8000002203 /* Client.swift in Sources */,
-				B8000002204 /* Dashboard.swift in Sources */,
-				B8000002205 /* Service.swift in Sources */,
-				B8000002206 /* Staff.swift in Sources */,
-				B8000002207 /* Transaction.swift in Sources */,
-				B8000002208 /* User.swift in Sources */,
-				B8000003201 /* APIClient.swift in Sources */,
-				B8000003202 /* AppleSignInManager.swift in Sources */,
-				B8000003203 /* AppointmentService.swift in Sources */,
-				B8000003204 /* AuthManager.swift in Sources */,
-				B8000003205 /* ClientService.swift in Sources */,
-				B8000003206 /* DashboardService.swift in Sources */,
-				B8000003207 /* ServiceService.swift in Sources */,
-				B8000003208 /* StaffService.swift in Sources */,
-				B8000003209 /* TransactionService.swift in Sources */,
-				B8000004201 /* NotificationManager.swift in Sources */,
-				B8000005201 /* AppointmentsViewModel.swift in Sources */,
-				B8000005202 /* ClientsViewModel.swift in Sources */,
-				B8000005203 /* DashboardViewModel.swift in Sources */,
-				B8000005204 /* POSViewModel.swift in Sources */,
-				B8000006201 /* AppointmentDetailView.swift in Sources */,
-				B8000006202 /* AppointmentsView.swift in Sources */,
-				B8000006203 /* ForgotPasswordView.swift in Sources */,
-				B8000006204 /* LoginView.swift in Sources */,
-				B8000006205 /* RegisterView.swift in Sources */,
-				B8000006206 /* ClientDetailView.swift in Sources */,
-				B8000006207 /* ClientsView.swift in Sources */,
-				B8000006208 /* CustomTextField.swift in Sources */,
-				B8000006209 /* DashboardView.swift in Sources */,
-				B8000006210 /* POSView.swift in Sources */,
-				B8000006211 /* SettingsView.swift in Sources */,
+				F001000001 /* BeautyHQApp.swift in Sources */,
+				F001000002 /* Config.swift in Sources */,
+				F001000003 /* ContentView.swift in Sources */,
+				F001000004 /* Appointment.swift in Sources */,
+				F001000005 /* Business.swift in Sources */,
+				F001000006 /* Client.swift in Sources */,
+				F001000007 /* Dashboard.swift in Sources */,
+				F001000008 /* Service.swift in Sources */,
+				F001000009 /* Staff.swift in Sources */,
+				F001000010 /* Transaction.swift in Sources */,
+				F001000011 /* User.swift in Sources */,
+				F001000012 /* APIClient.swift in Sources */,
+				F001000013 /* AppointmentService.swift in Sources */,
+				F001000014 /* AuthManager.swift in Sources */,
+				F001000015 /* ClientService.swift in Sources */,
+				F001000016 /* DashboardService.swift in Sources */,
+				F001000017 /* ServiceService.swift in Sources */,
+				F001000018 /* StaffService.swift in Sources */,
+				F001000019 /* TransactionService.swift in Sources */,
+				F001000020 /* NotificationManager.swift in Sources */,
+				F001000037 /* SocialAuthManager.swift in Sources */,
+				F001000021 /* AppointmentsViewModel.swift in Sources */,
+				F001000022 /* ClientsViewModel.swift in Sources */,
+				F001000023 /* DashboardViewModel.swift in Sources */,
+				F001000024 /* POSViewModel.swift in Sources */,
+				F001000025 /* AppointmentDetailView.swift in Sources */,
+				F001000026 /* AppointmentsView.swift in Sources */,
+				F001000027 /* ForgotPasswordView.swift in Sources */,
+				F001000028 /* LoginView.swift in Sources */,
+				F001000029 /* RegisterView.swift in Sources */,
+				F001000030 /* ClientDetailView.swift in Sources */,
+				F001000031 /* ClientsView.swift in Sources */,
+				F001000032 /* CustomTextField.swift in Sources */,
+				F001000033 /* DashboardView.swift in Sources */,
+				F001000034 /* POSView.swift in Sources */,
+				F001000035 /* SettingsView.swift in Sources */,
+				F001000040 /* CalendarView.swift in Sources */,
+				F001000041 /* ServicesView.swift in Sources */,
+				F001000042 /* StaffView.swift in Sources */,
+				F001000043 /* ProductsView.swift in Sources */,
+				F001000044 /* LoyaltyView.swift in Sources */,
+				F001000045 /* GiftCardsView.swift in Sources */,
+				F001000046 /* BillingView.swift in Sources */,
+				F001000047 /* MarketingView.swift in Sources */,
+				F001000048 /* ReviewsView.swift in Sources */,
+				F001000049 /* ReportsView.swift in Sources */,
+				F001000050 /* MarketplaceLeadsView.swift in Sources */,
+				F001000051 /* AIFeaturesView.swift in Sources */,
+				F001000052 /* SalesCRMView.swift in Sources */,
+				F001000053 /* MarketplaceView.swift in Sources */,
+				F001000054 /* MoreView.swift in Sources */,
+				F001000055 /* SubscriptionsView.swift in Sources */,
+				F001000056 /* Theme.swift in Sources */,
+				F001000057 /* AppComponents.swift in Sources */,
+				F001000058 /* AddForms.swift in Sources */,
+				F001000059 /* AppleSignInManager.swift in Sources */,
+				F001000060 /* StripeManager.swift in Sources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		B8000000301 /* Debug */ = {
+		F008000001 /* Debug configuration for PBXProject "BeautyHQ" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -423,7 +647,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -434,7 +658,7 @@
 			};
 			name = Debug;
 		};
-		B8000000302 /* Release */ = {
+		F008000002 /* Release configuration for PBXProject "BeautyHQ" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -480,7 +704,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -490,29 +714,30 @@
 			};
 			name = Release;
 		};
-		B8000000303 /* Debug */ = {
+		F008000003 /* Debug configuration for PBXNativeTarget "BeautyHQ" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = BeautyHQ/BeautyHQ.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = VKPMTL7RAU;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = BeautyHQ;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BeautyHQ/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.beautyhq.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.beautyhq.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -520,29 +745,30 @@
 			};
 			name = Debug;
 		};
-		B8000000304 /* Release */ = {
+		F008000004 /* Release configuration for PBXNativeTarget "BeautyHQ" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = BeautyHQ/BeautyHQ.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = VKPMTL7RAU;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = BeautyHQ;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BeautyHQ/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.beautyhq.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.beautyhq.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -553,26 +779,42 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		B8000000400 /* Build configuration list for PBXProject "BeautyHQ" */ = {
+		F007000001 /* Build configuration list for PBXProject "BeautyHQ" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				B8000000301 /* Debug */,
-				B8000000302 /* Release */,
+				F008000001 /* Debug configuration for PBXProject "BeautyHQ" */,
+				F008000002 /* Release configuration for PBXProject "BeautyHQ" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B8000000500 /* Build configuration list for PBXNativeTarget "BeautyHQ" */ = {
+		F007000002 /* Build configuration list for PBXNativeTarget "BeautyHQ" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				B8000000303 /* Debug */,
-				B8000000304 /* Release */,
+				F008000003 /* Debug configuration for PBXNativeTarget "BeautyHQ" */,
+				F008000004 /* Release configuration for PBXNativeTarget "BeautyHQ" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		978EC1802F01A3BB00E2D3CE /* XCRemoteSwiftPackageReference "stripe-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stripe/stripe-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 25.3.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		978EC1812F01A3BB00E2D3CE /* StripePaymentSheet */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 978EC1802F01A3BB00E2D3CE /* XCRemoteSwiftPackageReference "stripe-ios" */;
+			productName = StripePaymentSheet;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = B8000000000 /* Project object */;
+	rootObject = F005000002 /* Project object */;
 }

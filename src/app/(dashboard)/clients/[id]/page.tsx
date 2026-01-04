@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +100,11 @@ interface StyleRecommendation {
 export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Check if user is staff or receptionist (not manager/owner/admin)
+  const isStaffOnly = session?.user?.role === "STAFF" || session?.user?.role === "RECEPTIONIST";
   const [aiLoading, setAiLoading] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<StyleRecommendation | null>(null);
   const [client, setClient] = useState<ClientData | null>(null);
@@ -107,6 +112,7 @@ export default function ClientProfilePage() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const [expandedVisitId, setExpandedVisitId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchClient() {
@@ -239,19 +245,21 @@ export default function ClientProfilePage() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => router.push(`/messaging?clientId=${params.id}`)}>
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Message
-          </Button>
-          <Button onClick={() => router.push(`/appointments/new?clientId=${params.id}`)}>
-            <Calendar className="h-4 w-4 mr-2" />
-            Book Appointment
-          </Button>
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
+        {!isStaffOnly && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => router.push(`/messaging?clientId=${params.id}`)}>
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Message
+            </Button>
+            <Button onClick={() => router.push(`/appointments/new?clientId=${params.id}`)}>
+              <Calendar className="h-4 w-4 mr-2" />
+              Book Appointment
+            </Button>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Quick Stats */}
@@ -296,10 +304,12 @@ export default function ClientProfilePage() {
           <TabsTrigger value="formulas">Formulas</TabsTrigger>
           <TabsTrigger value="photos">Photos</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center gap-1">
-            <CreditCard className="h-3 w-3" />
-            Payment Methods
-          </TabsTrigger>
+          {!isStaffOnly && (
+            <TabsTrigger value="payments" className="flex items-center gap-1">
+              <CreditCard className="h-3 w-3" />
+              Payment Methods
+            </TabsTrigger>
+          )}
           <TabsTrigger value="ai" className="flex items-center gap-1">
             <Sparkles className="h-3 w-3" />
             AI Recommendations
@@ -407,67 +417,69 @@ export default function ClientProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Payment Methods */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      Payment Methods
-                    </CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowAddCardModal(true)}
-                      className="text-rose-600 hover:text-rose-700"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {paymentMethods.length === 0 ? (
-                    <p className="text-sm text-slate-500">No payment methods saved</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {paymentMethods.map((card) => (
-                        <div
-                          key={card.id}
-                          className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-7 bg-gradient-to-r from-slate-700 to-slate-900 rounded flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">
-                                {card.brand?.toUpperCase().slice(0, 4)}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">•••• {card.last4}</p>
-                              <p className="text-xs text-slate-500">
-                                Expires {card.expMonth}/{card.expYear}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteCard(card.id)}
-                            disabled={deletingCardId === card.id}
-                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                          >
-                            {deletingCardId === card.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      ))}
+              {/* Payment Methods - Hidden for staff */}
+              {!isStaffOnly && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <CreditCard className="h-5 w-5" />
+                        Payment Methods
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowAddCardModal(true)}
+                        className="text-rose-600 hover:text-rose-700"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardHeader>
+                  <CardContent>
+                    {paymentMethods.length === 0 ? (
+                      <p className="text-sm text-slate-500">No payment methods saved</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {paymentMethods.map((card) => (
+                          <div
+                            key={card.id}
+                            className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-7 bg-gradient-to-r from-slate-700 to-slate-900 rounded flex items-center justify-center">
+                                <span className="text-white text-xs font-bold">
+                                  {card.brand?.toUpperCase().slice(0, 4)}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">•••• {card.last4}</p>
+                                <p className="text-xs text-slate-500">
+                                  Expires {card.expMonth}/{card.expYear}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCard(card.id)}
+                              disabled={deletingCardId === card.id}
+                              className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            >
+                              {deletingCardId === card.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -478,37 +490,121 @@ export default function ClientProfilePage() {
               <CardTitle className="text-lg">Visit History</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {visits.length === 0 ? (
                   <div className="text-center py-8 text-slate-500">No visit history yet</div>
                 ) : (
                   visits.map((visit: any) => {
-                    const serviceNames = visit.lineItems?.filter((i: any) => i.type === "SERVICE").map((i: any) => i.description || i.name) || [];
+                    const serviceItems = visit.lineItems?.filter((i: any) => i.type === "SERVICE") || [];
+                    const productItems = visit.lineItems?.filter((i: any) => i.type === "PRODUCT") || [];
+                    const serviceNames = serviceItems.map((i: any) => i.description || i.name);
                     const tipAmount = Number(visit.tipAmount) || 0;
+                    const isExpanded = expandedVisitId === visit.id;
+
                     return (
-                      <div
-                        key={visit.id}
-                        className="flex items-center justify-between p-4 rounded-lg bg-slate-50"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 rounded-full bg-rose-100 flex items-center justify-center">
-                            <Calendar className="h-5 w-5 text-rose-600" />
+                      <div key={visit.id} className="rounded-lg border overflow-hidden">
+                        {/* Clickable Header */}
+                        <div
+                          className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={() => setExpandedVisitId(isExpanded ? null : visit.id)}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-rose-100 flex items-center justify-center">
+                              <Calendar className="h-5 w-5 text-rose-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{serviceNames.length > 0 ? serviceNames.join(", ") : "Transaction"}</p>
+                              <p className="text-sm text-slate-500">
+                                {formatDate(visit.date)}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{serviceNames.length > 0 ? serviceNames.join(", ") : "Transaction"}</p>
-                            <p className="text-sm text-slate-500">
-                              {formatDate(visit.date)}
-                            </p>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="font-medium">{formatCurrency(Number(visit.totalAmount))}</p>
+                              {tipAmount > 0 && (
+                                <p className="text-sm text-slate-500">
+                                  +{formatCurrency(tipAmount)} tip
+                                </p>
+                              )}
+                            </div>
+                            <div className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                              <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-medium">{formatCurrency(Number(visit.totalAmount))}</p>
-                          {tipAmount > 0 && (
-                            <p className="text-sm text-slate-500">
-                              +{formatCurrency(tipAmount)} tip
-                            </p>
-                          )}
-                        </div>
+
+                        {/* Expanded Details */}
+                        {isExpanded && (
+                          <div className="p-4 bg-white border-t space-y-4">
+                            {/* Services */}
+                            {serviceItems.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-700 mb-2">Services</h4>
+                                <div className="space-y-2">
+                                  {serviceItems.map((item: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between text-sm">
+                                      <span>{item.description || item.name}</span>
+                                      <span className="text-slate-600">{formatCurrency(Number(item.totalPrice || item.unitPrice))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Products */}
+                            {productItems.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-700 mb-2">Products</h4>
+                                <div className="space-y-2">
+                                  {productItems.map((item: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between text-sm">
+                                      <span>{item.description || item.name} {item.quantity > 1 && `x${item.quantity}`}</span>
+                                      <span className="text-slate-600">{formatCurrency(Number(item.totalPrice || item.unitPrice))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Summary */}
+                            <div className="pt-3 border-t space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-500">Subtotal</span>
+                                <span>{formatCurrency(Number(visit.subtotal))}</span>
+                              </div>
+                              {Number(visit.discountAmount) > 0 && (
+                                <div className="flex justify-between text-sm text-green-600">
+                                  <span>Discount</span>
+                                  <span>-{formatCurrency(Number(visit.discountAmount))}</span>
+                                </div>
+                              )}
+                              {Number(visit.taxAmount) > 0 && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-500">Tax</span>
+                                  <span>{formatCurrency(Number(visit.taxAmount))}</span>
+                                </div>
+                              )}
+                              {tipAmount > 0 && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-500">Tip</span>
+                                  <span>{formatCurrency(tipAmount)}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between font-medium pt-2 border-t">
+                                <span>Total</span>
+                                <span>{formatCurrency(Number(visit.totalAmount))}</span>
+                              </div>
+                            </div>
+
+                            {/* Transaction Info */}
+                            <div className="pt-3 border-t text-xs text-slate-400">
+                              <p>Transaction #{visit.transactionNumber}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -616,9 +712,10 @@ export default function ClientProfilePage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payments" className="mt-4 space-y-4">
-          {/* Add Card Form - Shown inline for better mobile compatibility */}
-          {showAddCardModal && (
+        {!isStaffOnly && (
+          <TabsContent value="payments" className="mt-4 space-y-4">
+            {/* Add Card Form - Shown inline for better mobile compatibility */}
+            {showAddCardModal && (
             <Card className="border-rose-200 bg-rose-50/30">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -720,6 +817,7 @@ export default function ClientProfilePage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         <TabsContent value="ai" className="mt-4">
           <div className="space-y-6">
@@ -784,10 +882,12 @@ export default function ClientProfilePage() {
                                 <span className="text-slate-500">{rec.reason}</span>
                               </div>
                             </div>
-                            <Button variant="outline" size="sm" className="ml-4">
-                              <Calendar className="h-4 w-4 mr-1" />
-                              Book
-                            </Button>
+                            {!isStaffOnly && (
+                              <Button variant="outline" size="sm" className="ml-4">
+                                <Calendar className="h-4 w-4 mr-1" />
+                                Book
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}

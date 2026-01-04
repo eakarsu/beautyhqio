@@ -7,6 +7,14 @@ struct BeautyHQApp: App {
 
     init() {
         setupAppearance()
+
+        // Log build configuration and API URL for debugging
+        #if DEBUG
+        print("🔧 BUILD: DEBUG")
+        #else
+        print("🚀 BUILD: RELEASE")
+        #endif
+        print("🌐 API URL: \(Config.apiBaseURL)")
     }
 
     var body: some Scene {
@@ -49,6 +57,6 @@ class AppState: ObservableObject {
         case appointments = 1
         case clients = 2
         case pos = 3
-        case settings = 4
+        case more = 4
     }
 }

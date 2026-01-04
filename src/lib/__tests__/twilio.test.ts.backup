@@ -1,0 +1,513 @@
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+
+// Load environment variables from .env file
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+// Store the phone number for test assertions
+const TWILIO_PHONE = process.env.TWILIO_PHONE_NUMBER || '+18043601129';
+
+// Mock twilio before importing the module
+const mockMessagesCreate = jest.fn();
+const mockCallsCreate = jest.fn();
+
+// Mock VoiceResponse class
+class MockVoiceResponse {
+  private elements: string[] = [];
+
+  say(options: { voice?: string; language?: string }, text: string) {
+    const voice = options.voice || 'Polly.Joanna';
+    const language = options.language || 'en-US';
+    this.elements.push(`<Say voice="${voice}" language="${language}">${text}</Say>`);
+    return this;
+  }
+
+  pause(options: { length?: number }) {
+    this.elements.push(`<Pause length="${options.length || 1}"/>`);
+    return this;
+  }
+
+  hangup() {
+    this.elements.push('<Hangup/>');
+    return this;
+  }
+
+  gather(options: Record<string, unknown>) {
+    const gatherContent: string[] = [];
+    return {
+      say: (sayOptions: { voice?: string; language?: string }, text: string) => {
+        const voice = sayOptions.voice || 'Polly.Joanna';
+        const language = sayOptions.language || 'en-US';
+        gatherContent.push(`<Say voice="${voice}" language="${language}">${text}</Say>`);
+      },
+    };
+  }
+
+  play(url: string) {
+    this.elements.push(`<Play>${url}</Play>`);
+    return this;
+  }
+
+  redirect(url: string) {
+    this.elements.push(`<Redirect>${url}</Redirect>`);
+    return this;
+  }
+
+  toString() {
+    return `<?xml version="1.0" encoding="UTF-8"?><Response>${this.elements.join('')}</Response>`;
+  }
+}
+
+const mockTwilio = jest.fn(() => ({
+  messages: {
+    create: mockMessagesCreate,
+  },
+  calls: {
+    create: mockCallsCreate,
+  },
+}));
+
+// Add twiml property to the mock
+(mockTwilio as unknown as { twiml: { VoiceResponse: typeof MockVoiceResponse } }).twiml = {
+  VoiceResponse: MockVoiceResponse,
+};
+
+jest.mock('twilio', () => mockTwilio);
+
+// Import after mocking
+import {
+  sendSMS,
+  sendBulkSMS,
+  makeCall,
+  sendAppointmentReminder,
+  sendAppointmentConfirmationSMS,
+  sendAppointmentReminderCall,
+  generateTwiML,
+  reminderTemplates,
+  confirmationTemplates,
+  voiceGreetings,
+  voiceReminderTemplates,
+} from '../twilio';
+
+describe('Twilio SMS Functions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('sendSMS', () => {
+    it('should send SMS successfully', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({
+        sid: 'SM123456',
+        status: 'sent',
+      });
+
+      const result = await sendSMS({
+        to: '8043601129',
+        message: 'Test message',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.messageId).toBe('SM123456');
+      expect(result.status).toBe('sent');
+      expect(mockMessagesCreate).toHaveBeenCalledWith({
+        body: 'Test message',
+        to: '+18043601129',
+        from: TWILIO_PHONE,
+      });
+    });
+
+    it('should format 10-digit US phone numbers correctly', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({
+        sid: 'SM123456',
+        status: 'sent',
+      });
+
+      await sendSMS({
+        to: '8043601129',
+        message: 'Test',
+      });
+
+      expect(mockMessagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: '+18043601129',
+        })
+      );
+    });
+
+    it('should format 11-digit US phone numbers correctly', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({
+        sid: 'SM123456',
+        status: 'sent',
+      });
+
+      await sendSMS({
+        to: '18043601129',
+        message: 'Test',
+      });
+
+      expect(mockMessagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: '+18043601129',
+        })
+      );
+    });
+
+    it('should handle phone numbers with special characters', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({
+        sid: 'SM123456',
+        status: 'sent',
+      });
+
+      await sendSMS({
+        to: '(804) 360-1129',
+        message: 'Test',
+      });
+
+      expect(mockMessagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: '+18043601129',
+        })
+      );
+    });
+
+    it('should include mediaUrl when provided', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({
+        sid: 'SM123456',
+        status: 'sent',
+      });
+
+      await sendSMS({
+        to: '8043601129',
+        message: 'Check this image',
+        mediaUrl: 'https://example.com/image.jpg',
+      });
+
+      expect(mockMessagesCreate).toHaveBeenCalledWith({
+        body: 'Check this image',
+        to: '+18043601129',
+        from: TWILIO_PHONE,
+        mediaUrl: ['https://example.com/image.jpg'],
+      });
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockMessagesCreate.mockRejectedValueOnce(new Error('Network error'));
+
+      const result = await sendSMS({
+        to: '8043601129',
+        message: 'Test',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Network error');
+    });
+  });
+
+  describe('sendBulkSMS', () => {
+    it('should send multiple SMS messages', async () => {
+      mockMessagesCreate
+        .mockResolvedValueOnce({ sid: 'SM1', status: 'sent' })
+        .mockResolvedValueOnce({ sid: 'SM2', status: 'sent' })
+        .mockResolvedValueOnce({ sid: 'SM3', status: 'sent' });
+
+      const result = await sendBulkSMS([
+        { phone: '8043601129', message: 'Message 1' },
+        { phone: '8043601129', message: 'Message 2' },
+        { phone: '8043601129', message: 'Message 3' },
+      ]);
+
+      expect(result.total).toBe(3);
+      expect(result.successful).toBe(3);
+      expect(result.failed).toBe(0);
+    });
+
+    it('should handle partial failures', async () => {
+      mockMessagesCreate
+        .mockResolvedValueOnce({ sid: 'SM1', status: 'sent' })
+        .mockRejectedValueOnce(new Error('Failed'))
+        .mockResolvedValueOnce({ sid: 'SM3', status: 'sent' });
+
+      const result = await sendBulkSMS([
+        { phone: '8043601129', message: 'Message 1' },
+        { phone: '8043601129', message: 'Message 2' },
+        { phone: '8043601129', message: 'Message 3' },
+      ]);
+
+      expect(result.total).toBe(3);
+      expect(result.successful).toBe(2);
+      expect(result.failed).toBe(1);
+    });
+  });
+
+  describe('sendAppointmentReminder', () => {
+    it('should send reminder in English by default', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({
+        sid: 'SM123',
+        status: 'sent',
+      });
+
+      await sendAppointmentReminder(
+        '8043601129',
+        'John',
+        'Dec 25',
+        '2:00 PM',
+        'Haircut'
+      );
+
+      expect(mockMessagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('Hi John'),
+          body: expect.stringContaining('Haircut'),
+          body: expect.stringContaining('Dec 25'),
+          body: expect.stringContaining('2:00 PM'),
+        })
+      );
+    });
+
+    it('should send reminder in Spanish', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({
+        sid: 'SM123',
+        status: 'sent',
+      });
+
+      await sendAppointmentReminder(
+        '8043601129',
+        'Maria',
+        'Dec 25',
+        '2:00 PM',
+        'Corte de pelo',
+        'es'
+      );
+
+      expect(mockMessagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('Hola Maria'),
+        })
+      );
+    });
+  });
+
+  describe('sendAppointmentConfirmationSMS', () => {
+    it('should send confirmation with business name', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({
+        sid: 'SM123',
+        status: 'sent',
+      });
+
+      await sendAppointmentConfirmationSMS(
+        '8043601129',
+        'Jane',
+        'Dec 26',
+        '10:00 AM',
+        'Manicure',
+        'BeautyHQ Salon'
+      );
+
+      expect(mockMessagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('Jane'),
+          body: expect.stringContaining('BeautyHQ Salon'),
+        })
+      );
+    });
+  });
+});
+
+describe('Twilio Voice Functions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('makeCall', () => {
+    it('should make a call with TwiML URL', async () => {
+      mockCallsCreate.mockResolvedValueOnce({
+        sid: 'CA123456',
+        status: 'queued',
+      });
+
+      const result = await makeCall({
+        to: '8043601129',
+        twimlUrl: 'https://example.com/twiml',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.callId).toBe('CA123456');
+      expect(mockCallsCreate).toHaveBeenCalledWith({
+        to: '+18043601129',
+        from: TWILIO_PHONE,
+        url: 'https://example.com/twiml',
+      });
+    });
+
+    it('should make a call with inline TwiML', async () => {
+      mockCallsCreate.mockResolvedValueOnce({
+        sid: 'CA123456',
+        status: 'queued',
+      });
+
+      const twiml = '<Response><Say>Hello</Say></Response>';
+      const result = await makeCall({
+        to: '8043601129',
+        twiml,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockCallsCreate).toHaveBeenCalledWith({
+        to: '+18043601129',
+        from: TWILIO_PHONE,
+        twiml,
+      });
+    });
+
+    it('should handle call errors', async () => {
+      mockCallsCreate.mockRejectedValueOnce(new Error('Call failed'));
+
+      const result = await makeCall({
+        to: '8043601129',
+        twimlUrl: 'https://example.com/twiml',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Call failed');
+    });
+  });
+
+  describe('sendAppointmentReminderCall', () => {
+    it('should make reminder call in English', async () => {
+      mockCallsCreate.mockResolvedValueOnce({
+        sid: 'CA123',
+        status: 'queued',
+      });
+
+      await sendAppointmentReminderCall(
+        '8043601129',
+        'John',
+        'Dec 25',
+        '2:00 PM',
+        'Haircut'
+      );
+
+      expect(mockCallsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: '+18043601129',
+          twiml: expect.stringContaining('John'),
+        })
+      );
+    });
+  });
+});
+
+describe('TwiML Generation', () => {
+  describe('generateTwiML', () => {
+    it('should generate TwiML with say element', () => {
+      const twiml = generateTwiML({
+        say: { text: 'Hello, welcome!' },
+      });
+
+      expect(twiml).toContain('<Say');
+      expect(twiml).toContain('Hello, welcome!');
+    });
+
+    it('should generate TwiML with hangup', () => {
+      const twiml = generateTwiML({
+        say: { text: 'Goodbye' },
+        hangup: true,
+      });
+
+      expect(twiml).toContain('<Hangup/>');
+    });
+
+    it('should generate TwiML with custom voice', () => {
+      const twiml = generateTwiML({
+        say: {
+          text: 'Test',
+          voice: 'Polly.Matthew',
+          language: 'en-US',
+        },
+      });
+
+      expect(twiml).toContain('Polly.Matthew');
+    });
+  });
+});
+
+describe('Message Templates', () => {
+  describe('reminderTemplates', () => {
+    it('should have all supported languages', () => {
+      expect(reminderTemplates).toHaveProperty('en');
+      expect(reminderTemplates).toHaveProperty('es');
+      expect(reminderTemplates).toHaveProperty('vi');
+      expect(reminderTemplates).toHaveProperty('ko');
+      expect(reminderTemplates).toHaveProperty('zh');
+    });
+
+    it('should generate correct English reminder', () => {
+      const message = reminderTemplates.en('John', 'Dec 25', '2:00 PM', 'Haircut');
+      expect(message).toContain('John');
+      expect(message).toContain('Dec 25');
+      expect(message).toContain('2:00 PM');
+      expect(message).toContain('Haircut');
+      expect(message).toContain('reminder');
+    });
+
+    it('should generate correct Spanish reminder', () => {
+      const message = reminderTemplates.es('Maria', 'Dec 25', '2:00 PM', 'Corte');
+      expect(message).toContain('Hola Maria');
+      expect(message).toContain('Recordatorio');
+    });
+  });
+
+  describe('confirmationTemplates', () => {
+    it('should have all supported languages', () => {
+      expect(confirmationTemplates).toHaveProperty('en');
+      expect(confirmationTemplates).toHaveProperty('es');
+      expect(confirmationTemplates).toHaveProperty('vi');
+      expect(confirmationTemplates).toHaveProperty('ko');
+      expect(confirmationTemplates).toHaveProperty('zh');
+    });
+
+    it('should include business name in confirmation', () => {
+      const message = confirmationTemplates.en(
+        'Jane',
+        'Dec 26',
+        '10:00 AM',
+        'Manicure',
+        'BeautyHQ'
+      );
+      expect(message).toContain('BeautyHQ');
+      expect(message).toContain('confirmed');
+    });
+  });
+
+  describe('voiceGreetings', () => {
+    it('should have greetings in all languages', () => {
+      expect(voiceGreetings).toHaveProperty('en');
+      expect(voiceGreetings).toHaveProperty('es');
+      expect(voiceGreetings).toHaveProperty('vi');
+      expect(voiceGreetings).toHaveProperty('ko');
+      expect(voiceGreetings).toHaveProperty('zh');
+    });
+
+    it('should have menu options in English greeting', () => {
+      expect(voiceGreetings.en).toContain('Press 1');
+      expect(voiceGreetings.en).toContain('press 2');
+      expect(voiceGreetings.en).toContain('press 3');
+    });
+  });
+
+  describe('voiceReminderTemplates', () => {
+    it('should generate voice reminder with all details', () => {
+      const message = voiceReminderTemplates.en(
+        'John',
+        'December 25th',
+        '2:00 PM',
+        'Haircut'
+      );
+      expect(message).toContain('John');
+      expect(message).toContain('December 25th');
+      expect(message).toContain('2:00 PM');
+      expect(message).toContain('Haircut');
+      expect(message).toContain('Press 1');
+    });
+  });
+});
