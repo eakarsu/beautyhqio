@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
 
 // Generate URL-friendly slug from business name
 function generateSlug(name: string): string {
@@ -16,17 +19,29 @@ export async function POST(request: NextRequest) {
     const {
       email,
       password,
-      firstName,
-      lastName,
+      firstName: providedFirstName,
+      lastName: providedLastName,
+      name, // Support single name field from mobile apps
       phone,
       businessName,
       businessType,
     } = body;
 
+    // Handle name field - support both "name" and "firstName/lastName"
+    let firstName = providedFirstName;
+    let lastName = providedLastName;
+
+    if (!firstName && name) {
+      // Split single name field into first and last
+      const nameParts = name.trim().split(" ");
+      firstName = nameParts[0] || name;
+      lastName = nameParts.slice(1).join(" ") || "";
+    }
+
     // Validate required fields
-    if (!email || !password || !firstName || !lastName) {
+    if (!email || !password || !firstName) {
       return NextResponse.json(
-        { error: "Email, password, first name, and last name are required" },
+        { error: "Email, password, and name are required" },
         { status: 400 }
       );
     }
@@ -67,12 +82,18 @@ export async function POST(request: NextRequest) {
       isNewBusiness = true;
     }
 
-    // If still no business, return error
+    // If still no business, create a default one
     if (!business) {
-      return NextResponse.json(
-        { error: "No business found. Please run database seed first." },
-        { status: 400 }
-      );
+      business = await prisma.business.create({
+        data: {
+          name: businessName || `${firstName}'s Business`,
+          type: businessType || "MULTI_SERVICE",
+          timezone: "America/New_York",
+          defaultLanguage: "en",
+          supportedLanguages: ["en"],
+        },
+      });
+      isNewBusiness = true;
     }
 
     // Create BusinessSubscription if it doesn't exist (STARTER plan - free, 20% commission)
@@ -126,21 +147,47 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         firstName,
-        lastName,
+        lastName: lastName || "",
         phone: phone || null,
         role: "OWNER",
         businessId: business.id,
       },
     });
 
+    // Generate JWT tokens for auto-login after registration
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+        businessId: user.businessId,
+        role: user.role,
+      },
+      JWT_SECRET,
+      { expiresIn: "30d" }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      JWT_SECRET,
+      { expiresIn: "90d" }
+    );
+
+    // Return response compatible with mobile app AuthResponse
     return NextResponse.json(
       {
-        message: "Account created successfully",
+        token,
+        refreshToken,
         user: {
           id: user.id,
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          name: `${user.firstName} ${user.lastName}`.trim(),
+          phone: user.phone,
+          image: null,
+          role: user.role,
+          businessId: user.businessId,
+          staffId: null,
+          createdAt: user.createdAt.toISOString(),
+          updatedAt: user.updatedAt.toISOString(),
         },
       },
       { status: 201 }
