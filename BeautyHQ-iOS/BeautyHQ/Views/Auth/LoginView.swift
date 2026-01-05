@@ -218,8 +218,6 @@ struct LoginView: View {
                         }
                         .padding(.horizontal, Spacing.lg)
 
-                        Spacer(minLength: Spacing.xxl)
-
                         // Register Link
                         HStack(spacing: Spacing.xs) {
                             Text("Don't have an account?")
@@ -240,8 +238,7 @@ struct LoginView: View {
                             }
                         )
                         .padding(.horizontal, Spacing.lg)
-
-                        .padding(.bottom, Spacing.xl)
+                        .padding(.bottom, 100)
                     }
                 }
             }
@@ -260,62 +257,49 @@ struct DemoAccountsSection: View {
     let onSelectAccount: (String, String) -> Void
 
     var body: some View {
-        VStack(spacing: Spacing.md) {
-            Text("DEMO ACCOUNTS & ROLE ACCESS")
-                .font(.appCaption)
-                .fontWeight(.semibold)
+        VStack(spacing: 8) {
+            Text("DEMO ACCOUNTS")
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(.softGray)
-                .tracking(1)
 
-            VStack(spacing: Spacing.sm) {
-                DemoAccountRow(
-                    role: "Owner",
-                    email: "admin@luxebeauty.com",
-                    password: "admin123",
-                    description: "Full dashboard with all features",
-                    color: .blue
-                ) {
+            HStack(spacing: 6) {
+                DemoChip(role: "Owner", color: .blue) {
                     onSelectAccount("admin@luxebeauty.com", "admin123")
                 }
-
-                DemoAccountRow(
-                    role: "Manager",
-                    email: "jennifer@luxebeauty.com",
-                    password: "password123",
-                    description: "Same as Owner (minus Billing/Subscription)",
-                    color: .purple
-                ) {
+                DemoChip(role: "Manager", color: .purple) {
                     onSelectAccount("jennifer@luxebeauty.com", "password123")
                 }
-
-                DemoAccountRow(
-                    role: "Receptionist",
-                    email: "lisa@luxebeauty.com",
-                    password: "password123",
-                    description: "Limited dashboard (no Services, Staff, Products)",
-                    color: .orange
-                ) {
+                DemoChip(role: "Receptionist", color: .orange) {
                     onSelectAccount("lisa@luxebeauty.com", "password123")
                 }
-
-                DemoAccountRow(
-                    role: "Staff",
-                    email: "sarah@luxebeauty.com",
-                    password: "password123",
-                    description: "Staff portal (My Schedule, Clients, Earnings)",
-                    color: .green
-                ) {
+                DemoChip(role: "Staff", color: .green) {
                     onSelectAccount("sarah@luxebeauty.com", "password123")
                 }
             }
-
-            Text("Tap any row to auto-fill credentials")
-                .font(.appCaption2)
-                .foregroundColor(.softGray)
         }
-        .padding(Spacing.md)
-        .background(Color.screenBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                .fill(Color.screenBackground)
+        )
+    }
+}
+
+struct DemoChip: View {
+    let role: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(role)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(color)
+                .clipShape(Capsule())
+        }
     }
 }
 

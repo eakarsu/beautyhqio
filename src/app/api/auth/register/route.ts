@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
 
 // Generate URL-friendly slug from business name
 function generateSlug(name: string): string {
@@ -16,17 +19,27 @@ export async function POST(request: NextRequest) {
     const {
       email,
       password,
-      firstName,
-      lastName,
+      firstName: firstNameFromBody,
+      lastName: lastNameFromBody,
+      name,  // iOS sends single "name" field
       phone,
       businessName,
       businessType,
     } = body;
 
+    // Handle iOS format (name) vs web format (firstName/lastName)
+    let firstName = firstNameFromBody;
+    let lastName = lastNameFromBody;
+    if (!firstName && !lastName && name) {
+      const nameParts = name.trim().split(' ');
+      firstName = nameParts[0] || '';
+      lastName = nameParts.slice(1).join(' ') || '';
+    }
+
     // Validate required fields
-    if (!email || !password || !firstName || !lastName) {
+    if (!email || !password || !firstName) {
       return NextResponse.json(
-        { error: "Email, password, first name, and last name are required" },
+        { error: "Email, password, and name are required" },
         { status: 400 }
       );
     }
@@ -136,18 +149,42 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(
+    // Generate JWT token (same as login)
+    const token = jwt.sign(
       {
-        message: "Account created successfully",
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
+        userId: user.id,
+        email: user.email,
+        businessId: user.businessId,
+        role: user.role,
       },
-      { status: 201 }
+      JWT_SECRET,
+      { expiresIn: "30d" }
     );
+
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      JWT_SECRET,
+      { expiresIn: "90d" }
+    );
+
+    // Return same format as login endpoint
+    return NextResponse.json({
+      token,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: `${user.firstName} ${user.lastName || ''}`.trim(),
+        phone: user.phone || null,
+        image: user.avatar || null,
+        role: user.role,
+        businessId: user.businessId,
+        staffId: null,
+        isClient: false,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      },
+    }, { status: 201 });
   } catch (error: any) {
     console.error("Error registering user:", error);
 

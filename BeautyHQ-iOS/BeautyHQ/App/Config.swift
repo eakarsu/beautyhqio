@@ -5,6 +5,11 @@ enum Config {
     static let apiBaseURL = "http://localhost:3000/api"
     // static let apiBaseURL = "https://beautyhq.io/api"  // Uncomment for production
 
+    // Web base URL (for terms, privacy pages)
+    static var webBaseURL: String {
+        apiBaseURL.replacingOccurrences(of: "/api", with: "")
+    }
+
     static let appName = "BeautyHQ"
     static let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     static let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
