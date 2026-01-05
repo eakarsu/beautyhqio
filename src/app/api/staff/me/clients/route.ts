@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/staff/me/clients - Get clients the current staff has served
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Find staff record for current user
     const staff = await prisma.staff.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
     });
 
     if (!staff) {

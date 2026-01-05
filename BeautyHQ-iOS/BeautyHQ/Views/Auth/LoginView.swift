@@ -229,6 +229,16 @@ struct LoginView: View {
                             .font(.appHeadline)
                             .foregroundColor(.roseGold)
                         }
+
+                        // Demo Accounts Section
+                        DemoAccountsSection(
+                            onSelectAccount: { demoEmail, demoPassword in
+                                email = demoEmail
+                                password = demoPassword
+                            }
+                        )
+                        .padding(.horizontal, Spacing.lg)
+
                         .padding(.bottom, Spacing.xl)
                     }
                 }
@@ -240,6 +250,107 @@ struct LoginView: View {
                 ForgotPasswordView()
             }
         }
+    }
+}
+
+// MARK: - Demo Accounts Section
+struct DemoAccountsSection: View {
+    let onSelectAccount: (String, String) -> Void
+
+    var body: some View {
+        VStack(spacing: Spacing.md) {
+            Text("DEMO ACCOUNTS & ROLE ACCESS")
+                .font(.appCaption)
+                .fontWeight(.semibold)
+                .foregroundColor(.softGray)
+                .tracking(1)
+
+            VStack(spacing: Spacing.sm) {
+                DemoAccountRow(
+                    role: "Owner",
+                    email: "admin@luxebeauty.com",
+                    password: "admin123",
+                    description: "Full dashboard with all features",
+                    color: .blue
+                ) {
+                    onSelectAccount("admin@luxebeauty.com", "admin123")
+                }
+
+                DemoAccountRow(
+                    role: "Manager",
+                    email: "jennifer@luxebeauty.com",
+                    password: "password123",
+                    description: "Same as Owner (minus Billing/Subscription)",
+                    color: .purple
+                ) {
+                    onSelectAccount("jennifer@luxebeauty.com", "password123")
+                }
+
+                DemoAccountRow(
+                    role: "Receptionist",
+                    email: "lisa@luxebeauty.com",
+                    password: "password123",
+                    description: "Limited dashboard (no Services, Staff, Products)",
+                    color: .orange
+                ) {
+                    onSelectAccount("lisa@luxebeauty.com", "password123")
+                }
+
+                DemoAccountRow(
+                    role: "Staff",
+                    email: "sarah@luxebeauty.com",
+                    password: "password123",
+                    description: "Staff portal (My Schedule, Clients, Earnings)",
+                    color: .green
+                ) {
+                    onSelectAccount("sarah@luxebeauty.com", "password123")
+                }
+            }
+
+            Text("Tap any row to auto-fill credentials")
+                .font(.appCaption2)
+                .foregroundColor(.softGray)
+        }
+        .padding(Spacing.md)
+        .background(Color.screenBackground)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+    }
+}
+
+struct DemoAccountRow: View {
+    let role: String
+    let email: String
+    let password: String
+    let description: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(role)
+                        .font(.appCaption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(color)
+
+                    Spacer()
+
+                    Text(email)
+                        .font(.appCaption2)
+                        .foregroundColor(color.opacity(0.8))
+                }
+
+                Text(description)
+                    .font(.system(size: 10))
+                    .foregroundColor(color.opacity(0.7))
+            }
+            .padding(Spacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

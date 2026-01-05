@@ -315,6 +315,64 @@ struct StaffDetailView: View {
                     }
                     .padding(.horizontal, Spacing.lg)
 
+                    // Payout Settings
+                    VStack(alignment: .leading, spacing: Spacing.md) {
+                        Text("Payout Settings")
+                            .font(.appTitle3)
+                            .foregroundColor(.charcoal)
+
+                        VStack(spacing: Spacing.sm) {
+                            AppMetricRow(
+                                label: "Payout Method",
+                                value: staff.payoutMethod?.displayName ?? "Manual",
+                                icon: "banknote"
+                            )
+
+                            // Show Stripe Connect status if using Stripe
+                            if staff.payoutMethod == .stripeConnect {
+                                AppDivider()
+                                AppMetricRow(
+                                    label: "Stripe Status",
+                                    value: staff.stripeAccountStatus ?? "Not connected",
+                                    icon: "checkmark.shield"
+                                )
+                            }
+
+                            // Show bank account info if using bank transfer
+                            if staff.payoutMethod == .bankTransfer {
+                                if let bankName = staff.bankName {
+                                    AppDivider()
+                                    AppMetricRow(
+                                        label: "Bank",
+                                        value: bankName,
+                                        icon: "building.columns"
+                                    )
+                                }
+                                if let last4 = staff.bankAccountLast4 {
+                                    AppDivider()
+                                    AppMetricRow(
+                                        label: "Account",
+                                        value: "••••\(last4)",
+                                        icon: "creditcard"
+                                    )
+                                }
+                                if let accountType = staff.bankAccountType {
+                                    AppDivider()
+                                    AppMetricRow(
+                                        label: "Account Type",
+                                        value: accountType.capitalized,
+                                        icon: "tag"
+                                    )
+                                }
+                            }
+                        }
+                        .padding(Spacing.md)
+                        .background(Color.cardBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+                        .appShadow(.soft)
+                    }
+                    .padding(.horizontal, Spacing.lg)
+
                     // Specialties
                     if let specialties = staff.specialties, !specialties.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.md) {

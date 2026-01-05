@@ -555,7 +555,7 @@ class MarketplaceViewModel: ObservableObject {
             // Calculate aggregate stats for analytics
             let totalViews = response.profiles.reduce(0) { $0 + ($1.viewCount ?? 0) }
             let totalBookings = response.profiles.reduce(0) { $0 + ($1.bookingClickCount ?? 0) }
-            let avgRating = response.profiles.compactMap { $0.avgRating }.reduce(0, +) / Double(max(1, response.profiles.count))
+            _ = response.profiles.compactMap { $0.avgRating }.reduce(0, +) / Double(max(1, response.profiles.count))
 
             // Use first profile as "my listing" or create a placeholder
             if let myProfile = response.profiles.first {

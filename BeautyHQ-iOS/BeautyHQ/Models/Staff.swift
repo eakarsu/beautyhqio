@@ -28,11 +28,30 @@ struct Staff: Codable, Identifiable, Hashable {
     let isActive: Bool
     let user: StaffUser?
 
+    // Stripe Connect
+    let stripeAccountId: String?
+    let stripeAccountStatus: String?  // not_connected, pending, active, restricted
+
+    // Bank Account (for manual payouts)
+    let bankAccountHolder: String?
+    let bankName: String?
+    let bankAccountLast4: String?
+    let bankRoutingNumber: String?
+    let bankAccountNumber: String?
+    let bankAccountType: String?  // checking, savings
+
+    // Payout preference
+    let payoutMethod: PayoutMethod?
+
     // Custom decoder for Prisma Decimal fields
     enum CodingKeys: String, CodingKey {
         case id, userId, locationId, displayName, title, bio, color
         case specialties, employmentType, payType, hourlyRate, commissionPct
         case isActive, user
+        case stripeAccountId, stripeAccountStatus
+        case bankAccountHolder, bankName, bankAccountLast4
+        case bankRoutingNumber, bankAccountNumber, bankAccountType
+        case payoutMethod
     }
 
     init(from decoder: Decoder) throws {
@@ -51,6 +70,21 @@ struct Staff: Codable, Identifiable, Hashable {
         commissionPct = try container.decodeFlexibleDoubleIfPresent(forKey: .commissionPct)
         isActive = try container.decode(Bool.self, forKey: .isActive)
         user = try container.decodeIfPresent(StaffUser.self, forKey: .user)
+
+        // Stripe Connect fields
+        stripeAccountId = try container.decodeIfPresent(String.self, forKey: .stripeAccountId)
+        stripeAccountStatus = try container.decodeIfPresent(String.self, forKey: .stripeAccountStatus)
+
+        // Bank Account fields
+        bankAccountHolder = try container.decodeIfPresent(String.self, forKey: .bankAccountHolder)
+        bankName = try container.decodeIfPresent(String.self, forKey: .bankName)
+        bankAccountLast4 = try container.decodeIfPresent(String.self, forKey: .bankAccountLast4)
+        bankRoutingNumber = try container.decodeIfPresent(String.self, forKey: .bankRoutingNumber)
+        bankAccountNumber = try container.decodeIfPresent(String.self, forKey: .bankAccountNumber)
+        bankAccountType = try container.decodeIfPresent(String.self, forKey: .bankAccountType)
+
+        // Payout preference
+        payoutMethod = try container.decodeIfPresent(PayoutMethod.self, forKey: .payoutMethod)
     }
 
     var fullName: String {
@@ -125,4 +159,52 @@ enum CompensationType: String, Codable, CaseIterable {
         case .hybrid: return "Hybrid"
         }
     }
+}
+
+enum PayoutMethod: String, Codable, CaseIterable {
+    case stripeConnect = "stripe_connect"
+    case bankTransfer = "bank_transfer"
+    case check = "check"
+    case manual = "manual"
+
+    var displayName: String {
+        switch self {
+        case .stripeConnect: return "Stripe Connect"
+        case .bankTransfer: return "Bank Transfer"
+        case .check: return "Check"
+        case .manual: return "Manual/Cash"
+        }
+    }
+}
+
+// MARK: - Staff Schedule
+struct StaffSchedule: Codable, Identifiable {
+    let id: String
+    let dayOfWeek: Int
+    let startTime: String
+    let endTime: String
+    let isWorking: Bool
+    let staffId: String
+    let breaks: [ScheduleBreak]?
+
+    var dayName: String {
+        switch dayOfWeek {
+        case 0: return "Sunday"
+        case 1: return "Monday"
+        case 2: return "Tuesday"
+        case 3: return "Wednesday"
+        case 4: return "Thursday"
+        case 5: return "Friday"
+        case 6: return "Saturday"
+        default: return "Unknown"
+        }
+    }
+}
+
+struct ScheduleBreak: Codable, Identifiable {
+    let id: String
+    let startTime: String
+    let endTime: String
+    let label: String?
+    let scheduleId: String?
 }

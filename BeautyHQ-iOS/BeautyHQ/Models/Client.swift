@@ -13,6 +13,15 @@ struct Client: Codable, Identifiable, Hashable {
     let createdAt: Date
     let updatedAt: Date
 
+    // Business association - clients belong to a specific salon
+    let businessId: String?
+
+    // Link to User account (for authenticated clients)
+    let userId: String?
+
+    // Stripe customer ID for payments
+    let stripeCustomerId: String?
+
     // Computed fields from backend
     let lastVisit: Date?
     let totalVisits: Int?

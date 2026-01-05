@@ -1,121 +1,163 @@
 import SwiftUI
 
 struct MoreView: View {
+    @EnvironmentObject var authManager: AuthManager
+
+    /// Current user role
+    private var userRole: UserRole? {
+        authManager.currentUser?.role
+    }
+
+    /// Check if user has admin privileges (owner, manager, or platform admin)
+    private var isAdmin: Bool {
+        guard let role = userRole else { return false }
+        return role == .platformAdmin || role == .owner || role == .manager
+    }
+
+    /// Check if user can manage services/products (owner, manager only - NOT receptionist)
+    private var canManageServices: Bool {
+        guard let role = userRole else { return false }
+        return role == .platformAdmin || role == .owner || role == .manager
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
                     // Core Features
                     MoreSection(title: "Features") {
+                        // Calendar - available to all
                         NavigationLink {
                             CalendarView()
                         } label: {
                             MoreMenuItem(icon: "calendar", title: "Calendar", gradient: .roseGoldGradient)
                         }
 
-                        NavigationLink {
-                            ServicesView()
-                        } label: {
-                            MoreMenuItem(icon: "scissors", title: "Services", gradient: .deepRoseGradient)
+                        // Services - only for owner/manager (NOT receptionist/staff)
+                        if canManageServices {
+                            NavigationLink {
+                                ServicesView()
+                            } label: {
+                                MoreMenuItem(icon: "scissors", title: "Services", gradient: .deepRoseGradient)
+                            }
                         }
 
-                        NavigationLink {
-                            StaffView()
-                        } label: {
-                            MoreMenuItem(icon: "person.3.fill", title: "Staff", gradient: .goldGradient)
+                        // Staff management - only for owner/manager
+                        if isAdmin {
+                            NavigationLink {
+                                StaffView()
+                            } label: {
+                                MoreMenuItem(icon: "person.3.fill", title: "Staff", gradient: .goldGradient)
+                            }
                         }
 
-                        NavigationLink {
-                            ProductsView()
-                        } label: {
-                            MoreMenuItem(icon: "cube.box.fill", title: "Products", gradient: .successGradient)
-                        }
-                    }
-
-                    // Customer Engagement
-                    MoreSection(title: "Customer Engagement") {
-                        NavigationLink {
-                            LoyaltyView()
-                        } label: {
-                            MoreMenuItem(icon: "star.circle.fill", title: "Loyalty Program", gradient: .goldGradient)
-                        }
-
-                        NavigationLink {
-                            GiftCardsView()
-                        } label: {
-                            MoreMenuItem(icon: "giftcard.fill", title: "Gift Cards", gradient: .roseGoldGradient)
-                        }
-
-                        NavigationLink {
-                            ReviewsView()
-                        } label: {
-                            MoreMenuItem(icon: "star.bubble.fill", title: "Reviews", gradient: .goldGradient)
-                        }
-
-                        NavigationLink {
-                            MarketingView()
-                        } label: {
-                            MoreMenuItem(icon: "megaphone.fill", title: "Marketing", gradient: .deepRoseGradient)
+                        // Products - only for owner/manager (NOT receptionist/staff)
+                        if canManageServices {
+                            NavigationLink {
+                                ProductsView()
+                            } label: {
+                                MoreMenuItem(icon: "cube.box.fill", title: "Products", gradient: .successGradient)
+                            }
                         }
                     }
 
-                    // Business Tools
-                    MoreSection(title: "Business Tools") {
-                        NavigationLink {
-                            ReportsView()
-                        } label: {
-                            MoreMenuItem(icon: "chart.bar.fill", title: "Reports", gradient: .roseGoldGradient)
-                        }
+                    // Customer Engagement - only show for owner/manager
+                    if isAdmin {
+                        MoreSection(title: "Customer Engagement") {
+                            NavigationLink {
+                                LoyaltyView()
+                            } label: {
+                                MoreMenuItem(icon: "star.circle.fill", title: "Loyalty Program", gradient: .goldGradient)
+                            }
 
-                        NavigationLink {
-                            BillingView()
-                        } label: {
-                            MoreMenuItem(icon: "creditcard.fill", title: "Billing", gradient: .successGradient)
-                        }
+                            NavigationLink {
+                                GiftCardsView()
+                            } label: {
+                                MoreMenuItem(icon: "giftcard.fill", title: "Gift Cards", gradient: .roseGoldGradient)
+                            }
 
-                        NavigationLink {
-                            SubscriptionsView()
-                        } label: {
-                            MoreMenuItem(icon: "rectangle.stack.fill", title: "Subscriptions", gradient: .deepRoseGradient)
-                        }
+                            NavigationLink {
+                                ReviewsView()
+                            } label: {
+                                MoreMenuItem(icon: "star.bubble.fill", title: "Reviews", gradient: .goldGradient)
+                            }
 
-                        NavigationLink {
-                            SalesCRMView()
-                        } label: {
-                            MoreMenuItem(icon: "briefcase.fill", title: "Sales CRM", gradient: .roseGoldGradient)
-                        }
-                    }
-
-                    // Marketplace
-                    MoreSection(title: "Marketplace") {
-                        NavigationLink {
-                            MarketplaceView()
-                        } label: {
-                            MoreMenuItem(icon: "storefront.fill", title: "My Marketplace", gradient: .goldGradient)
-                        }
-
-                        NavigationLink {
-                            MarketplaceLeadsView()
-                        } label: {
-                            MoreMenuItem(icon: "person.crop.circle.badge.plus", title: "Marketplace Leads", gradient: .deepRoseGradient)
+                            NavigationLink {
+                                MarketingView()
+                            } label: {
+                                MoreMenuItem(icon: "megaphone.fill", title: "Marketing", gradient: .deepRoseGradient)
+                            }
                         }
                     }
 
-                    // AI
-                    MoreSection(title: "AI & Automation") {
-                        NavigationLink {
-                            AIFeaturesView()
-                        } label: {
-                            MoreMenuItem(icon: "sparkles", title: "AI Features", gradient: .roseGoldGradient)
+                    // Business Tools - only for admins
+                    if isAdmin {
+                        MoreSection(title: "Business Tools") {
+                            NavigationLink {
+                                ReportsView()
+                            } label: {
+                                MoreMenuItem(icon: "chart.bar.fill", title: "Reports", gradient: .roseGoldGradient)
+                            }
+
+                            NavigationLink {
+                                BillingView()
+                            } label: {
+                                MoreMenuItem(icon: "creditcard.fill", title: "Billing", gradient: .successGradient)
+                            }
+
+                            NavigationLink {
+                                SubscriptionsView()
+                            } label: {
+                                MoreMenuItem(icon: "rectangle.stack.fill", title: "Subscriptions", gradient: .deepRoseGradient)
+                            }
+
+                            NavigationLink {
+                                SalesCRMView()
+                            } label: {
+                                MoreMenuItem(icon: "briefcase.fill", title: "Sales CRM", gradient: .roseGoldGradient)
+                            }
+                        }
+
+                        // Marketplace - only for admins
+                        MoreSection(title: "Marketplace") {
+                            NavigationLink {
+                                MarketplaceView()
+                            } label: {
+                                MoreMenuItem(icon: "storefront.fill", title: "My Marketplace", gradient: .goldGradient)
+                            }
+
+                            NavigationLink {
+                                MarketplaceLeadsView()
+                            } label: {
+                                MoreMenuItem(icon: "person.crop.circle.badge.plus", title: "Marketplace Leads", gradient: .deepRoseGradient)
+                            }
                         }
                     }
 
-                    // Settings
+                    // AI - only for owner/manager
+                    if isAdmin {
+                        MoreSection(title: "AI & Automation") {
+                            NavigationLink {
+                                AIFeaturesView()
+                            } label: {
+                                MoreMenuItem(icon: "sparkles", title: "AI Features", gradient: .roseGoldGradient)
+                            }
+                        }
+                    }
+
+                    // Settings - available to all
                     MoreSection(title: "Account") {
                         NavigationLink {
                             SettingsView()
                         } label: {
                             MoreMenuItem(icon: "gearshape.fill", title: "Settings", color: .softGray)
+                        }
+
+                        // Logout button
+                        Button {
+                            showingLogoutAlert = true
+                        } label: {
+                            MoreMenuItem(icon: "rectangle.portrait.and.arrow.right", title: "Sign Out", color: .red)
                         }
                     }
                 }
@@ -123,8 +165,20 @@ struct MoreView: View {
             }
             .background(Color.screenBackground)
             .navigationTitle("More")
+            .alert("Sign Out", isPresented: $showingLogoutAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Sign Out", role: .destructive) {
+                    Task {
+                        await authManager.logout()
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to sign out?")
+            }
         }
     }
+
+    @State private var showingLogoutAlert = false
 }
 
 struct MoreSection<Content: View>: View {

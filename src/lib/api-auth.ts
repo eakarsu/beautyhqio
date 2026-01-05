@@ -1,6 +1,11 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
+import jwt from "jsonwebtoken";
+import { prisma } from "./prisma";
 import { authOptions } from "./auth";
+
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
 
 export type UserRole = "PLATFORM_ADMIN" | "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF" | "CLIENT";
 
@@ -17,27 +22,70 @@ export interface AuthenticatedUser {
 }
 
 /**
- * Get the authenticated user from the session
+ * Get the authenticated user from session OR JWT token (for mobile)
  * Returns null if not authenticated
  */
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
+  // First try NextAuth session (web)
   const session = await getServerSession(authOptions);
 
-  if (!session?.user) {
-    return null;
+  if (session?.user) {
+    return {
+      id: session.user.id,
+      email: session.user.email || "",
+      role: session.user.role as UserRole,
+      businessId: session.user.businessId,
+      businessName: session.user.businessName,
+      staffId: session.user.staffId,
+      firstName: session.user.firstName,
+      lastName: session.user.lastName,
+      isPlatformAdmin: session.user.isPlatformAdmin,
+    };
   }
 
-  return {
-    id: session.user.id,
-    email: session.user.email || "",
-    role: session.user.role as UserRole,
-    businessId: session.user.businessId,
-    businessName: session.user.businessName,
-    staffId: session.user.staffId,
-    firstName: session.user.firstName,
-    lastName: session.user.lastName,
-    isPlatformAdmin: session.user.isPlatformAdmin,
-  };
+  // Try JWT token from Authorization header (mobile)
+  try {
+    const headersList = await headers();
+    const authHeader = headersList.get("authorization");
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const decoded = jwt.verify(token, JWT_SECRET) as {
+        userId: string;
+        email: string;
+        businessId: string;
+        role: string;
+      };
+
+      // Fetch full user data from database
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: {
+          business: true,
+          staff: true,
+        },
+      });
+
+      if (user) {
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role as UserRole,
+          businessId: user.businessId,
+          businessName: user.business?.name || null,
+          staffId: user.staff?.id || null,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isPlatformAdmin: user.role === "PLATFORM_ADMIN",
+        };
+      }
+    }
+  } catch (error) {
+    // JWT verification failed, continue to return null
+    console.error("JWT verification error:", error);
+  }
+
+  return null;
 }
 
 /**

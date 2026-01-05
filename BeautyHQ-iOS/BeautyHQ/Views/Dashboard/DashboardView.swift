@@ -6,6 +6,7 @@ struct DashboardView: View {
     @State private var showingNewBooking = false
     @State private var showingAddClient = false
     @State private var showingPOS = false
+    @State private var showingLogoutAlert = false
     @State private var selectedTab: Int = 0
 
     var body: some View {
@@ -143,21 +144,20 @@ struct DashboardView: View {
                 AppQuickAction(icon: "creditcard.fill", label: "Checkout", color: .success) {
                     showingPOS = true
                 }
-                NavigationLink(destination: CalendarView()) {
-                    VStack(spacing: Spacing.sm) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                            .background(Color.champagneGold)
-                            .clipShape(Circle())
-                            .shadow(color: Color.champagneGold.opacity(0.3), radius: 6, x: 0, y: 3)
-                        Text("Schedule")
-                            .font(.appCaption)
-                            .foregroundColor(.charcoal)
-                    }
+                AppQuickAction(icon: "rectangle.portrait.and.arrow.right", label: "Sign Out", color: .softGray) {
+                    showingLogoutAlert = true
                 }
             }
+        }
+        .alert("Sign Out", isPresented: $showingLogoutAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Sign Out", role: .destructive) {
+                Task {
+                    await authManager.logout()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to sign out?")
         }
     }
 

@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/client/profile - Get client profile
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const authUser = await getAuthenticatedUser();
 
-    if (!session?.user) {
+    if (!authUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: authUser.id },
       include: {
         client: true,
       },
@@ -25,12 +24,12 @@ export async function GET() {
 
     return NextResponse.json({
       profile: {
+        id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        phone: user.phone || user.client?.phone || "",
-        birthday: user.client?.birthday?.toISOString().split("T")[0] || "",
-        avatar: user.avatar,
+        phone: user.phone || user.client?.phone || null,
+        birthday: user.client?.birthday?.toISOString() || null,
       },
     });
   } catch (error) {
@@ -45,9 +44,9 @@ export async function GET() {
 // PUT /api/client/profile - Update client profile
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const authUser = await getAuthenticatedUser();
 
-    if (!session?.user) {
+    if (!authUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -56,7 +55,7 @@ export async function PUT(request: NextRequest) {
 
     // Update user
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: authUser.id },
       data: {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
@@ -69,7 +68,7 @@ export async function PUT(request: NextRequest) {
       const birthdayDate = new Date(birthday);
 
       await prisma.client.upsert({
-        where: { userId: session.user.id },
+        where: { userId: authUser.id },
         update: {
           firstName: firstName || undefined,
           lastName: lastName || undefined,
@@ -79,10 +78,10 @@ export async function PUT(request: NextRequest) {
           birthdayDay: birthdayDate.getDate(),
         },
         create: {
-          userId: session.user.id,
-          firstName: firstName || session.user.firstName,
-          lastName: lastName || session.user.lastName,
-          email: session.user.email,
+          userId: authUser.id,
+          firstName: firstName || authUser.firstName,
+          lastName: lastName || authUser.lastName,
+          email: authUser.email,
           phone: phone || "0000000000",
           birthday: birthdayDate,
           birthdayMonth: birthdayDate.getMonth() + 1,

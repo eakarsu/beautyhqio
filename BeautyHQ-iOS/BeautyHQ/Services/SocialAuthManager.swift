@@ -360,11 +360,13 @@ struct MobileAuthRequest: Encodable {
 
 // MARK: - ASWebAuthenticationPresentationContextProviding
 extension SocialAuthManager: ASWebAuthenticationPresentationContextProviding {
+    @MainActor
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
-            return ASPresentationAnchor()
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first else {
+            fatalError("No window found for presentation")
         }
-        return windowScene.keyWindow ?? ASPresentationAnchor()
+        return window
     }
 }
 

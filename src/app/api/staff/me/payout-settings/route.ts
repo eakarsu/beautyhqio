@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/staff/me/payout-settings - Get payout settings
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const staff = await prisma.staff.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
       select: {
         payoutMethod: true,
         bankAccountHolder: true,
@@ -53,9 +52,9 @@ export async function GET() {
 // PUT /api/staff/me/payout-settings - Update payout settings
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -70,7 +69,7 @@ export async function PUT(request: NextRequest) {
     } = body;
 
     const staff = await prisma.staff.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
     });
 
     if (!staff) {
@@ -131,14 +130,14 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/staff/me/payout-settings - Remove bank account
 export async function DELETE() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const staff = await prisma.staff.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
     });
 
     if (!staff) {

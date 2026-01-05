@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/client/appointments/[id] - Get single appointment
 export async function GET(
@@ -9,20 +8,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
     const { id } = await params;
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Find client profiles linked to this user
     const orConditions: Array<Record<string, unknown>> = [];
-    if (session.user.id) {
-      orConditions.push({ userId: session.user.id });
+    if (user.id) {
+      orConditions.push({ userId: user.id });
     }
-    if (session.user.email) {
-      orConditions.push({ email: session.user.email });
+    if (user.email) {
+      orConditions.push({ email: user.email });
     }
 
     if (orConditions.length === 0) {
@@ -96,14 +95,14 @@ export async function GET(
           duration: s.service.duration,
           price: Number(s.service.price),
         })),
-        staff: {
+        staff: appointment.staff ? {
           id: appointment.staff.id,
           displayName:
             appointment.staff.displayName ||
             `${appointment.staff.user?.firstName || ""} ${appointment.staff.user?.lastName || ""}`.trim() ||
             "Staff",
           photo: appointment.staff.photo,
-        },
+        } : null,
         locationId: appointment.locationId,
       },
     });
@@ -122,10 +121,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
     const { id } = await params;
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -134,11 +133,11 @@ export async function PATCH(
 
     // Find client profiles linked to this user
     const orConditions: Array<Record<string, unknown>> = [];
-    if (session.user.id) {
-      orConditions.push({ userId: session.user.id });
+    if (user.id) {
+      orConditions.push({ userId: user.id });
     }
-    if (session.user.email) {
-      orConditions.push({ email: session.user.email });
+    if (user.email) {
+      orConditions.push({ email: user.email });
     }
 
     if (orConditions.length === 0) {
@@ -206,6 +205,87 @@ export async function PATCH(
       return NextResponse.json({
         success: true,
         appointment: updated,
+      });
+    }
+
+    if (action === "reschedule") {
+      const { scheduledStart } = body;
+
+      if (!scheduledStart) {
+        return NextResponse.json(
+          { error: "New scheduled start time is required" },
+          { status: 400 }
+        );
+      }
+
+      const newStart = new Date(scheduledStart);
+
+      // Check if new time is in the future
+      if (newStart <= new Date()) {
+        return NextResponse.json(
+          { error: "Cannot reschedule to a past time" },
+          { status: 400 }
+        );
+      }
+
+      // Check if appointment is in the future
+      if (new Date(appointment.scheduledStart) <= new Date()) {
+        return NextResponse.json(
+          { error: "Cannot reschedule past appointments" },
+          { status: 400 }
+        );
+      }
+
+      // Check if already cancelled
+      if (appointment.status === "CANCELLED") {
+        return NextResponse.json(
+          { error: "Cannot reschedule a cancelled appointment" },
+          { status: 400 }
+        );
+      }
+
+      // Get total duration from services
+      const services = await prisma.appointmentService.findMany({
+        where: { appointmentId: id },
+        include: { service: { select: { duration: true } } },
+      });
+
+      const totalDuration = services.reduce(
+        (sum, s) => sum + (s.service.duration || 0),
+        0
+      );
+      const newEnd = new Date(newStart.getTime() + totalDuration * 60000);
+
+      // Update the appointment
+      const updated = await prisma.appointment.update({
+        where: { id },
+        data: {
+          scheduledStart: newStart,
+          scheduledEnd: newEnd,
+        },
+      });
+
+      // Log activity
+      if (appointment.clientId) {
+        await prisma.activity.create({
+          data: {
+            clientId: appointment.clientId,
+            type: "APPOINTMENT_RESCHEDULED",
+            title: "Appointment Rescheduled",
+            description: `Rescheduled from ${appointment.scheduledStart.toLocaleDateString()} to ${newStart.toLocaleDateString()}`,
+            metadata: { appointmentId: id },
+          },
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        appointment: {
+          id: updated.id,
+          scheduledStart: updated.scheduledStart.toISOString(),
+          scheduledEnd: updated.scheduledEnd.toISOString(),
+          status: updated.status,
+        },
       });
     }
 

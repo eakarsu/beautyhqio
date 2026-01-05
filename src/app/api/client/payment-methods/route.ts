@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -11,9 +10,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 // GET /api/client/payment-methods - Get client's saved payment methods
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -21,8 +20,8 @@ export async function GET() {
     const client = await prisma.client.findFirst({
       where: {
         OR: [
-          { userId: session.user.id },
-          { email: session.user.email },
+          { userId: user.id },
+          { email: user.email },
         ],
       },
     });
@@ -63,9 +62,9 @@ export async function GET() {
 // POST /api/client/payment-methods - Add a new payment method
 export async function POST() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -73,8 +72,8 @@ export async function POST() {
     let client = await prisma.client.findFirst({
       where: {
         OR: [
-          { userId: session.user.id },
-          { email: session.user.email },
+          { userId: user.id },
+          { email: user.email },
         ],
       },
     });
@@ -89,8 +88,8 @@ export async function POST() {
     // Create Stripe customer if needed
     if (!client.stripeCustomerId) {
       const stripeCustomer = await stripe.customers.create({
-        email: session.user.email || undefined,
-        name: `${session.user.firstName} ${session.user.lastName}`,
+        email: user.email || undefined,
+        name: `${user.firstName} ${user.lastName}`,
         metadata: { clientId: client.id },
       });
 

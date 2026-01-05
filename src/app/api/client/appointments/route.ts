@@ -1,25 +1,24 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/client/appointments - Get client's appointments
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Find client profiles linked to this user (could have multiple across businesses)
     const orConditions: Array<Record<string, unknown>> = [];
 
-    if (session.user.id) {
-      orConditions.push({ userId: session.user.id });
+    if (user.id) {
+      orConditions.push({ userId: user.id });
     }
-    if (session.user.email) {
-      orConditions.push({ email: session.user.email });
+    if (user.email) {
+      orConditions.push({ email: user.email });
     }
 
     if (orConditions.length === 0) {
@@ -47,19 +46,19 @@ export async function GET() {
         location: {
           include: {
             business: {
-              select: { name: true },
+              select: { name: true, phone: true },
             },
           },
         },
         services: {
           include: {
             service: {
-              select: { name: true, duration: true, price: true },
+              select: { id: true, name: true, duration: true, price: true },
             },
           },
         },
         staff: {
-          select: { displayName: true },
+          select: { id: true, displayName: true, photo: true },
         },
       },
     });
@@ -70,18 +69,26 @@ export async function GET() {
         scheduledStart: apt.scheduledStart.toISOString(),
         scheduledEnd: apt.scheduledEnd.toISOString(),
         status: apt.status,
+        notes: apt.notes,
+        locationId: apt.locationId,
         salon: {
           name: apt.location.business.name,
+          phone: apt.location.phone,
           address: apt.location.address,
+          city: apt.location.city,
+          state: apt.location.state,
         },
         services: apt.services.map((s) => ({
+          id: s.service.id,
           name: s.service.name,
           duration: s.service.duration,
           price: Number(s.service.price),
         })),
-        staff: {
+        staff: apt.staff ? {
+          id: apt.staff.id,
           displayName: apt.staff.displayName || "Staff",
-        },
+          photo: apt.staff.photo,
+        } : null,
       })),
     });
   } catch (error) {

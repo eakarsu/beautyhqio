@@ -1,14 +1,9 @@
 import Foundation
 
 enum Config {
-    static let apiBaseURL: String = {
-        #if DEBUG
-        // Use production URL for testing; set API_URL env var for local dev
-        return ProcessInfo.processInfo.environment["API_URL"] ?? "https://beautyhq.io/api"
-        #else
-        return "https://beautyhq.io/api"
-        #endif
-    }()
+    // Set to localhost for local testing, production for deployed
+    static let apiBaseURL = "http://localhost:3000/api"
+    // static let apiBaseURL = "https://beautyhq.io/api"  // Uncomment for production
 
     static let appName = "BeautyHQ"
     static let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"

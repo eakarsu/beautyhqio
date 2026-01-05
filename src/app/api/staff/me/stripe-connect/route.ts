@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -11,14 +10,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 // GET /api/staff/me/stripe-connect - Get Stripe Connect status
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const staff = await prisma.staff.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
       select: {
         stripeAccountId: true,
         stripeAccountStatus: true,
@@ -66,14 +65,14 @@ export async function GET() {
 // POST /api/staff/me/stripe-connect - Create Stripe Connect onboarding link
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const staff = await prisma.staff.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
       include: {
         user: {
           select: { email: true, firstName: true, lastName: true },
@@ -105,7 +104,7 @@ export async function POST(request: NextRequest) {
           },
           metadata: {
             staffId: staff.id,
-            userId: session.user.id,
+            userId: user.id,
           },
         });
 
@@ -158,14 +157,14 @@ export async function POST(request: NextRequest) {
 // DELETE /api/staff/me/stripe-connect - Disconnect Stripe account
 export async function DELETE() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const staff = await prisma.staff.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
     });
 
     if (!staff) {

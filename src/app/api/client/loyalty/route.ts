@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/client/loyalty - Get client's loyalty account
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -16,8 +15,8 @@ export async function GET() {
     const client = await prisma.client.findFirst({
       where: {
         OR: [
-          { userId: session.user.id },
-          { email: session.user.email },
+          { userId: user.id },
+          { email: user.email },
         ],
       },
       include: {
@@ -26,7 +25,6 @@ export async function GET() {
     });
 
     if (!client?.loyaltyAccount) {
-      // Return default account if not enrolled
       return NextResponse.json({
         account: {
           pointsBalance: 0,

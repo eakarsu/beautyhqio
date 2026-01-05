@@ -176,29 +176,26 @@ extension AppleSignInManager: ASAuthorizationControllerDelegate {
         isProcessing = false
 
         if let authError = error as? ASAuthorizationError {
-            switch authError.code {
-            case .canceled:
+            let code = authError.code
+            if code == .canceled {
                 // User canceled - not an error
                 self.error = nil
                 signInCompletion?(.failure(AppleSignInError.canceled))
-            case .failed:
+            } else if code == .failed {
                 self.error = "Sign in with Apple failed. Please try again."
                 signInCompletion?(.failure(AppleSignInError.failed))
-            case .invalidResponse:
+            } else if code == .invalidResponse {
                 self.error = "Invalid response from Apple. Please try again."
                 signInCompletion?(.failure(AppleSignInError.invalidResponse))
-            case .notHandled:
+            } else if code == .notHandled {
                 self.error = "Sign in request was not handled."
                 signInCompletion?(.failure(AppleSignInError.notHandled))
-            case .notInteractive:
+            } else if code == .notInteractive {
                 self.error = "Sign in requires user interaction."
                 signInCompletion?(.failure(AppleSignInError.notInteractive))
-            case .unknown:
+            } else {
                 self.error = "An unknown error occurred."
                 signInCompletion?(.failure(AppleSignInError.unknown))
-            @unknown default:
-                self.error = error.localizedDescription
-                signInCompletion?(.failure(error))
             }
         } else {
             self.error = error.localizedDescription
@@ -213,10 +210,11 @@ extension AppleSignInManager: ASAuthorizationControllerDelegate {
 // MARK: - ASAuthorizationControllerPresentationContextProviding
 extension AppleSignInManager: ASAuthorizationControllerPresentationContextProviding {
 
-    nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    @MainActor
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         // Get the key window from the current scene
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else {
+              let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first else {
             fatalError("No window found for presentation")
         }
         return window

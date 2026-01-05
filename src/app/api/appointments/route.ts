@@ -99,10 +99,42 @@ export async function POST(request: NextRequest) {
       locationId,
       scheduledStart,
       scheduledEnd,
-      services,
+      services: servicesFromBody,
+      serviceIds,  // iOS sends serviceIds instead of services
       notes,
       source = "PHONE",
     } = body;
+
+    // Handle iOS format (serviceIds) vs web format (services)
+    let services = servicesFromBody;
+    if (!services && serviceIds && Array.isArray(serviceIds)) {
+      // Fetch service details from database
+      const serviceRecords = await prisma.service.findMany({
+        where: { id: { in: serviceIds } },
+        select: { id: true, price: true, duration: true },
+      });
+      services = serviceRecords.map((s) => ({
+        serviceId: s.id,
+        price: Number(s.price),
+        duration: s.duration,
+      }));
+    }
+
+    // For client portal bookings, find or create client from user
+    let finalClientId = clientId;
+    if (!finalClientId && user.email) {
+      const client = await prisma.client.findFirst({
+        where: {
+          OR: [
+            { userId: user.id },
+            { email: user.email },
+          ],
+        },
+      });
+      if (client) {
+        finalClientId = client.id;
+      }
+    }
 
     // Get locationId - use provided or get default location for this business
     let finalLocationId = locationId;
@@ -135,13 +167,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Calculate scheduledEnd if not provided (iOS doesn't send it)
+    let finalScheduledEnd = scheduledEnd;
+    if (!finalScheduledEnd && services && services.length > 0) {
+      const totalDuration = services.reduce((sum: number, s: any) => sum + (s.duration || 0), 0);
+      const startDate = new Date(scheduledStart);
+      finalScheduledEnd = new Date(startDate.getTime() + totalDuration * 60000).toISOString();
+    }
+
     const appointment = await prisma.appointment.create({
       data: {
-        clientId,
+        clientId: finalClientId,
         staffId,
         locationId: finalLocationId,
         scheduledStart: new Date(scheduledStart),
-        scheduledEnd: new Date(scheduledEnd),
+        scheduledEnd: new Date(finalScheduledEnd),
         notes,
         source,
         services: {
@@ -168,10 +208,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Create activity for client
-    if (clientId) {
+    if (finalClientId) {
       await prisma.activity.create({
         data: {
-          clientId,
+          clientId: finalClientId,
           type: "APPOINTMENT_BOOKED",
           title: "Appointment Booked",
           description: `Booked for ${new Date(scheduledStart).toLocaleDateString()}`,
