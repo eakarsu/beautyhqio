@@ -5,8 +5,7 @@ struct SettingsView: View {
     @State private var showingLogoutAlert = false
 
     var body: some View {
-        NavigationStack {
-            List {
+        List {
                 // Profile Section
                 Section {
                     HStack(spacing: 16) {
@@ -163,7 +162,6 @@ struct SettingsView: View {
             } message: {
                 Text("Are you sure you want to sign out?")
             }
-        }
     }
 }
 

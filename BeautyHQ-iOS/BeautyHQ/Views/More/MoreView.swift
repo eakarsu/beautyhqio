@@ -161,9 +161,8 @@ struct MoreView: View {
                         }
                     }
                 }
-                .padding(.vertical, Spacing.lg)
             }
-            .background(Color.screenBackground)
+            .listStyle(.insetGrouped)
             .navigationTitle("More")
             .alert("Sign Out", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) {}
