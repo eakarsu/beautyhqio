@@ -191,7 +191,9 @@ struct LoginView: View {
                                 backgroundColor: .charcoal,
                                 foregroundColor: .white
                             ) {
-                                // Apple Sign-In
+                                Task {
+                                    await SocialAuthManager.shared.signInWithApple()
+                                }
                             }
 
                             // Google

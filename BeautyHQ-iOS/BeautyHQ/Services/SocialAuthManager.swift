@@ -21,6 +21,79 @@ class SocialAuthManager: NSObject, ObservableObject {
         super.init()
     }
 
+    // MARK: - Apple Sign-In
+    func signInWithApple() async {
+        isLoading = true
+        error = nil
+        debugInfo = "Starting Apple Sign-In..."
+
+        do {
+            let credentials = try await AppleSignInManager.shared.signIn()
+            debugInfo = "Got Apple credentials, sending to backend..."
+
+            // Build name from credentials
+            let fullName = [credentials.firstName, credentials.lastName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            let name = fullName.isEmpty ? "Apple User" : fullName
+
+            // Use email or generate placeholder from user ID
+            let email = credentials.email ?? "\(credentials.userIdentifier.prefix(8))@privaterelay.appleid.com"
+
+            // Send to backend for authentication (same endpoint as Google/Microsoft)
+            let backendURL = URL(string: "\(Config.apiBaseURL)/auth/mobile")!
+            var backendRequest = URLRequest(url: backendURL)
+            backendRequest.httpMethod = "POST"
+            backendRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+            let authBody: [String: Any] = [
+                "provider": "apple",
+                "email": email,
+                "name": name,
+                "providerId": credentials.userIdentifier,
+                "accessToken": credentials.identityToken
+            ]
+            backendRequest.httpBody = try JSONSerialization.data(withJSONObject: authBody)
+
+            let (backendData, backendResponse) = try await URLSession.shared.data(for: backendRequest)
+
+            if let httpResponse = backendResponse as? HTTPURLResponse {
+                if httpResponse.statusCode != 200 {
+                    let errorString = String(data: backendData, encoding: .utf8) ?? "Unknown error"
+                    self.error = "Backend error: \(errorString)"
+                    debugInfo = "FAILED: \(errorString)"
+                    isLoading = false
+                    return
+                }
+            }
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let authResponse = try decoder.decode(AuthResponse.self, from: backendData)
+
+            await TokenManager.shared.setTokens(token: authResponse.token, refreshToken: authResponse.refreshToken)
+            AuthManager.shared.currentUser = authResponse.user
+            AuthManager.shared.isAuthenticated = true
+
+            debugInfo = "SUCCESS! Logged in with Apple"
+            isLoading = false
+            error = nil
+        } catch let signInError as AppleSignInError {
+            if signInError == .canceled {
+                debugInfo = ""
+                error = nil
+            } else {
+                error = signInError.localizedDescription
+                debugInfo = "FAILED: \(signInError.localizedDescription)"
+            }
+            isLoading = false
+        } catch {
+            self.error = "Apple sign-in failed: \(error.localizedDescription)"
+            debugInfo = "FAILED: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+
     // MARK: - Google Sign-In
     func signInWithGoogle() async {
         isLoading = true
