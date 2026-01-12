@@ -12,12 +12,24 @@ import Foundation
 struct CalendarProviderStatus: Codable {
     let connected: Bool
     let calendarId: String?
+    let tokenExpiry: String?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        connected = try container.decode(Bool.self, forKey: .connected)
+        calendarId = try container.decodeIfPresent(String.self, forKey: .calendarId)
+        tokenExpiry = try container.decodeIfPresent(String.self, forKey: .tokenExpiry)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case connected, calendarId, tokenExpiry
+    }
 }
 
 struct CalendarStatus: Codable {
-    let id: String
-    let name: String
-    let email: String
+    let id: String?
+    let name: String?
+    let email: String?
     let google: CalendarProviderStatus
     let outlook: CalendarProviderStatus
 }

@@ -66,6 +66,10 @@
 		F001000058 /* AddForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000058 /* AddForms.swift */; };
 		F001000059 /* AppleSignInManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000059 /* AppleSignInManager.swift */; };
 		F001000060 /* StripeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000060 /* StripeManager.swift */; };
+		F001000061 /* CalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000061 /* CalendarService.swift */; };
+		F001000062 /* CalendarAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000062 /* CalendarAuthManager.swift */; };
+		F001000063 /* CalendarSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000063 /* CalendarSettingsView.swift */; };
+		F001000064 /* ClientCalendarSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000064 /* ClientCalendarSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -129,6 +133,10 @@
 		F002000058 /* AddForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddForms.swift; sourceTree = "<group>"; };
 		F002000059 /* AppleSignInManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInManager.swift; sourceTree = "<group>"; };
 		F002000060 /* StripeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripeManager.swift; sourceTree = "<group>"; };
+		F002000061 /* CalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
+		F002000062 /* CalendarAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarAuthManager.swift; sourceTree = "<group>"; };
+		F002000063 /* CalendarSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSettingsView.swift; sourceTree = "<group>"; };
+		F002000064 /* ClientCalendarSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCalendarSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -205,6 +213,8 @@
 				F002000059 /* AppleSignInManager.swift */,
 				F002000013 /* AppointmentService.swift */,
 				F002000014 /* AuthManager.swift */,
+				F002000061 /* CalendarService.swift */,
+				F002000062 /* CalendarAuthManager.swift */,
 				F002000015 /* ClientService.swift */,
 				F002000016 /* DashboardService.swift */,
 				F002000017 /* ServiceService.swift */,
@@ -323,6 +333,8 @@
 			isa = PBXGroup;
 			children = (
 				F002000035 /* SettingsView.swift */,
+				F002000063 /* CalendarSettingsView.swift */,
+				F002000064 /* ClientCalendarSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -590,6 +602,10 @@
 				F001000058 /* AddForms.swift in Sources */,
 				F001000059 /* AppleSignInManager.swift in Sources */,
 				F001000060 /* StripeManager.swift in Sources */,
+				F001000061 /* CalendarService.swift in Sources */,
+				F001000062 /* CalendarAuthManager.swift in Sources */,
+				F001000063 /* CalendarSettingsView.swift in Sources */,
+				F001000064 /* ClientCalendarSettingsView.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */

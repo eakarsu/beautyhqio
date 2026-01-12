@@ -22,7 +22,7 @@ struct MoreView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: Spacing.lg) {
                     // Core Features
                     MoreSection(title: "Features") {
@@ -161,8 +161,12 @@ struct MoreView: View {
                         }
                     }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Spacing.lg)
+                .padding(.bottom, 100)
             }
-            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.screenBackground)
             .navigationTitle("More")
             .alert("Sign Out", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -253,6 +257,7 @@ struct MoreMenuItem: View {
         .padding(Spacing.md)
         .background(Color.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        .contentShape(Rectangle())
         .appShadow(.soft)
     }
 }

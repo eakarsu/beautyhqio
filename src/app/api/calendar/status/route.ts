@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// GET /api/calendar/status - Get Google Calendar connection status for all staff
+// GET /api/calendar/status - Get calendar connection status for staff
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
           displayName: true,
           googleCalendarToken: true,
           googleCalendarId: true,
+          outlookCalendarToken: true,
+          outlookCalendarId: true,
           user: {
             select: {
               firstName: true,
@@ -37,6 +39,15 @@ export async function GET(request: NextRequest) {
         id: staff.id,
         name: staff.displayName || `${staff.user.firstName} ${staff.user.lastName}`,
         email: staff.user.email,
+        google: {
+          connected: !!staff.googleCalendarToken,
+          calendarId: staff.googleCalendarId,
+        },
+        outlook: {
+          connected: !!staff.outlookCalendarToken,
+          calendarId: staff.outlookCalendarId,
+        },
+        // Keep legacy field for backwards compatibility
         connected: !!staff.googleCalendarToken,
         calendarId: staff.googleCalendarId,
       });
@@ -50,6 +61,8 @@ export async function GET(request: NextRequest) {
         displayName: true,
         googleCalendarToken: true,
         googleCalendarId: true,
+        outlookCalendarToken: true,
+        outlookCalendarId: true,
         user: {
           select: {
             firstName: true,
@@ -69,6 +82,15 @@ export async function GET(request: NextRequest) {
       id: staff.id,
       name: staff.displayName || `${staff.user.firstName} ${staff.user.lastName}`,
       email: staff.user.email,
+      google: {
+        connected: !!staff.googleCalendarToken,
+        calendarId: staff.googleCalendarId,
+      },
+      outlook: {
+        connected: !!staff.outlookCalendarToken,
+        calendarId: staff.outlookCalendarId,
+      },
+      // Keep legacy field for backwards compatibility
       connected: !!staff.googleCalendarToken,
       calendarId: staff.googleCalendarId,
     }));
@@ -83,11 +105,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// DELETE /api/calendar/status - Disconnect Google Calendar for a staff member
+// DELETE /api/calendar/status - Disconnect calendar for a staff member
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const staffId = searchParams.get("staffId");
+    const provider = searchParams.get("provider"); // "google" or "outlook"
 
     if (!staffId) {
       return NextResponse.json(
@@ -96,14 +119,28 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await prisma.staff.update({
-      where: { id: staffId },
-      data: {
-        googleCalendarToken: null,
-        googleRefreshToken: null,
-        googleCalendarId: null,
-      },
-    });
+    if (provider === "outlook") {
+      // Disconnect Outlook Calendar
+      await prisma.staff.update({
+        where: { id: staffId },
+        data: {
+          outlookCalendarToken: null,
+          outlookRefreshToken: null,
+          outlookCalendarId: null,
+          outlookTokenExpiry: null,
+        },
+      });
+    } else {
+      // Default to Google for backwards compatibility
+      await prisma.staff.update({
+        where: { id: staffId },
+        data: {
+          googleCalendarToken: null,
+          googleRefreshToken: null,
+          googleCalendarId: null,
+        },
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

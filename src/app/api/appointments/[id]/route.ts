@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncAppointmentToCalendars } from "@/lib/calendar-sync";
 
 // GET /api/appointments/[id] - Get single appointment
 export async function GET(
@@ -78,6 +79,11 @@ export async function PUT(
       },
     });
 
+    // Auto-sync to connected calendars (non-blocking)
+    syncAppointmentToCalendars(appointment.id, "update").catch((err) => {
+      console.error("Calendar sync error:", err);
+    });
+
     return NextResponse.json(appointment);
   } catch (error) {
     console.error("Error updating appointment:", error);
@@ -95,6 +101,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+
+    // Delete from calendars first (before removing from database)
+    try {
+      await syncAppointmentToCalendars(id, "delete");
+    } catch (err) {
+      console.error("Calendar sync error during delete:", err);
+    }
 
     // First delete related records
     await prisma.appointmentService.deleteMany({

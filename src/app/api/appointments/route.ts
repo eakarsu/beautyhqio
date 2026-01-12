@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmationEmail } from "@/lib/email";
 import { sendAppointmentConfirmationSMS } from "@/lib/twilio";
 import { getAuthenticatedUser } from "@/lib/api-auth";
+import { syncAppointmentToCalendars } from "@/lib/calendar-sync";
 
 // GET /api/appointments - List appointments
 export async function GET(request: NextRequest) {
@@ -301,6 +302,11 @@ export async function POST(request: NextRequest) {
         console.error('Failed to send confirmation SMS:', smsError);
       }
     }
+
+    // Auto-sync to connected calendars (non-blocking)
+    syncAppointmentToCalendars(appointment.id, "create").catch((err) => {
+      console.error("Calendar sync error:", err);
+    });
 
     return NextResponse.json(appointment, { status: 201 });
   } catch (error) {

@@ -10,6 +10,7 @@ struct User: Codable, Identifiable {
     let role: UserRole
     let businessId: String?
     let staffId: String?
+    let clientId: String?
     let isClient: Bool?
     let createdAt: Date
     let updatedAt: Date

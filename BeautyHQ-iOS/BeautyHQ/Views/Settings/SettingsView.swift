@@ -84,6 +84,20 @@ struct SettingsView: View {
                     } label: {
                         SettingsRowLabel(icon: "clock", iconColor: .pink, title: "Business Hours", subtitle: "Set operating hours")
                     }
+                    // Show different calendar settings based on user role
+                    if authManager.currentUser?.role == .client {
+                        NavigationLink {
+                            ClientCalendarSettingsView()
+                        } label: {
+                            SettingsRowLabel(icon: "calendar.badge.clock", iconColor: .purple, title: "Calendar Sync", subtitle: "Sync appointments to your calendar")
+                        }
+                    } else {
+                        NavigationLink {
+                            CalendarSettingsView()
+                        } label: {
+                            SettingsRowLabel(icon: "calendar.badge.clock", iconColor: .purple, title: "Calendar Sync", subtitle: "Google & Outlook integration")
+                        }
+                    }
                 }
 
                 // Preferences Section
