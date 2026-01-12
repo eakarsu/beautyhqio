@@ -8,8 +8,14 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 // Get authorization URL for OAuth
-export function getAuthUrl(state?: string): string {
-  return oauth2Client.generateAuthUrl({
+export function getAuthUrl(state?: string, redirectUri?: string): string {
+  const client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri || process.env.GOOGLE_REDIRECT_URI
+  );
+
+  return client.generateAuthUrl({
     access_type: "offline",
     scope: [
       "https://www.googleapis.com/auth/calendar",
@@ -20,8 +26,13 @@ export function getAuthUrl(state?: string): string {
 }
 
 // Exchange authorization code for tokens
-export async function getTokensFromCode(code: string) {
-  const { tokens } = await oauth2Client.getToken(code);
+export async function getTokensFromCode(code: string, redirectUri?: string) {
+  const client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri || process.env.GOOGLE_REDIRECT_URI
+  );
+  const { tokens } = await client.getToken(code);
   return tokens;
 }
 

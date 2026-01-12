@@ -220,6 +220,12 @@ model Staff {
   googleRefreshToken String?
   googleCalendarId String?
 
+  // Outlook Calendar integration
+  outlookCalendarToken String?
+  outlookRefreshToken  String?
+  outlookCalendarId    String?
+  outlookTokenExpiry   DateTime?
+
   // Stripe Connect (for payouts)
   stripeAccountId     String?
   stripeAccountStatus String?   @default("not_connected") // not_connected, pending, active, restricted
@@ -354,6 +360,17 @@ model Client {
 
   // Stripe
   stripeCustomerId String?
+
+  // Google Calendar integration (for client)
+  googleCalendarToken String?
+  googleRefreshToken String?
+  googleCalendarId String?
+
+  // Outlook Calendar integration (for client)
+  outlookCalendarToken String?
+  outlookRefreshToken  String?
+  outlookCalendarId    String?
+  outlookTokenExpiry   DateTime?
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -641,8 +658,17 @@ model Appointment {
   recurrenceRule String?
   parentAppointmentId String?
 
-  // Google Calendar integration
+  // Google Calendar integration (staff)
   googleEventId String?
+
+  // Outlook Calendar integration (staff)
+  outlookEventId String?
+
+  // Google Calendar integration (client)
+  clientGoogleEventId String?
+
+  // Outlook Calendar integration (client)
+  clientOutlookEventId String?
 
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
