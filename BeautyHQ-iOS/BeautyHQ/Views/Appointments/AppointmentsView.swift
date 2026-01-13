@@ -11,6 +11,9 @@ struct AppointmentsView: View {
                 // Date Navigator
                 dateNavigator
 
+                // Search Bar
+                searchBar
+
                 // Status Filter
                 statusFilter
 
@@ -113,6 +116,28 @@ struct AppointmentsView: View {
         }
         .padding()
         .background(Color(.systemBackground))
+    }
+
+    private var searchBar: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            TextField("Search by client name...", text: $viewModel.searchQuery)
+                .textFieldStyle(.plain)
+            if !viewModel.searchQuery.isEmpty {
+                Button {
+                    viewModel.searchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal)
+        .padding(.bottom, 8)
     }
 
     private var relativeDay: String {

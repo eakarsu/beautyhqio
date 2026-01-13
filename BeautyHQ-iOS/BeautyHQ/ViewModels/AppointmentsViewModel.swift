@@ -5,16 +5,32 @@ class AppointmentsViewModel: ObservableObject {
     @Published var appointments: [Appointment] = []
     @Published var allAppointments: [Appointment] = []
     @Published var selectedStatus: AppointmentStatus?
+    @Published var searchQuery: String = ""
     @Published var isLoading = false
     @Published var error: String?
     @Published var availableDates: Set<String> = []
     @Published var showingAllDates = true
 
     var filteredAppointments: [Appointment] {
-        guard let status = selectedStatus else {
-            return appointments
+        var result = appointments
+
+        // Filter by status
+        if let status = selectedStatus {
+            result = result.filter { $0.status == status }
         }
-        return appointments.filter { $0.status == status }
+
+        // Filter by search query (client name)
+        if !searchQuery.isEmpty {
+            let query = searchQuery.lowercased()
+            result = result.filter { appointment in
+                if let client = appointment.client {
+                    return client.fullName.lowercased().contains(query)
+                }
+                return false
+            }
+        }
+
+        return result
     }
 
     // Load all appointments (no date filter) to get seeded data

@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
     const {
       locationId,
       serviceId,
+      serviceIds, // Support multiple services
       staffId,
       date,
       time,
@@ -24,8 +25,13 @@ export async function POST(request: NextRequest) {
       rescheduleId,
     } = body;
 
+    // Support both single serviceId and array of serviceIds
+    const allServiceIds: string[] = serviceIds?.length > 0
+      ? serviceIds
+      : (serviceId ? [serviceId] : []);
+
     // Validate required fields (phone is optional if email is provided)
-    if (!locationId || !serviceId || !date || !time || !firstName) {
+    if (!locationId || allServiceIds.length === 0 || !date || !time || !firstName) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -52,39 +58,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get service details
-    const service = await prisma.service.findUnique({
-      where: { id: serviceId },
+    // Get all service details
+    const services = await prisma.service.findMany({
+      where: { id: { in: allServiceIds } },
     });
 
-    if (!service) {
+    if (services.length === 0) {
       return NextResponse.json(
-        { error: "Service not found" },
+        { error: "No valid services found" },
         { status: 404 }
       );
     }
+
+    // Calculate total duration from all services
+    const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
 
     // Parse date and time - use explicit local time to avoid timezone issues
     const [hour, min] = time.split(":").map(Number);
     const [year, month, day] = date.split("-").map(Number);
     const scheduledStart = new Date(year, month - 1, day, hour, min, 0, 0);
-    const scheduledEnd = new Date(scheduledStart.getTime() + service.duration * 60000);
+    const scheduledEnd = new Date(scheduledStart.getTime() + totalDuration * 60000);
+
+    // Primary service for display purposes
+    const primaryService = services[0];
 
     // Check if user is logged in
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
 
     // Find or create client for this business
-    let client = await prisma.client.findFirst({
-      where: {
-        businessId: location.businessId,
-        OR: [
-          ...(userId ? [{ userId }] : []),
-          ...(email ? [{ email }] : []),
-          { phone },
-        ],
-      },
-    });
+    // First, check if there's already a client linked to this userId
+    let client = userId
+      ? await prisma.client.findFirst({
+          where: { businessId: location.businessId, userId },
+        })
+      : null;
+
+    // If no client found by userId, search by email or phone
+    if (!client) {
+      client = await prisma.client.findFirst({
+        where: {
+          businessId: location.businessId,
+          OR: [
+            ...(email ? [{ email }] : []),
+            ...(phone ? [{ phone }] : []),
+          ],
+        },
+      });
+    }
 
     if (!client) {
       client = await prisma.client.create({
@@ -98,12 +119,28 @@ export async function POST(request: NextRequest) {
           userId: userId || null,
         },
       });
-    } else if (userId && !client.userId) {
-      // Link existing client to logged-in user
-      client = await prisma.client.update({
-        where: { id: client.id },
-        data: { userId },
-      });
+    } else {
+      // Update client info if needed
+      const updates: Record<string, string | null> = {};
+      if (userId && !client.userId) {
+        // Only link userId if no other client has it for this business
+        const existingUserClient = await prisma.client.findFirst({
+          where: { businessId: location.businessId, userId },
+        });
+        if (!existingUserClient) {
+          updates.userId = userId;
+        }
+      }
+      // Update contact info if provided and missing
+      if (email && !client.email) updates.email = email;
+      if (phone && !client.phone) updates.phone = phone;
+
+      if (Object.keys(updates).length > 0) {
+        client = await prisma.client.update({
+          where: { id: client.id },
+          data: updates,
+        });
+      }
     }
 
     // Select staff if not provided
@@ -161,7 +198,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create appointment
+    // Create appointment with all services
     const appointment = await prisma.appointment.create({
       data: {
         locationId,
@@ -173,11 +210,11 @@ export async function POST(request: NextRequest) {
         notes,
         source: "ONLINE",
         services: {
-          create: {
-            serviceId,
-            price: service.price,
-            duration: service.duration,
-          },
+          create: services.map((svc) => ({
+            serviceId: svc.id,
+            price: svc.price,
+            duration: svc.duration,
+          })),
         },
       },
       include: {
@@ -197,11 +234,12 @@ export async function POST(request: NextRequest) {
     });
 
     // Create activity for client
+    const serviceNames = services.map((s) => s.name).join(", ");
     await prisma.activity.create({
       data: {
         clientId: client.id,
         type: "APPOINTMENT_BOOKED",
-        title: `Booked ${service.name}`,
+        title: `Booked ${serviceNames}`,
         description: `Appointment on ${scheduledStart.toLocaleDateString()} at ${time}`,
         metadata: { appointmentId: appointment.id, source },
       },
@@ -256,7 +294,7 @@ export async function POST(request: NextRequest) {
           `${client.firstName} ${client.lastName || ''}`.trim(),
           formattedDate,
           formattedTime,
-          service.name,
+          serviceNames,
           staffName,
           settings?.businessName || 'Beauty & Wellness',
           settings?.phone || appointment.location?.phone || '',
@@ -292,7 +330,7 @@ export async function POST(request: NextRequest) {
           `${client.firstName}`,
           formattedDate,
           formattedTime,
-          service.name,
+          serviceNames,
           settings?.businessName || 'Beauty & Wellness',
           client.preferredLanguage || 'en'
         );

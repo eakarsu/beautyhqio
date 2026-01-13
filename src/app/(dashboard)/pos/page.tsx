@@ -129,6 +129,58 @@ export default function POSPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
   const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
 
+  // Appointment checkout
+  const [appointmentId, setAppointmentId] = useState<string | null>(null);
+  const [appointmentLoaded, setAppointmentLoaded] = useState(false);
+
+  // Load appointment from URL params
+  useEffect(() => {
+    const apptId = searchParams.get("appointmentId");
+    if (apptId && !appointmentLoaded) {
+      setAppointmentId(apptId);
+      loadAppointment(apptId);
+    }
+  }, [searchParams, appointmentLoaded]);
+
+  const loadAppointment = async (apptId: string) => {
+    try {
+      const response = await fetch(`/api/appointments/${apptId}`);
+      if (response.ok) {
+        const appointment = await response.json();
+
+        // Set client
+        if (appointment.client) {
+          setSelectedClient({
+            id: appointment.client.id,
+            firstName: appointment.client.firstName,
+            lastName: appointment.client.lastName,
+            email: appointment.client.email,
+            phone: appointment.client.phone,
+          });
+        }
+
+        // Set staff
+        if (appointment.staff?.id) {
+          setSelectedStaff(appointment.staff.id);
+        }
+
+        // Add services to cart
+        const cartItems: CartItem[] = appointment.services.map((svc: { id: string; service: { name: string }; price: number; }) => ({
+          id: svc.id,
+          name: svc.service.name,
+          price: Number(svc.price),
+          quantity: 1,
+          type: "service" as const,
+          staffId: appointment.staff?.id,
+        }));
+        setCart(cartItems);
+        setAppointmentLoaded(true);
+      }
+    } catch (error) {
+      console.error("Error loading appointment:", error);
+    }
+  };
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -484,7 +536,9 @@ export default function POSPage() {
         <Card className="flex-1 flex flex-col overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Point of Sale</CardTitle>
+              <CardTitle className="text-lg">
+                {appointmentId ? "Appointment Checkout" : "Point of Sale"}
+              </CardTitle>
               <div className="flex gap-2">
                 <Button
                   variant={activeTab === "services" ? "default" : "outline"}

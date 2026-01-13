@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +26,8 @@ export default function SelectDateTimePage({
   const { locationId } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const serviceIds = searchParams.get("services")?.split(",") || [];
+  const servicesParam = searchParams.get("services");
+  const serviceIds = useMemo(() => servicesParam?.split(",") || [], [servicesParam]);
   const rescheduleId = searchParams.get("reschedule") || "";
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());

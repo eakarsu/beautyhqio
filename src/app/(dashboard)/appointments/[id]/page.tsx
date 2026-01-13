@@ -340,10 +340,22 @@ export default function AppointmentDetailPage({ params }: { params: Promise<{ id
               <CardTitle>Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {appointment.status === "BOOKED" && (
+              {/* Checkout button - available for active appointments */}
+              {["BOOKED", "CONFIRMED", "CHECKED_IN", "COMPLETED"].includes(appointment.status) && (
+                <Button
+                  className="w-full bg-rose-600 hover:bg-rose-700"
+                  onClick={() => router.push(`/pos?appointmentId=${appointment.id}`)}
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Checkout
+                </Button>
+              )}
+
+              {(appointment.status === "BOOKED" || appointment.status === "CONFIRMED") && (
                 <>
                   <Button
                     className="w-full"
+                    variant="outline"
                     onClick={() => handleAction("check-in")}
                     disabled={actionLoading !== null}
                   >
@@ -380,22 +392,13 @@ export default function AppointmentDetailPage({ params }: { params: Promise<{ id
 
               {appointment.status === "CHECKED_IN" && (
                 <Button
-                  className="w-full bg-rose-600 hover:bg-rose-700"
+                  className="w-full"
+                  variant="outline"
                   onClick={() => handleAction("complete")}
                   disabled={actionLoading !== null}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  {actionLoading === "complete" ? "Completing..." : "Complete & Checkout"}
-                </Button>
-              )}
-
-              {appointment.status === "COMPLETED" && (
-                <Button
-                  className="w-full bg-rose-600 hover:bg-rose-700"
-                  onClick={() => router.push(`/pos?appointmentId=${appointment.id}`)}
-                >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Go to Checkout
+                  {actionLoading === "complete" ? "Completing..." : "Mark Complete"}
                 </Button>
               )}
             </CardContent>

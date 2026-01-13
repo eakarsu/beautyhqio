@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,8 @@ export default function ConfirmBookingPage({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const serviceIds = searchParams.get("services")?.split(",") || [];
+  const servicesParam = searchParams.get("services");
+  const serviceIds = useMemo(() => servicesParam?.split(",") || [], [servicesParam]);
   const date = searchParams.get("date") || "";
   const time = searchParams.get("time") || "";
   const staffId = searchParams.get("staff") || "";
@@ -117,7 +118,7 @@ export default function ConfirmBookingPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           locationId,
-          serviceId: serviceIds[0], // Primary service
+          serviceIds, // All selected services
           staffId,
           date,
           time,

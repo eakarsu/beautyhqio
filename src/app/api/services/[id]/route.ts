@@ -50,9 +50,36 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
+    // Only allow specific fields to be updated
+    const updateData: Record<string, unknown> = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.price !== undefined) updateData.price = Number(body.price);
+    if (body.duration !== undefined) updateData.duration = Number(body.duration);
+    if (body.isActive !== undefined) updateData.isActive = body.isActive;
+
+    // Handle categoryId - can be string ID or object with id
+    // Only update if it's a valid-looking ID (not empty, not "undefined")
+    let newCategoryId: string | undefined;
+    if (body.categoryId && typeof body.categoryId === "string" && body.categoryId.length > 10) {
+      newCategoryId = body.categoryId;
+    } else if (body.category?.id && typeof body.category.id === "string" && body.category.id.length > 10) {
+      newCategoryId = body.category.id;
+    }
+
+    // Verify category exists before updating
+    if (newCategoryId) {
+      const categoryExists = await prisma.serviceCategory.findUnique({
+        where: { id: newCategoryId },
+      });
+      if (categoryExists) {
+        updateData.categoryId = newCategoryId;
+      }
+    }
+
     const service = await prisma.service.update({
       where: { id },
-      data: body,
+      data: updateData,
       include: {
         category: true,
         addOns: true,
