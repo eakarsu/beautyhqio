@@ -3,9 +3,11 @@ import prisma from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-12-18.acacia" as any,
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+    apiVersion: "2024-12-18.acacia" as any,
+  });
+}
 
 // GET /api/client/payment-history - Get client's payment history from Stripe
 export async function GET() {
@@ -31,7 +33,7 @@ export async function GET() {
     }
 
     // Get payment intents from Stripe for this customer
-    const paymentIntents = await stripe.paymentIntents.list({
+    const paymentIntents = await getStripe().paymentIntents.list({
       customer: client.stripeCustomerId,
       limit: 50,
     });
@@ -42,7 +44,7 @@ export async function GET() {
         let paymentMethodDetails = null;
         if (pi.payment_method && typeof pi.payment_method === "string") {
           try {
-            paymentMethodDetails = await stripe.paymentMethods.retrieve(pi.payment_method);
+            paymentMethodDetails = await getStripe().paymentMethods.retrieve(pi.payment_method);
           } catch {
             // Payment method may have been deleted
           }

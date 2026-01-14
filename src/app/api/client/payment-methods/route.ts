@@ -3,9 +3,11 @@ import prisma from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-12-15.clover",
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+    apiVersion: "2025-12-15.clover",
+  });
+}
 
 // GET /api/client/payment-methods - Get client's saved payment methods
 export async function GET() {
@@ -31,13 +33,13 @@ export async function GET() {
     }
 
     // Get payment methods from Stripe
-    const paymentMethods = await stripe.paymentMethods.list({
+    const paymentMethods = await getStripe().paymentMethods.list({
       customer: client.stripeCustomerId,
       type: "card",
     });
 
     // Get default payment method
-    const customer = await stripe.customers.retrieve(client.stripeCustomerId);
+    const customer = await getStripe().customers.retrieve(client.stripeCustomerId);
     const defaultPaymentMethodId =
       typeof customer !== "string" && !customer.deleted
         ? customer.invoice_settings?.default_payment_method
@@ -87,7 +89,7 @@ export async function POST() {
 
     // Create Stripe customer if needed
     if (!client.stripeCustomerId) {
-      const stripeCustomer = await stripe.customers.create({
+      const stripeCustomer = await getStripe().customers.create({
         email: user.email || undefined,
         name: `${user.firstName} ${user.lastName}`,
         metadata: { clientId: client.id },
@@ -100,7 +102,7 @@ export async function POST() {
     }
 
     // Create setup intent for adding a card
-    const setupIntent = await stripe.setupIntents.create({
+    const setupIntent = await getStripe().setupIntents.create({
       customer: client.stripeCustomerId!,
       payment_method_types: ["card"],
     });

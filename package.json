@@ -50,6 +50,7 @@
     "@stripe/stripe-js": "^8.5.3",
     "@twilio/voice-sdk": "^2.17.0",
     "@types/twilio": "^3.19.2",
+    "@xterm/xterm": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

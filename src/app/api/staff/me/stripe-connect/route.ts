@@ -3,9 +3,11 @@ import prisma from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia" as any,
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2024-12-18.acacia" as any,
+  });
+}
 
 // GET /api/staff/me/stripe-connect - Get Stripe Connect status
 export async function GET() {
@@ -31,7 +33,7 @@ export async function GET() {
     // If connected, get account details from Stripe
     if (staff.stripeAccountId) {
       try {
-        const account = await stripe.accounts.retrieve(staff.stripeAccountId);
+        const account = await getStripe().accounts.retrieve(staff.stripeAccountId);
 
         return NextResponse.json({
           connected: true,
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
     // Create Stripe Connect account if not exists
     if (!accountId) {
       try {
-        const account = await stripe.accounts.create({
+        const account = await getStripe().accounts.create({
           type: "express",
           country: "US",
           email: staff.user.email,
@@ -137,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     // Create account link for onboarding
     const origin = request.headers.get("origin") || process.env.NEXTAUTH_URL;
-    const accountLink = await stripe.accountLinks.create({
+    const accountLink = await getStripe().accountLinks.create({
       account: accountId,
       refresh_url: `${origin}/staff/settings?stripe=refresh`,
       return_url: `${origin}/staff/settings?stripe=success`,

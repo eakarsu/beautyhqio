@@ -334,7 +334,7 @@ async function syncToGoogleCalendar(
         data: { googleEventId: created.id },
       });
 
-      return { provider: "google", success: true, eventId: created.id };
+      return { provider: "google", success: true, eventId: created.id ?? undefined };
     }
 
     case "update": {
@@ -351,7 +351,7 @@ async function syncToGoogleCalendar(
           data: { googleEventId: created.id },
         });
 
-        return { provider: "google", success: true, eventId: created.id };
+        return { provider: "google", success: true, eventId: created.id ?? undefined };
       }
 
       const event = appointmentToCalendarEvent(appointment);
@@ -493,7 +493,7 @@ async function syncToClientGoogleCalendar(
         data: { clientGoogleEventId: created.id },
       });
 
-      return { provider: "google", success: true, eventId: created.id };
+      return { provider: "google", success: true, eventId: created.id ?? undefined };
     }
 
     case "update": {
@@ -518,7 +518,7 @@ async function syncToClientGoogleCalendar(
           data: { clientGoogleEventId: created.id },
         });
 
-        return { provider: "google", success: true, eventId: created.id };
+        return { provider: "google", success: true, eventId: created.id ?? undefined };
       }
 
       const event = appointmentToClientCalendarEvent(appointment);
