@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 
 // GET /api/clients/[id] - Get client profile
@@ -9,8 +8,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -106,8 +105,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -153,7 +152,7 @@ export async function PUT(
         title: "Profile updated",
         description: "Client information was updated",
         clientId: client.id,
-        userId: session.user.id,
+        userId: user.id,
       },
     });
 
@@ -173,8 +172,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -188,6 +187,19 @@ export async function DELETE(
     await prisma.serviceFormula.deleteMany({ where: { clientId: id } });
     await prisma.clientPreference.deleteMany({ where: { clientId: id } });
     await prisma.review.deleteMany({ where: { clientId: id } });
+
+    // Delete loyalty account and its transactions
+    const loyaltyAccount = await prisma.loyaltyAccount.findUnique({
+      where: { clientId: id },
+    });
+    if (loyaltyAccount) {
+      await prisma.loyaltyTransaction.deleteMany({
+        where: { accountId: loyaltyAccount.id },
+      });
+      await prisma.loyaltyAccount.delete({
+        where: { clientId: id },
+      });
+    }
 
     // Delete the client
     await prisma.client.delete({

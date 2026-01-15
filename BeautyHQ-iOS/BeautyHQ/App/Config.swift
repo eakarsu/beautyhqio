@@ -1,9 +1,22 @@
 import Foundation
 
 enum Config {
-    // Set to localhost for local testing, production for deployed
-    static let apiBaseURL = "http://localhost:3000/api"
-    // static let apiBaseURL = "https://beautyhq.io/api"  // Uncomment for production
+    // TEMPORARY: Force localhost for testing - change back when done
+    static var useLocalhost = true
+
+    // Automatically switch between local and production
+    static var apiBaseURL: String {
+        if useLocalhost {
+            return "http://localhost:3000/api"
+        }
+        #if DEBUG
+        // Debug builds use localhost (works for simulator and macOS)
+        return "http://localhost:3000/api"
+        #else
+        // Release builds always use production
+        return "https://beautyhq.io/api"
+        #endif
+    }
 
     // Web base URL (for terms, privacy pages)
     static var webBaseURL: String {

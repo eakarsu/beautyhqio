@@ -246,21 +246,26 @@ actor APIClient {
 
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
         do {
+            print("DEBUG APIClient: \(request.httpMethod ?? "GET") \(request.url?.absoluteString ?? "unknown")")
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.unknown
             }
 
+            print("DEBUG APIClient: response status \(httpResponse.statusCode), data size \(data.count) bytes")
+
             switch httpResponse.statusCode {
             case 200...299:
                 do {
-                    return try decoder.decode(T.self, from: data)
+                    let result = try decoder.decode(T.self, from: data)
+                    print("DEBUG APIClient: decoded successfully")
+                    return result
                 } catch let decodingError as DecodingError {
                     // Print detailed decoding error for debugging
-                    print("Decoding error: \(decodingError)")
+                    print("DEBUG APIClient: Decoding error: \(decodingError)")
                     if let jsonString = String(data: data, encoding: .utf8) {
-                        print("Response data: \(jsonString.prefix(1000))...")
+                        print("DEBUG APIClient: Response data: \(jsonString.prefix(1000))...")
                     }
                     throw APIError.decodingError(decodingError)
                 } catch {

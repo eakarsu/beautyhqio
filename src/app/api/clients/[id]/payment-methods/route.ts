@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 import Stripe from "stripe";
 import prisma from "@/lib/prisma";
 
@@ -16,8 +15,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -32,6 +31,13 @@ export async function GET(
     }
 
     const stripe = getStripe();
+
+    // Get customer to find default payment method
+    const customer = await stripe.customers.retrieve(client.stripeCustomerId);
+    const defaultPaymentMethodId = typeof customer !== 'string' && !customer.deleted
+      ? customer.invoice_settings?.default_payment_method
+      : null;
+
     const paymentMethods = await stripe.paymentMethods.list({
       customer: client.stripeCustomerId,
       type: "card",
@@ -43,6 +49,7 @@ export async function GET(
       last4: pm.card?.last4,
       expMonth: pm.card?.exp_month,
       expYear: pm.card?.exp_year,
+      isDefault: pm.id === defaultPaymentMethodId,
       card: {
         brand: pm.card?.brand,
         last4: pm.card?.last4,
@@ -67,8 +74,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

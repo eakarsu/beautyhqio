@@ -36,7 +36,17 @@ struct Appointment: Codable, Identifiable, Hashable {
     let notes: String?
     let client: Client?
     let staff: Staff?
-    let services: [AppointmentServiceItem]?
+    var services: [AppointmentServiceItem]?
+
+    /// Merge updated appointment with original, preserving services if not in update
+    func mergedWith(_ updated: Appointment) -> Appointment {
+        var merged = updated
+        // Preserve services from original if the update doesn't have them
+        if merged.services == nil || merged.services?.isEmpty == true {
+            merged.services = self.services
+        }
+        return merged
+    }
 
     // Convenience computed properties
     var startTime: Date { scheduledStart }
@@ -64,7 +74,12 @@ struct Appointment: Codable, Identifiable, Hashable {
     }
 
     var totalPrice: Double {
-        services?.reduce(0) { $0 + ($1.price ?? 0) } ?? 0
+        guard let items = services else { return 0 }
+        var sum = 0.0
+        for item in items {
+            sum += item.service?.price ?? item.price ?? 0
+        }
+        return sum
     }
 }
 

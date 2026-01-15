@@ -7,6 +7,7 @@ struct AppointmentDetailView: View {
     @State private var showingCancelAlert = false
     @State private var showingReschedule = false
     @State private var showingEditNotes = false
+    @State private var showingCheckout = false
     @State private var currentAppointment: Appointment?
 
     private var appointment: Appointment {
@@ -101,6 +102,12 @@ struct AppointmentDetailView: View {
         .sheet(isPresented: $showingEditNotes) {
             EditAppointmentNotesView(appointment: appointment) { updated in
                 currentAppointment = updated
+            }
+        }
+        .sheet(isPresented: $showingCheckout) {
+            CheckoutView(appointment: appointment) { updated in
+                currentAppointment = appointment.mergedWith(updated)
+                dismiss()
             }
         }
     }
@@ -277,7 +284,7 @@ struct AppointmentDetailView: View {
             return [
                 ("Check In", true, {
                     if let updated = await viewModel.checkIn(appointment) {
-                        currentAppointment = updated
+                        currentAppointment = appointment.mergedWith(updated)
                     }
                 }),
                 ("Cancel", false, { showingCancelAlert = true })
@@ -286,12 +293,12 @@ struct AppointmentDetailView: View {
             return [
                 ("Start Service", true, {
                     if let updated = await viewModel.startService(appointment) {
-                        currentAppointment = updated
+                        currentAppointment = appointment.mergedWith(updated)
                     }
                 }),
                 ("No Show", false, {
                     if let updated = await viewModel.markNoShow(appointment) {
-                        currentAppointment = updated
+                        currentAppointment = appointment.mergedWith(updated)
                         dismiss()
                     }
                 })
@@ -299,10 +306,14 @@ struct AppointmentDetailView: View {
         case .inService:
             return [
                 ("Complete & Checkout", true, {
-                    if let updated = await viewModel.complete(appointment) {
-                        currentAppointment = updated
-                        dismiss()
-                    }
+                    showingCheckout = true
+                })
+            ]
+        case .completed:
+            return [
+                ("View Receipt", false, {
+                    // Already completed - could navigate to receipt
+                    dismiss()
                 })
             ]
         default:
@@ -389,7 +400,8 @@ class AppointmentDetailViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            return try await AppointmentService.shared.complete(id: appointment.id)
+            // Use completeWithPayment to charge the client's card first
+            return try await AppointmentService.shared.completeWithPayment(appointment: appointment)
         } catch {
             self.error = error.localizedDescription
             return nil
@@ -551,5 +563,223 @@ struct EditAppointmentNotesView: View {
             self.error = error.localizedDescription
         }
         isSaving = false
+    }
+}
+
+// MARK: - Checkout View
+struct CheckoutView: View {
+    let appointment: Appointment
+    let onComplete: (Appointment) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var paymentMethods: [ClientPaymentMethod] = []
+    @State private var selectedPaymentMethod: ClientPaymentMethod?
+    @State private var isLoading = true
+    @State private var isCharging = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                if isLoading {
+                    Spacer()
+                    ProgressView("Loading payment methods...")
+                    Spacer()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // Service Summary
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Service Summary")
+                                    .font(.headline)
+
+                                if let service = appointment.service {
+                                    HStack {
+                                        Text(service.name)
+                                        Spacer()
+                                        Text(service.formattedPrice)
+                                            .fontWeight(.medium)
+                                    }
+                                }
+
+                                Divider()
+
+                                HStack {
+                                    Text("Total")
+                                        .font(.headline)
+                                    Spacer()
+                                    Text(formatCurrency(appointment.totalPrice))
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.purple)
+                                }
+                            }
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+
+                            // Payment Method Selection
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Payment Method")
+                                    .font(.headline)
+
+                                if paymentMethods.isEmpty {
+                                    Text("No saved payment methods")
+                                        .foregroundColor(.secondary)
+                                        .padding(.vertical)
+                                } else {
+                                    ForEach(paymentMethods) { method in
+                                        Button {
+                                            selectedPaymentMethod = method
+                                        } label: {
+                                            HStack {
+                                                Image(systemName: "creditcard.fill")
+                                                    .foregroundColor(.purple)
+                                                Text("\(method.brand.capitalized) •••• \(method.last4)")
+                                                Spacer()
+                                                if selectedPaymentMethod?.id == method.id {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                        .foregroundColor(.purple)
+                                                }
+                                            }
+                                            .padding()
+                                            .background(selectedPaymentMethod?.id == method.id ? Color.purple.opacity(0.1) : Color(.systemGray6))
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
+                            }
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+
+                            if let error = error {
+                                Text(error)
+                                    .foregroundColor(.red)
+                                    .font(.subheadline)
+                                    .padding()
+                            }
+                        }
+                        .padding()
+                    }
+
+                    // Charge Button
+                    VStack {
+                        Button {
+                            Task { await chargeAndComplete() }
+                        } label: {
+                            HStack {
+                                if isCharging {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "creditcard.fill")
+                                    Text("Charge \(formatCurrency(appointment.totalPrice))")
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(selectedPaymentMethod != nil ? Color.purple : Color.gray)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .disabled(selectedPaymentMethod == nil || isCharging)
+
+                        Button("Skip Payment") {
+                            Task { await completeWithoutPayment() }
+                        }
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Checkout")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .task {
+                await loadPaymentMethods()
+            }
+        }
+    }
+
+    private func loadPaymentMethods() async {
+        guard let clientId = appointment.clientId else {
+            isLoading = false
+            return
+        }
+
+        do {
+            paymentMethods = try await AppointmentService.shared.getClientPaymentMethods(clientId: clientId)
+            // Select default or first payment method
+            selectedPaymentMethod = paymentMethods.first(where: { $0.isDefault }) ?? paymentMethods.first
+        } catch {
+            self.error = "Failed to load payment methods"
+        }
+        isLoading = false
+    }
+
+    private func chargeAndComplete() async {
+        guard let paymentMethod = selectedPaymentMethod,
+              let clientId = appointment.clientId else { return }
+
+        isCharging = true
+        error = nil
+
+        do {
+            let amountInCents = Int(appointment.totalPrice * 100)
+
+            if amountInCents > 0 {
+                let chargeResult = try await AppointmentService.shared.chargePayment(
+                    clientId: clientId,
+                    paymentMethodId: paymentMethod.id,
+                    amount: amountInCents,
+                    staffId: appointment.staffId,
+                    appointmentId: appointment.id
+                )
+
+                if !chargeResult.success {
+                    self.error = chargeResult.error ?? "Payment failed"
+                    isCharging = false
+                    return
+                }
+            }
+
+            // Mark appointment as complete
+            let updated = try await AppointmentService.shared.complete(id: appointment.id)
+            onComplete(updated)
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isCharging = false
+    }
+
+    private func completeWithoutPayment() async {
+        isCharging = true
+        do {
+            let updated = try await AppointmentService.shared.complete(id: appointment.id)
+            onComplete(updated)
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isCharging = false
+    }
+
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        return formatter.string(from: NSNumber(value: value)) ?? "$\(value)"
     }
 }

@@ -47,6 +47,9 @@ struct ClientsView: View {
         .onChange(of: searchText) { _, newValue in
             viewModel.filterClients(query: newValue)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .clientDeleted)) { _ in
+            Task { await viewModel.loadClients() }
+        }
     }
 
     private var clientsList: some View {
@@ -67,7 +70,9 @@ struct ClientsView: View {
             await viewModel.loadClients()
         }
         .navigationDestination(for: Client.self) { client in
-            ClientDetailView(client: client)
+            ClientDetailView(client: client, onDelete: {
+                Task { await viewModel.loadClients() }
+            })
         }
     }
 }

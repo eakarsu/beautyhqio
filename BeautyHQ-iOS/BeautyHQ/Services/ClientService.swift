@@ -48,7 +48,7 @@ actor ClientService {
     }
 
     func deleteClient(id: String) async throws {
-        let _: EmptyResponse = try await APIClient.shared.delete("/clients/\(id)")
+        let _: SuccessResponse = try await APIClient.shared.delete("/clients/\(id)")
     }
 
     func getClientAppointments(clientId: String, limit: Int = 10) async throws -> [Appointment] {
@@ -92,6 +92,11 @@ actor ClientService {
         let dateString = formatter.string(from: newDate)
         let body = RescheduleAppointmentRequest(action: "reschedule", scheduledStart: "\(dateString)T\(newTime):00")
         let _: RescheduleAppointmentResponse = try await APIClient.shared.patch("/client/appointments/\(id)", body: body)
+    }
+
+    /// Delete an appointment
+    func deleteMyAppointment(id: String) async throws {
+        let _: SuccessResponse = try await APIClient.shared.delete("/appointments/\(id)")
     }
 
     /// Get current client's profile
@@ -172,20 +177,38 @@ actor ClientService {
         if let serviceId = serviceId {
             queryItems.append(URLQueryItem(name: "serviceId", value: serviceId))
         }
-        return try await APIClient.shared.get("/locations/\(locationId)/staff", queryItems: queryItems.isEmpty ? nil : queryItems)
+        print("DEBUG getLocationStaff: calling /locations/\(locationId)/staff")
+        let result: [BookingStaff] = try await APIClient.shared.get("/locations/\(locationId)/staff", queryItems: queryItems.isEmpty ? nil : queryItems)
+        print("DEBUG getLocationStaff: received \(result.count) staff")
+        for member in result {
+            print("DEBUG getLocationStaff: - \(member.displayName) (id: \(member.id))")
+        }
+        return result
     }
 
-    /// Get available time slots
-    func getAvailableSlots(locationId: String, staffId: String, serviceId: String, date: Date) async throws -> AvailableSlotsResponse {
+    /// Get available time slots (matches web booking flow - no staff required upfront)
+    func getAvailableSlots(locationId: String, serviceId: String, date: Date, staffId: String? = nil) async throws -> BookingAvailabilityResponse {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let dateString = formatter.string(from: date)
-        let queryItems = [
-            URLQueryItem(name: "staffId", value: staffId),
+        var queryItems = [
+            URLQueryItem(name: "locationId", value: locationId),
             URLQueryItem(name: "serviceId", value: serviceId),
             URLQueryItem(name: "date", value: dateString)
         ]
-        return try await APIClient.shared.get("/locations/\(locationId)/availability", queryItems: queryItems)
+        if let staffId = staffId {
+            queryItems.append(URLQueryItem(name: "staffId", value: staffId))
+        }
+        print("DEBUG getAvailableSlots: calling API with date=\(dateString)")
+        let response: BookingAvailabilityResponse = try await APIClient.shared.get("/booking/availability", queryItems: queryItems)
+        print("DEBUG getAvailableSlots: got \(response.slots.count) slots")
+        for slot in response.slots.prefix(2) {
+            print("DEBUG getAvailableSlots: slot \(slot.time) available=\(slot.available) staffCount=\(slot.availableStaff.count)")
+            for staff in slot.availableStaff.prefix(2) {
+                print("DEBUG getAvailableSlots:   - \(staff.firstName) \(staff.lastName)")
+            }
+        }
+        return response
     }
 
     /// Create a new appointment
@@ -222,6 +245,10 @@ struct RescheduledAppointment: Codable {
     let scheduledStart: Date
     let scheduledEnd: Date
     let status: String
+}
+
+struct SuccessResponse: Codable {
+    let success: Bool
 }
 
 // MARK: - Client Portal Response Models
@@ -357,7 +384,7 @@ struct ClientAppointmentService: Codable, Identifiable {
     let price: Double
 
     var formattedPrice: String {
-        String(format: "$%.0f", price)
+        String(format: "$%.2f", price)
     }
 
     var formattedDuration: String {
@@ -514,7 +541,7 @@ struct BookingService: Codable, Identifiable, Equatable {
     let categoryName: String?
 
     var formattedPrice: String {
-        String(format: "$%.0f", price)
+        String(format: "$%.2f", price)
     }
 
     var formattedDuration: String {
@@ -532,6 +559,51 @@ struct BookingStaff: Codable, Identifiable, Equatable {
 struct AvailableSlotsResponse: Codable {
     let date: String
     let slots: [TimeSlot]
+}
+
+// Response from /api/booking/availability (matches web flow)
+struct BookingAvailabilityResponse: Codable {
+    let date: String
+    let locationId: String
+    let serviceId: String?
+    let duration: Int
+    let slots: [BookingTimeSlot]
+}
+
+struct BookingTimeSlot: Codable, Identifiable {
+    let time: String
+    let available: Bool
+    let availableStaff: [AvailableStaff]
+
+    var id: String { time }
+
+    var displayTime: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        if let date = formatter.date(from: time) {
+            formatter.dateFormat = "h:mm a"
+            return formatter.string(from: date)
+        }
+        return time
+    }
+}
+
+struct AvailableStaff: Codable, Identifiable, Equatable {
+    let id: String
+    let firstName: String
+    let lastName: String
+    let avatar: String?
+    let color: String
+
+    var fullName: String {
+        "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+    }
+
+    var initials: String {
+        let first = firstName.prefix(1)
+        let last = lastName.prefix(1)
+        return "\(first)\(last)".uppercased()
+    }
 }
 
 struct TimeSlot: Codable, Identifiable {

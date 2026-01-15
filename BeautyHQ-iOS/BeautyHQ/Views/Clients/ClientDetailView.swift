@@ -1,10 +1,23 @@
 import SwiftUI
 
+// MARK: - Notification Names
+extension Notification.Name {
+    static let clientDeleted = Notification.Name("clientDeleted")
+    static let appointmentDeleted = Notification.Name("appointmentDeleted")
+    static let appointmentCreated = Notification.Name("appointmentCreated")
+}
+
 struct ClientDetailView: View {
     let client: Client
+    var onDelete: (() -> Void)? = nil
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = ClientDetailViewModel()
     @State private var showingEditClient = false
     @State private var showingBookAppointment = false
+    @State private var showingDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+    @State private var showingDeleteError = false
 
     var body: some View {
         ScrollView {
@@ -35,10 +48,22 @@ struct ClientDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingEditClient = true
+                Menu {
+                    Button {
+                        showingEditClient = true
+                    } label: {
+                        Label("Edit Client", systemImage: "pencil")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label("Delete Client", systemImage: "trash")
+                    }
                 } label: {
-                    Image(systemName: "pencil")
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -54,6 +79,55 @@ struct ClientDetailView: View {
         .sheet(isPresented: $showingBookAppointment) {
             AddAppointmentView {
                 Task { await viewModel.loadAppointments(for: client.id) }
+            }
+        }
+        .alert("Delete Client", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                Task { await deleteClient() }
+            }
+        } message: {
+            Text("Are you sure you want to delete \(client.fullName)? This action cannot be undone.")
+        }
+        .alert("Error", isPresented: $showingDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteError ?? "An unknown error occurred")
+        }
+        .overlay {
+            if isDeleting {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .overlay {
+                        ProgressView("Deleting...")
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .cornerRadius(10)
+                    }
+            }
+        }
+    }
+
+    private func deleteClient() async {
+        isDeleting = true
+        do {
+            try await ClientService.shared.deleteClient(id: client.id)
+            // Post notification to refresh clients list
+            await MainActor.run {
+                NotificationCenter.default.post(name: .clientDeleted, object: nil)
+                onDelete?()
+            }
+            // Small delay to allow refresh to start
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            await MainActor.run {
+                dismiss()
+            }
+        } catch {
+            print("Error deleting client: \(error)")
+            await MainActor.run {
+                isDeleting = false
+                deleteError = "Failed to delete client: \(error.localizedDescription)"
+                showingDeleteError = true
             }
         }
     }

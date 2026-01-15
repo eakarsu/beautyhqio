@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -61,6 +64,7 @@ struct MainTabView: View {
     @EnvironmentObject var appState: AppState
 
     init() {
+        #if os(iOS)
         // Configure tab bar appearance
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -84,6 +88,7 @@ struct MainTabView: View {
 
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+        #endif
     }
 
     var body: some View {
@@ -127,6 +132,7 @@ struct ClientPortalTabView: View {
     @State private var selectedTab: ClientTab = .appointments
 
     init() {
+        #if os(iOS)
         // Configure tab bar appearance
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -148,6 +154,7 @@ struct ClientPortalTabView: View {
 
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+        #endif
     }
 
     enum ClientTab: Int {
@@ -290,6 +297,12 @@ struct ClientAppointmentsView: View {
         .task {
             await loadAppointments()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .appointmentDeleted)) { _ in
+            Task { await loadAppointments() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .appointmentCreated)) { _ in
+            Task { await loadAppointments() }
+        }
     }
 
     private func loadAppointments() async {
@@ -415,7 +428,9 @@ struct ClientAppointmentDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showCancelAlert = false
+    @State private var showDeleteAlert = false
     @State private var isCancelling = false
+    @State private var isDeleting = false
     @State private var showRescheduleSheet = false
 
     var body: some View {
@@ -622,6 +637,19 @@ struct ClientAppointmentDetailView: View {
         .background(Color.screenBackground)
         .navigationTitle("Appointment Details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(role: .destructive) {
+                        showDeleteAlert = true
+                    } label: {
+                        Label("Delete Appointment", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
         .alert("Cancel Appointment", isPresented: $showCancelAlert) {
             Button("Keep Appointment", role: .cancel) {}
             Button("Cancel", role: .destructive) {
@@ -630,12 +658,32 @@ struct ClientAppointmentDetailView: View {
         } message: {
             Text("Are you sure you want to cancel this appointment?")
         }
+        .alert("Delete Appointment", isPresented: $showDeleteAlert) {
+            Button("Keep", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task { await deleteAppointment() }
+            }
+        } message: {
+            Text("Are you sure you want to permanently delete this appointment? This cannot be undone.")
+        }
         .sheet(isPresented: $showRescheduleSheet) {
             if let apt = appointment {
                 ClientRescheduleAppointmentView(appointment: apt) {
                     showRescheduleSheet = false
                     Task { await loadAppointment() }
                 }
+            }
+        }
+        .overlay {
+            if isDeleting {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .overlay {
+                        ProgressView("Deleting...")
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .cornerRadius(10)
+                    }
             }
         }
         .task {
@@ -662,6 +710,19 @@ struct ClientAppointmentDetailView: View {
         }
         isCancelling = false
     }
+
+    private func deleteAppointment() async {
+        isDeleting = true
+        do {
+            try await ClientService.shared.deleteMyAppointment(id: appointmentId)
+            // Post notification to refresh appointments list
+            NotificationCenter.default.post(name: .appointmentDeleted, object: nil)
+            dismiss()
+        } catch {
+            print("Error deleting appointment: \(error)")
+        }
+        isDeleting = false
+    }
 }
 
 // MARK: - Client Reschedule Appointment View
@@ -670,8 +731,8 @@ struct ClientRescheduleAppointmentView: View {
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDate = Date()
-    @State private var availableSlots: [TimeSlot] = []
-    @State private var selectedSlot: TimeSlot?
+    @State private var availableSlots: [BookingTimeSlot] = []
+    @State private var selectedSlot: BookingTimeSlot?
     @State private var isLoadingSlots = false
     @State private var isRescheduling = false
     @State private var errorMessage: String?
@@ -822,11 +883,11 @@ struct ClientRescheduleAppointmentView: View {
         do {
             let response = try await ClientService.shared.getAvailableSlots(
                 locationId: appointment.locationId,
-                staffId: staffId,
                 serviceId: serviceId,
-                date: selectedDate
+                date: selectedDate,
+                staffId: staffId
             )
-            availableSlots = response.slots
+            availableSlots = response.slots.filter { $0.available }
         } catch {
             availableSlots = []
         }
@@ -1639,12 +1700,14 @@ struct BookAppointmentView: View {
     @State private var selectedLocation: BookingLocation?
     @State private var services: [BookingService] = []
     @State private var selectedServices: [BookingService] = []
-    @State private var staff: [BookingStaff] = []
-    @State private var selectedStaff: BookingStaff?
+    @State private var availableStylists: [BookingStaff] = []
+    @State private var selectedStylist: BookingStaff?
     @State private var selectedDate = Date()
-    @State private var availableSlots: [TimeSlot] = []
-    @State private var selectedSlot: TimeSlot?
+    @State private var availableSlots: [BookingTimeSlot] = []
+    @State private var selectedSlot: BookingTimeSlot?
     @State private var isLoading = true
+    @State private var isLoadingStylists = false
+    @State private var isLoadingSlots = false
     @State private var isBooking = false
     @State private var errorMessage: String?
     @State private var bookingSuccess = false
@@ -1652,9 +1715,9 @@ struct BookAppointmentView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Progress indicator
+                // Progress indicator (5 steps: Location, Services, Stylist, Date/Time, Confirm)
                 HStack(spacing: 4) {
-                    ForEach(0..<4) { step in
+                    ForEach(0..<5) { step in
                         RoundedRectangle(cornerRadius: 2)
                             .fill(step <= currentStep ? Color.roseGold : Color.softGray.opacity(0.3))
                             .frame(height: 4)
@@ -1700,19 +1763,24 @@ struct BookAppointmentView: View {
                     case 1:
                         ServiceSelectionStep(services: services, selectedServices: $selectedServices)
                     case 2:
-                        StaffDateSelectionStep(
-                            staff: staff,
-                            selectedStaff: $selectedStaff,
+                        StylistSelectionStep(
+                            stylists: availableStylists,
+                            selectedStylist: $selectedStylist,
+                            isLoading: isLoadingStylists
+                        )
+                    case 3:
+                        DateTimeSelectionStepSimple(
                             selectedDate: $selectedDate,
                             availableSlots: availableSlots,
                             selectedSlot: $selectedSlot,
+                            isLoading: isLoadingSlots,
                             onDateChange: { await loadSlots() }
                         )
-                    case 3:
+                    case 4:
                         BookingConfirmationStep(
                             location: selectedLocation,
                             services: selectedServices,
-                            staff: selectedStaff,
+                            stylist: selectedStylist,
                             date: selectedDate,
                             slot: selectedSlot
                         )
@@ -1735,8 +1803,8 @@ struct BookAppointmentView: View {
                             .cornerRadius(CornerRadius.md)
                         }
 
-                        Button(currentStep == 3 ? (isBooking ? "Booking..." : "Confirm Booking") : "Next") {
-                            if currentStep == 3 {
+                        Button(nextButtonTitle) {
+                            if currentStep == 4 {
                                 Task { await createBooking() }
                             } else {
                                 nextStep()
@@ -1747,7 +1815,7 @@ struct BookAppointmentView: View {
                         .background(canProceed ? Color.roseGold : Color.softGray.opacity(0.3))
                         .foregroundColor(canProceed ? .white : .softGray)
                         .cornerRadius(CornerRadius.md)
-                        .disabled(!canProceed || isBooking)
+                        .disabled(!canProceed || isBooking || isLoadingSlots)
                     }
                     .padding()
                 }
@@ -1767,19 +1835,14 @@ struct BookAppointmentView: View {
             await loadLocations()
         }
         .onChange(of: selectedLocation) {
+            print("DEBUG onChange: selectedLocation changed to \(selectedLocation?.name ?? "nil")")
             if selectedLocation != nil {
                 Task { await loadServices() }
             }
         }
         .onChange(of: selectedServices) {
-            if !selectedServices.isEmpty {
-                Task { await loadStaff() }
-            }
-        }
-        .onChange(of: selectedStaff) {
-            if selectedStaff != nil {
-                Task { await loadSlots() }
-            }
+            print("DEBUG onChange: selectedServices changed, count=\(selectedServices.count)")
+            // Slots will be loaded when entering step 2
         }
     }
 
@@ -1787,25 +1850,59 @@ struct BookAppointmentView: View {
         switch currentStep {
         case 0: return "Select Location"
         case 1: return "Select Services"
-        case 2: return "Select Date & Time"
-        case 3: return "Confirm Booking"
+        case 2: return "Select Stylist"
+        case 3: return "Select Date & Time"
+        case 4: return "Confirm Booking"
         default: return "Book Appointment"
         }
+    }
+
+    private var nextButtonTitle: String {
+        if currentStep == 4 {
+            return isBooking ? "Booking..." : "Confirm Booking"
+        }
+        if currentStep == 1 && isLoadingStylists {
+            return "Loading..."
+        }
+        if currentStep == 2 && isLoadingSlots {
+            return "Loading..."
+        }
+        return "Next"
     }
 
     private var canProceed: Bool {
         switch currentStep {
         case 0: return selectedLocation != nil
         case 1: return !selectedServices.isEmpty
-        case 2: return selectedStaff != nil && selectedSlot != nil
-        case 3: return true
+        case 2: return selectedStylist != nil
+        case 3: return selectedSlot != nil
+        case 4: return true
         default: return false
         }
     }
 
     private func nextStep() {
-        if currentStep < 3 {
+        if currentStep < 4 {
+            // When moving from step 1 to step 2, load available stylists
+            if currentStep == 1 {
+                print("DEBUG nextStep: moving to step 2, loading stylists")
+                currentStep = 2
+                Task {
+                    await loadStylists()
+                }
+                return
+            }
+            // When moving from step 2 to step 3, load available slots
+            if currentStep == 2 {
+                print("DEBUG nextStep: moving to step 3, loading slots")
+                currentStep = 3
+                Task {
+                    await loadSlots()
+                }
+                return
+            }
             currentStep += 1
+            print("DEBUG nextStep: moved to step \(currentStep)")
         }
     }
 
@@ -1828,47 +1925,66 @@ struct BookAppointmentView: View {
         }
     }
 
-    private func loadStaff() async {
-        guard let location = selectedLocation else { return }
-        let serviceId = selectedServices.first?.id
-        do {
-            staff = try await ClientService.shared.getLocationStaff(locationId: location.id, serviceId: serviceId)
-        } catch {
-            print("Error loading staff: \(error)")
+    private func loadStylists() async {
+        guard let location = selectedLocation else {
+            print("DEBUG loadStylists: missing location")
+            return
         }
+        isLoadingStylists = true
+        let serviceId = selectedServices.first?.id
+        print("DEBUG loadStylists: loading for location=\(location.id), serviceId=\(serviceId ?? "nil")")
+        do {
+            availableStylists = try await ClientService.shared.getLocationStaff(locationId: location.id, serviceId: serviceId)
+            print("DEBUG loadStylists: got \(availableStylists.count) stylists")
+            for stylist in availableStylists {
+                print("DEBUG loadStylists: - \(stylist.displayName)")
+            }
+        } catch {
+            print("Error loading stylists: \(error)")
+            availableStylists = []
+        }
+        isLoadingStylists = false
     }
 
     private func loadSlots() async {
         guard let location = selectedLocation,
-              let staffMember = selectedStaff,
-              let service = selectedServices.first else { return }
+              let service = selectedServices.first,
+              let stylist = selectedStylist else {
+            print("DEBUG loadSlots: missing location, service, or stylist")
+            return
+        }
+        isLoadingSlots = true
+        print("DEBUG loadSlots: loading for location=\(location.id), service=\(service.id), stylist=\(stylist.id), date=\(selectedDate)")
         do {
+            // Pass the selected stylist ID to filter slots for that specific stylist
             let response = try await ClientService.shared.getAvailableSlots(
                 locationId: location.id,
-                staffId: staffMember.id,
                 serviceId: service.id,
-                date: selectedDate
+                date: selectedDate,
+                staffId: stylist.id
             )
             availableSlots = response.slots.filter { $0.available }
+            print("DEBUG loadSlots: got \(availableSlots.count) available slots for \(stylist.displayName)")
         } catch {
             print("Error loading slots: \(error)")
+            availableSlots = []
         }
+        isLoadingSlots = false
     }
 
     private func createBooking() async {
         guard let location = selectedLocation,
-              let staffMember = selectedStaff,
+              let stylist = selectedStylist,
               let slot = selectedSlot else { return }
 
         isBooking = true
-        let formatter = ISO8601DateFormatter()
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let dateString = dateFormatter.string(from: selectedDate)
 
         let request = ClientCreateAppointmentRequest(
             locationId: location.id,
-            staffId: staffMember.id,
+            staffId: stylist.id,
             serviceIds: selectedServices.map { $0.id },
             scheduledStart: "\(dateString)T\(slot.time):00",
             notes: nil,
@@ -1878,6 +1994,8 @@ struct BookAppointmentView: View {
         do {
             _ = try await ClientService.shared.createAppointment(request: request)
             bookingSuccess = true
+            // Post notification to refresh appointments list
+            NotificationCenter.default.post(name: .appointmentCreated, object: nil)
         } catch {
             errorMessage = "Failed to create booking"
             print("Error: \(error)")
@@ -2001,52 +2119,123 @@ struct ServiceSelectionStep: View {
     }
 }
 
-// MARK: - Staff & Date Selection Step
-struct StaffDateSelectionStep: View {
-    let staff: [BookingStaff]
-    @Binding var selectedStaff: BookingStaff?
+// MARK: - Stylist Selection Step
+struct StylistSelectionStep: View {
+    let stylists: [BookingStaff]
+    @Binding var selectedStylist: BookingStaff?
+    let isLoading: Bool
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                Text("Choose Your Stylist")
+                    .font(.appHeadline)
+                    .foregroundColor(.charcoal)
+                    .padding(.horizontal)
+
+                if isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .roseGold))
+                        Text("Loading stylists...")
+                            .font(.appCaption)
+                            .foregroundColor(.softGray)
+                        Spacer()
+                    }
+                    .padding()
+                } else if stylists.isEmpty {
+                    Text("No stylists available")
+                        .font(.appBody)
+                        .foregroundColor(.softGray)
+                        .padding()
+                } else {
+                    LazyVStack(spacing: Spacing.md) {
+                        ForEach(stylists) { stylist in
+                            Button(action: { selectedStylist = stylist }) {
+                                HStack(spacing: Spacing.md) {
+                                    // Avatar
+                                    if let photoUrl = stylist.photo, let url = URL(string: photoUrl) {
+                                        AsyncImage(url: url) { image in
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Circle()
+                                                .fill(Color.roseGold.opacity(0.2))
+                                                .overlay(
+                                                    Text(String(stylist.displayName.prefix(1)))
+                                                        .font(.appTitle2)
+                                                        .foregroundColor(.roseGold)
+                                                )
+                                        }
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(Circle())
+                                    } else {
+                                        Circle()
+                                            .fill(Color.roseGold.opacity(0.2))
+                                            .frame(width: 60, height: 60)
+                                            .overlay(
+                                                Text(String(stylist.displayName.prefix(1)))
+                                                    .font(.appTitle2)
+                                                    .foregroundColor(.roseGold)
+                                            )
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(stylist.displayName)
+                                            .font(.appBody)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.charcoal)
+                                        if let title = stylist.title {
+                                            Text(title)
+                                                .font(.appCaption)
+                                                .foregroundColor(.softGray)
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    if selectedStylist?.id == stylist.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.roseGold)
+                                            .font(.title2)
+                                    } else {
+                                        Image(systemName: "circle")
+                                            .foregroundColor(.softGray)
+                                            .font(.title2)
+                                    }
+                                }
+                                .padding()
+                                .background(selectedStylist?.id == stylist.id ? Color.roseGold.opacity(0.1) : Color.cardBackground)
+                                .cornerRadius(CornerRadius.md)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: CornerRadius.md)
+                                        .stroke(selectedStylist?.id == stylist.id ? Color.roseGold : Color.clear, lineWidth: 2)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .padding(.vertical)
+        }
+    }
+}
+
+// MARK: - Date & Time Selection Step (Simple - stylist already selected)
+struct DateTimeSelectionStepSimple: View {
     @Binding var selectedDate: Date
-    let availableSlots: [TimeSlot]
-    @Binding var selectedSlot: TimeSlot?
+    let availableSlots: [BookingTimeSlot]
+    @Binding var selectedSlot: BookingTimeSlot?
+    let isLoading: Bool
     let onDateChange: () async -> Void
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.lg) {
-                // Staff selection
-                Text("Select Stylist")
-                    .font(.appHeadline)
-                    .foregroundColor(.charcoal)
-                    .padding(.horizontal)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Spacing.md) {
-                        ForEach(staff) { member in
-                            Button(action: { selectedStaff = member }) {
-                                VStack(spacing: 8) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.roseGold.opacity(0.2))
-                                            .frame(width: 60, height: 60)
-                                        Text(String(member.displayName.prefix(1)))
-                                            .font(.appTitle2)
-                                            .foregroundColor(.roseGold)
-                                    }
-                                    .overlay(
-                                        Circle()
-                                            .stroke(selectedStaff?.id == member.id ? Color.roseGold : Color.clear, lineWidth: 3)
-                                    )
-                                    Text(member.displayName)
-                                        .font(.appCaption)
-                                        .foregroundColor(.charcoal)
-                                }
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-
                 // Date selection
                 Text("Select Date")
                     .font(.appHeadline)
@@ -2057,37 +2246,180 @@ struct StaffDateSelectionStep: View {
                     .datePickerStyle(GraphicalDatePickerStyle())
                     .padding(.horizontal)
                     .onChange(of: selectedDate) {
+                        selectedSlot = nil
                         Task { await onDateChange() }
                     }
 
                 // Time slots
-                if selectedStaff != nil {
-                    Text("Available Times")
+                Text("Available Times")
+                    .font(.appHeadline)
+                    .foregroundColor(.charcoal)
+                    .padding(.horizontal)
+
+                if isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .roseGold))
+                        Text("Loading available times...")
+                            .font(.appCaption)
+                            .foregroundColor(.softGray)
+                        Spacer()
+                    }
+                    .padding()
+                } else if availableSlots.isEmpty {
+                    Text("No available times for this date")
+                        .font(.appBody)
+                        .foregroundColor(.softGray)
+                        .padding()
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
+                        ForEach(availableSlots) { slot in
+                            Button(action: {
+                                selectedSlot = slot
+                            }) {
+                                Text(slot.displayTime)
+                                    .font(.appCaption)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(selectedSlot?.id == slot.id ? Color.roseGold : Color.cardBackground)
+                                    .foregroundColor(selectedSlot?.id == slot.id ? .white : .charcoal)
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.vertical)
+        }
+    }
+}
+
+// MARK: - Date & Time Selection Step (with staff selection - legacy)
+struct DateTimeSelectionStep: View {
+    @Binding var selectedDate: Date
+    let availableSlots: [BookingTimeSlot]
+    @Binding var selectedSlot: BookingTimeSlot?
+    @Binding var selectedStaff: AvailableStaff?
+    let isLoading: Bool
+    let onDateChange: () async -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                // Date selection
+                Text("Select Date")
+                    .font(.appHeadline)
+                    .foregroundColor(.charcoal)
+                    .padding(.horizontal)
+
+                DatePicker("", selection: $selectedDate, in: Date()..., displayedComponents: .date)
+                    .datePickerStyle(GraphicalDatePickerStyle())
+                    .padding(.horizontal)
+                    .onChange(of: selectedDate) {
+                        selectedSlot = nil
+                        selectedStaff = nil
+                        Task { await onDateChange() }
+                    }
+
+                // Time slots
+                Text("Available Times")
+                    .font(.appHeadline)
+                    .foregroundColor(.charcoal)
+                    .padding(.horizontal)
+
+                if isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .roseGold))
+                        Text("Loading available times...")
+                            .font(.appCaption)
+                            .foregroundColor(.softGray)
+                        Spacer()
+                    }
+                    .padding()
+                } else if availableSlots.isEmpty {
+                    Text("No available times for this date")
+                        .font(.appBody)
+                        .foregroundColor(.softGray)
+                        .padding()
+                } else {
+                    let _ = print("DEBUG DateTimeSelectionStep: showing \(availableSlots.count) slots")
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
+                        ForEach(availableSlots) { slot in
+                            Button(action: {
+                                print("DEBUG DateTimeSelectionStep: tapped slot \(slot.time), availableStaff count: \(slot.availableStaff.count)")
+                                selectedSlot = slot
+                                selectedStaff = nil  // Reset staff when time changes
+                            }) {
+                                Text(slot.displayTime)
+                                    .font(.appCaption)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(selectedSlot?.id == slot.id ? Color.roseGold : Color.cardBackground)
+                                    .foregroundColor(selectedSlot?.id == slot.id ? .white : .charcoal)
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+
+                // Debug: show selected slot info
+                Text("Selected: \(selectedSlot?.time ?? "none") - Staff: \(selectedSlot?.availableStaff.count ?? 0)")
+                    .font(.appCaption)
+                    .foregroundColor(.red)
+                    .padding(.horizontal)
+
+                // Staff selection (only shown after selecting a time slot)
+                if let slot = selectedSlot {
+                    let _ = print("DEBUG DateTimeSelectionStep: selectedSlot=\(slot.time), staffCount=\(slot.availableStaff.count)")
+                    Text("Select Stylist")
                         .font(.appHeadline)
                         .foregroundColor(.charcoal)
                         .padding(.horizontal)
+                        .padding(.top, Spacing.md)
 
-                    if availableSlots.isEmpty {
-                        Text("No available times for this date")
+                    if slot.availableStaff.isEmpty {
+                        let _ = print("DEBUG DateTimeSelectionStep: NO STAFF AVAILABLE")
+                        Text("No stylists available for this time")
                             .font(.appBody)
                             .foregroundColor(.softGray)
-                            .padding()
+                            .padding(.horizontal)
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
-                            ForEach(availableSlots) { slot in
-                                Button(action: { selectedSlot = slot }) {
-                                    Text(slot.displayTime)
-                                        .font(.appCaption)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(selectedSlot?.id == slot.id ? Color.roseGold : Color.cardBackground)
-                                        .foregroundColor(selectedSlot?.id == slot.id ? .white : .charcoal)
-                                        .cornerRadius(6)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: Spacing.md) {
+                                ForEach(slot.availableStaff) { staff in
+                                    Button(action: { selectedStaff = staff }) {
+                                        VStack(spacing: 8) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(Color(hex: staff.color).opacity(0.2))
+                                                    .frame(width: 60, height: 60)
+                                                Text(staff.initials)
+                                                    .font(.appTitle2)
+                                                    .foregroundColor(Color(hex: staff.color))
+                                            }
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(selectedStaff?.id == staff.id ? Color.roseGold : Color.clear, lineWidth: 3)
+                                            )
+                                            Text(staff.fullName)
+                                                .font(.appCaption)
+                                                .foregroundColor(.charcoal)
+                                                .lineLimit(1)
+                                        }
+                                        .frame(width: 80)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .buttonStyle(PlainButtonStyle())
                             }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                     }
                 }
             }
@@ -2100,9 +2432,9 @@ struct StaffDateSelectionStep: View {
 struct BookingConfirmationStep: View {
     let location: BookingLocation?
     let services: [BookingService]
-    let staff: BookingStaff?
+    let stylist: BookingStaff?
     let date: Date
-    let slot: TimeSlot?
+    let slot: BookingTimeSlot?
 
     var body: some View {
         ScrollView {
@@ -2163,7 +2495,7 @@ struct BookingConfirmationStep: View {
                             .font(.appHeadline)
                             .foregroundColor(.charcoal)
                         Spacer()
-                        Text(String(format: "$%.0f", services.reduce(0) { $0 + $1.price }))
+                        Text(String(format: "$%.2f", services.reduce(0) { $0 + $1.price }))
                             .font(.appTitle2)
                             .foregroundColor(.roseGold)
                     }
@@ -2174,12 +2506,12 @@ struct BookingConfirmationStep: View {
                 .cornerRadius(CornerRadius.md)
 
                 // Stylist
-                if let staff = staff {
+                if let stylist = stylist {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Stylist", systemImage: "person.fill")
                             .font(.appCaption)
                             .foregroundColor(.softGray)
-                        Text(staff.displayName)
+                        Text(stylist.displayName)
                             .font(.appBody)
                             .foregroundColor(.charcoal)
                     }
@@ -2201,6 +2533,7 @@ struct StaffPortalTabView: View {
     @State private var showingLogoutAlert = false
 
     init() {
+        #if os(iOS)
         // Configure tab bar appearance
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -2222,6 +2555,7 @@ struct StaffPortalTabView: View {
 
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+        #endif
     }
 
     enum StaffTab: Int {
@@ -2923,6 +3257,7 @@ struct StaffClientDetailView: View {
                                     .foregroundColor(.charcoal)
                             }
                             Spacer()
+                            #if os(iOS)
                             Button {
                                 if let url = URL(string: "tel:\(client.phone)") {
                                     UIApplication.shared.open(url)
@@ -2932,6 +3267,7 @@ struct StaffClientDetailView: View {
                                     .font(.system(size: 32))
                                     .foregroundColor(.roseGold)
                             }
+                            #endif
                         }
 
                         if let email = client.email {
@@ -2949,6 +3285,7 @@ struct StaffClientDetailView: View {
                                         .foregroundColor(.charcoal)
                                 }
                                 Spacer()
+                                #if os(iOS)
                                 Button {
                                     if let url = URL(string: "mailto:\(email)") {
                                         UIApplication.shared.open(url)
@@ -2958,6 +3295,7 @@ struct StaffClientDetailView: View {
                                         .font(.system(size: 32))
                                         .foregroundColor(.roseGold)
                                 }
+                                #endif
                             }
                         }
                     }
@@ -3017,6 +3355,7 @@ struct StaffClientDetailView: View {
                 .padding(.horizontal)
 
                 // Quick Actions
+                #if os(iOS)
                 VStack(spacing: Spacing.sm) {
                     Button {
                         if let url = URL(string: "sms:\(client.phone)") {
@@ -3035,6 +3374,7 @@ struct StaffClientDetailView: View {
                     }
                 }
                 .padding(.horizontal)
+                #endif
 
                 Spacer()
             }
@@ -3741,6 +4081,7 @@ struct StaffSettingsView: View {
         .task {
             await loadData()
         }
+        #if os(iOS)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             // Reload Stripe status when app becomes active after opening Stripe
             if pendingStripeReload {
@@ -3750,6 +4091,7 @@ struct StaffSettingsView: View {
                 }
             }
         }
+        #endif
     }
 
     private var currentPayoutMethodText: String {
@@ -3795,9 +4137,11 @@ struct StaffSettingsView: View {
                     // Mark for reload when returning from Safari
                     pendingStripeReload = true
                     // Open Stripe onboarding in Safari
+                    #if os(iOS)
                     await MainActor.run {
                         UIApplication.shared.open(stripeURL)
                     }
+                    #endif
                 } else if let error = response.error {
                     stripeError = response.message ?? error
                 }

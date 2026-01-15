@@ -184,7 +184,7 @@ struct AddAppointmentView: View {
                             Picker("Select Service *", selection: $viewModel.selectedServiceId) {
                                 Text("Select...").tag("")
                                 ForEach(viewModel.services) { service in
-                                    Text("\(service.name) - $\(String(format: "%.0f", service.price))").tag(service.id)
+                                    Text("\(service.name) - \(service.formattedPrice)").tag(service.id)
                                 }
                             }
                             if viewModel.services.isEmpty {
