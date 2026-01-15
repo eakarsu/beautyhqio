@@ -61,6 +61,32 @@ actor ClientService {
         return try await APIClient.shared.get("/clients/\(clientId)/transactions", queryItems: queryItems)
     }
 
+    // MARK: - AI Recommendations
+
+    func getAIRecommendations(clientId: String, preferences: String?) async throws -> AIStyleRecommendation {
+        struct AIRequest: Encodable {
+            let clientId: String
+            let preferences: String?
+        }
+
+        struct AIResponse: Codable {
+            let success: Bool
+            let recommendation: AIStyleRecommendation?
+            let error: String?
+        }
+
+        let request = AIRequest(clientId: clientId, preferences: preferences)
+        let response: AIResponse = try await APIClient.shared.post("/ai/style-recommendation", body: request)
+
+        if let recommendation = response.recommendation {
+            return recommendation
+        } else if let error = response.error {
+            throw NSError(domain: "AIRecommendation", code: -1, userInfo: [NSLocalizedDescriptionKey: error])
+        } else {
+            throw NSError(domain: "AIRecommendation", code: -1, userInfo: [NSLocalizedDescriptionKey: "No recommendation returned"])
+        }
+    }
+
     // MARK: - Client Portal (for logged-in client user)
 
     /// Get current client's appointments
@@ -636,4 +662,19 @@ struct CreateAppointmentResponse: Codable {
     let id: String
     let status: String
     let scheduledStart: Date
+}
+
+// MARK: - AI Recommendation Models
+
+struct AIStyleRecommendation: Codable {
+    let recommendations: [AIServiceRecommendation]
+    let personalizedTips: [String]
+    let productsToConsider: [String]
+}
+
+struct AIServiceRecommendation: Codable {
+    let service: String
+    let description: String
+    let reason: String
+    let confidence: Int
 }

@@ -18,6 +18,10 @@ struct ClientDetailView: View {
     @State private var isDeleting = false
     @State private var deleteError: String?
     @State private var showingDeleteError = false
+    @State private var showingAIRecommendations = false
+    @State private var aiRecommendations: AIStyleRecommendation?
+    @State private var isLoadingAI = false
+    @State private var selectedServiceForBooking: String?
 
     var body: some View {
         ScrollView {
@@ -41,6 +45,9 @@ struct ClientDetailView: View {
 
                 // Appointments
                 appointmentsSection
+
+                // AI Recommendations
+                aiRecommendationsSection
             }
             .padding()
         }
@@ -270,6 +277,140 @@ struct ClientDetailView: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+    }
+
+    private var aiRecommendationsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                SectionHeader(icon: "sparkles", title: "AI Recommendations")
+                Spacer()
+                Button {
+                    Task { await fetchAIRecommendations() }
+                } label: {
+                    HStack(spacing: 4) {
+                        if isLoadingAI {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
+                        Text(isLoadingAI ? "Analyzing..." : "Get AI Tips")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        LinearGradient(
+                            colors: [.purple, .indigo],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(Capsule())
+                }
+                .disabled(isLoadingAI)
+            }
+
+            if let recommendations = aiRecommendations {
+                // Recommended Services
+                if !recommendations.recommendations.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Recommended Services")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+
+                        ForEach(recommendations.recommendations, id: \.service) { rec in
+                            AIServiceRecommendationCard(
+                                recommendation: rec,
+                                onBook: {
+                                    selectedServiceForBooking = rec.service
+                                    showingBookAppointment = true
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Personalized Tips
+                if !recommendations.personalizedTips.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Personalized Tips")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+
+                        ForEach(Array(recommendations.personalizedTips.enumerated()), id: \.offset) { index, tip in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("\(index + 1)")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .frame(width: 20, height: 20)
+                                    .background(Color.pink)
+                                    .clipShape(Circle())
+                                Text(tip)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.pink.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                // Products to Consider
+                if !recommendations.productsToConsider.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Products to Consider")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+
+                        ForEach(recommendations.productsToConsider, id: \.self) { product in
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.orange)
+                                Text(product)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.orange.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            } else if !isLoadingAI {
+                VStack(spacing: 12) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 32))
+                        .foregroundColor(.purple.opacity(0.5))
+                    Text("Get personalized service and product recommendations")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+    }
+
+    private func fetchAIRecommendations() async {
+        isLoadingAI = true
+        do {
+            aiRecommendations = try await ClientService.shared.getAIRecommendations(clientId: client.id, preferences: client.notes)
+        } catch {
+            print("Error fetching AI recommendations: \(error)")
+        }
+        isLoadingAI = false
     }
 
     private var bookButton: some View {
@@ -514,5 +655,71 @@ struct ClientAppointmentsListView: View {
             print("Error loading appointments: \(error)")
         }
         isLoading = false
+    }
+}
+
+// MARK: - AI Service Recommendation Card
+struct AIServiceRecommendationCard: View {
+    let recommendation: AIServiceRecommendation
+    let onBook: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(recommendation.service)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Text("\(recommendation.confidence)% match")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.15))
+                            .foregroundColor(.purple)
+                            .clipShape(Capsule())
+                    }
+                    Text(recommendation.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Button(action: onBook) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                        Text("Book")
+                    }
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.purple)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.purple.opacity(0.1))
+                    .clipShape(Capsule())
+                }
+            }
+
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.caption)
+                Text(recommendation.reason)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color(.systemBackground), Color.purple.opacity(0.05)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+        )
     }
 }

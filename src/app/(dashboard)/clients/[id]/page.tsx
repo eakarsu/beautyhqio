@@ -883,7 +883,12 @@ export default function ClientProfilePage() {
                               </div>
                             </div>
                             {!isStaffOnly && (
-                              <Button variant="outline" size="sm" className="ml-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="ml-4"
+                                onClick={() => router.push(`/appointments/new?clientId=${params.id}&service=${encodeURIComponent(rec.service)}`)}
+                              >
                                 <Calendar className="h-4 w-4 mr-1" />
                                 Book
                               </Button>
