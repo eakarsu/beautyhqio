@@ -3,6 +3,10 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var showingLogoutAlert = false
+    @State private var showingDeleteAccountAlert = false
+    @State private var showingDeleteConfirmation = false
+    @State private var deleteConfirmationText = ""
+    @State private var isDeleting = false
 
     var body: some View {
         List {
@@ -153,6 +157,30 @@ struct SettingsView: View {
                     }
                 }
 
+                // Delete Account
+                Section {
+                    Button {
+                        showingDeleteAccountAlert = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                            Text("Delete Account")
+                                .foregroundColor(.red)
+                            Spacer()
+                            if isDeleting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            }
+                        }
+                    }
+                    .disabled(isDeleting)
+                } footer: {
+                    Text("Permanently delete your account and all associated data. This action cannot be undone.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
                 // Version
                 Section {
                     HStack {
@@ -175,6 +203,36 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("Are you sure you want to sign out?")
+            }
+            .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete Account", role: .destructive) {
+                    showingDeleteConfirmation = true
+                }
+            } message: {
+                Text("Are you sure you want to permanently delete your account? This will remove all your data including appointments, preferences, and payment information. This action cannot be undone.")
+            }
+            .alert("Confirm Deletion", isPresented: $showingDeleteConfirmation) {
+                TextField("Type DELETE to confirm", text: $deleteConfirmationText)
+                Button("Cancel", role: .cancel) {
+                    deleteConfirmationText = ""
+                }
+                Button("Delete Forever", role: .destructive) {
+                    if deleteConfirmationText.uppercased() == "DELETE" {
+                        Task {
+                            isDeleting = true
+                            let success = await authManager.deleteAccount()
+                            isDeleting = false
+                            if !success {
+                                // Error will be shown via authManager.error
+                            }
+                            deleteConfirmationText = ""
+                        }
+                    }
+                }
+                .disabled(deleteConfirmationText.uppercased() != "DELETE")
+            } message: {
+                Text("This is your final confirmation. Type DELETE to permanently remove your account.")
             }
     }
 }

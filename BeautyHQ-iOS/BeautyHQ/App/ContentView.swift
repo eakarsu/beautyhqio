@@ -1216,6 +1216,10 @@ struct ClientProfileView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showingLogoutAlert = false
+    @State private var showingDeleteAccountAlert = false
+    @State private var showingDeleteConfirmation = false
+    @State private var deleteConfirmationText = ""
+    @State private var isDeleting = false
 
     // Editable fields
     @State private var firstName = ""
@@ -1354,6 +1358,32 @@ struct ClientProfileView: View {
                             .cornerRadius(CornerRadius.md)
                         }
                         .padding(.horizontal)
+
+                        // Delete Account
+                        Button(action: { showingDeleteAccountAlert = true }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text("Delete Account")
+                                if isDeleting {
+                                    Spacer()
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .error))
+                                        .scaleEffect(0.8)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .foregroundColor(.error)
+                            .background(Color.error.opacity(0.05))
+                            .cornerRadius(CornerRadius.md)
+                        }
+                        .disabled(isDeleting)
+                        .padding(.horizontal)
+
+                        Text("Permanently delete your account and all associated data.")
+                            .font(.appCaption)
+                            .foregroundColor(.softGray)
+                            .padding(.horizontal)
                     }
                 }
                 .padding(.vertical)
@@ -1367,6 +1397,33 @@ struct ClientProfileView: View {
                 }
             } message: {
                 Text("Are you sure you want to sign out?")
+            }
+            .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete Account", role: .destructive) {
+                    showingDeleteConfirmation = true
+                }
+            } message: {
+                Text("Are you sure you want to permanently delete your account? This will remove all your data including appointments, rewards, and payment information. This action cannot be undone.")
+            }
+            .alert("Confirm Deletion", isPresented: $showingDeleteConfirmation) {
+                TextField("Type DELETE to confirm", text: $deleteConfirmationText)
+                Button("Cancel", role: .cancel) {
+                    deleteConfirmationText = ""
+                }
+                Button("Delete Forever", role: .destructive) {
+                    if deleteConfirmationText.uppercased() == "DELETE" {
+                        Task {
+                            isDeleting = true
+                            await authManager.deleteAccount()
+                            isDeleting = false
+                            deleteConfirmationText = ""
+                        }
+                    }
+                }
+                .disabled(deleteConfirmationText.uppercased() != "DELETE")
+            } message: {
+                Text("This is your final confirmation. Type DELETE to permanently remove your account.")
             }
         }
         .task {

@@ -147,6 +147,32 @@ class AuthManager: ObservableObject {
         }
     }
 
+    func deleteAccount() async -> Bool {
+        isLoading = true
+        error = nil
+
+        do {
+            let _: MessageResponse = try await APIClient.shared.delete("/auth/account")
+
+            // Clear all local data after successful deletion
+            await TokenManager.shared.clearTokens()
+            UserDefaults.standard.removeObject(forKey: "appleUserIdentifier")
+            currentUser = nil
+            isAuthenticated = false
+            isLoading = false
+
+            return true
+        } catch let apiError as APIError {
+            error = apiError.errorDescription
+            isLoading = false
+            return false
+        } catch {
+            self.error = error.localizedDescription
+            isLoading = false
+            return false
+        }
+    }
+
     // MARK: - Apple Sign In
 
     /// Initiates Sign in with Apple flow

@@ -1,14 +1,8 @@
 import Foundation
 
 enum Config {
-    // TEMPORARY: Force localhost for testing - change back when done
-    static var useLocalhost = true
-
     // Automatically switch between local and production
     static var apiBaseURL: String {
-        if useLocalhost {
-            return "http://localhost:3000/api"
-        }
         #if DEBUG
         // Debug builds use localhost (works for simulator and macOS)
         return "http://localhost:3000/api"

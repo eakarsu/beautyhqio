@@ -435,11 +435,22 @@ struct MobileAuthRequest: Encodable {
 extension SocialAuthManager: ASWebAuthenticationPresentationContextProviding {
     @MainActor
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first else {
-            fatalError("No window found for presentation")
+        // Find the active window scene - works on both iPhone and iPad
+        let scenes = UIApplication.shared.connectedScenes
+        let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+            ?? scenes.first as? UIWindowScene
+
+        if let window = windowScene?.windows.first(where: { $0.isKeyWindow }) ?? windowScene?.windows.first {
+            return window
         }
-        return window
+
+        // Fallback for iPad split view or other configurations
+        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first {
+            return window
+        }
+
+        // Last resort - create a new window (should never reach here)
+        return UIWindow()
     }
 }
 

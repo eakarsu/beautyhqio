@@ -1,6 +1,7 @@
 import AuthenticationServices
 import CryptoKit
 import Foundation
+import UIKit
 
 /// Manages Sign in with Apple authentication flow
 @MainActor
@@ -175,8 +176,16 @@ extension AppleSignInManager: ASAuthorizationControllerDelegate {
     private func handleError(_ error: Error) {
         isProcessing = false
 
+        // Log the actual error for debugging
+        print("Apple Sign-In Error: \(error)")
+        print("Error domain: \((error as NSError).domain)")
+        print("Error code: \((error as NSError).code)")
+        print("Error description: \(error.localizedDescription)")
+
         if let authError = error as? ASAuthorizationError {
             let code = authError.code
+            print("ASAuthorizationError code: \(code.rawValue)")
+
             if code == .canceled {
                 // User canceled - not an error
                 self.error = nil
@@ -194,11 +203,11 @@ extension AppleSignInManager: ASAuthorizationControllerDelegate {
                 self.error = "Sign in requires user interaction."
                 signInCompletion?(.failure(AppleSignInError.notInteractive))
             } else {
-                self.error = "An unknown error occurred."
+                self.error = "Apple Sign-In error (code \(code.rawValue)): \(error.localizedDescription)"
                 signInCompletion?(.failure(AppleSignInError.unknown))
             }
         } else {
-            self.error = error.localizedDescription
+            self.error = "Sign-In error: \(error.localizedDescription)"
             signInCompletion?(.failure(error))
         }
 
@@ -212,12 +221,22 @@ extension AppleSignInManager: ASAuthorizationControllerPresentationContextProvid
 
     @MainActor
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        // Get the key window from the current scene
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first else {
-            fatalError("No window found for presentation")
+        // Find the active window scene - works on both iPhone and iPad
+        let scenes = UIApplication.shared.connectedScenes
+        let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+            ?? scenes.first as? UIWindowScene
+
+        if let window = windowScene?.windows.first(where: { $0.isKeyWindow }) ?? windowScene?.windows.first {
+            return window
         }
-        return window
+
+        // Fallback for iPad split view or other configurations
+        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first {
+            return window
+        }
+
+        // Last resort - return a new window instead of crashing
+        return UIWindow()
     }
 }
 
