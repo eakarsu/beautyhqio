@@ -34,7 +34,7 @@ enum Config {
     static let tokenCacheKey = "auth_token"
     static let userCacheKey = "current_user"
 
-    // Stripe Configuration
+    // Stripe Configuration (used for web - keeping for reference)
     static let stripePublishableKey: String = {
         #if DEBUG
         return ProcessInfo.processInfo.environment["STRIPE_PUBLISHABLE_KEY"] ?? "pk_test_517dTUvI61ZON1HDDm3DatTWR4BsHImmaWbEynNFMr1HNEFoQSoPF8biwQwYEC4bijPFgKA5TkSHNIJfZSv4a4v1W00HJtHCs2o"
@@ -42,6 +42,20 @@ enum Config {
         return "pk_test_517dTUvI61ZON1HDDm3DatTWR4BsHImmaWbEynNFMr1HNEFoQSoPF8biwQwYEC4bijPFgKA5TkSHNIJfZSv4a4v1W00HJtHCs2o"
         #endif
     }()
+
+    // MARK: - StoreKit / In-App Purchase Configuration
+    // These product IDs must match what you configure in App Store Connect
+    enum StoreKit {
+        static let subscriptionGroupID = "beautyhq_subscriptions"
+
+        // Subscription Product IDs
+        static let growthMonthly = "com.beautyhq.subscription.growth"
+        static let proMonthly = "com.beautyhq.subscription.pro"
+
+        static var allProductIDs: [String] {
+            [growthMonthly, proMonthly]
+        }
+    }
 }
 
 // MARK: - Brand Colors

@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/stripe/stripe-ios",
       "state" : {
-        "revision" : "729265b745b5969ad5fc4805c25f2d37168ca685",
-        "version" : "25.3.1"
+        "revision" : "9937dc7b89c62e7400e602fd61677f6ebb481c17",
+        "version" : "25.6.0"
       }
     }
   ],

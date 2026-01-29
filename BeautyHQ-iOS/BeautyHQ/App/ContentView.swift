@@ -204,7 +204,7 @@ struct ClientAppointmentsView: View {
     @State private var showBookingSheet = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Header
                 HStack {
@@ -738,7 +738,7 @@ struct ClientRescheduleAppointmentView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.lg) {
                     // Current appointment info
@@ -926,7 +926,7 @@ struct ClientPaymentsView: View {
     @State private var methodToDelete: ClientPaymentMethod?
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Header
                 Text("Payments")
@@ -1217,6 +1217,7 @@ struct ClientProfileView: View {
     @State private var errorMessage: String?
     @State private var showingLogoutAlert = false
     @State private var showingDeleteAccountAlert = false
+    @State private var showingSubscription = false
     @State private var showingDeleteConfirmation = false
     @State private var deleteConfirmationText = ""
     @State private var isDeleting = false
@@ -1229,7 +1230,7 @@ struct ClientProfileView: View {
     @State private var hasBirthday = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
                     // Header
@@ -1345,6 +1346,26 @@ struct ClientProfileView: View {
                         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
                         .padding(.horizontal)
 
+                        // My Subscription - For Apple Review access
+                        Button(action: { showingSubscription = true }) {
+                            HStack {
+                                Image(systemName: "crown.fill")
+                                    .foregroundColor(.yellow)
+                                Text("My Subscription")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.softGray)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .foregroundColor(.charcoal)
+                            .background(Color.cardBackground)
+                            .cornerRadius(CornerRadius.md)
+                            .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        }
+                        .padding(.horizontal)
+
                         // Sign Out
                         Button(action: { showingLogoutAlert = true }) {
                             HStack {
@@ -1425,6 +1446,9 @@ struct ClientProfileView: View {
             } message: {
                 Text("This is your final confirmation. Type DELETE to permanently remove your account.")
             }
+            .sheet(isPresented: $showingSubscription) {
+                SubscriptionPurchaseView()
+            }
         }
         .task {
             await loadProfile()
@@ -1484,7 +1508,7 @@ struct ClientRewardsView: View {
     @State private var isRedeeming = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
                     // Header
@@ -1770,7 +1794,7 @@ struct BookAppointmentView: View {
     @State private var bookingSuccess = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Progress indicator (5 steps: Location, Services, Stylist, Date/Time, Confirm)
                 HStack(spacing: 4) {
@@ -2663,7 +2687,7 @@ struct StaffScheduleView: View {
     private let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Header
                 HStack {
@@ -3108,7 +3132,7 @@ struct StaffClientsView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Header
                 Text("My Clients")
@@ -3467,7 +3491,7 @@ struct StaffEarningsView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
                     // Header
@@ -3727,7 +3751,7 @@ struct StaffSettingsView: View {
     @State private var stripeError: String?
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
                     // Header

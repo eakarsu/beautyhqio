@@ -11,6 +11,10 @@ struct BillingView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
+                    // Apple Subscription Notice
+                    AppleSubscriptionNotice()
+                        .padding(.horizontal, Spacing.lg)
+
                     // Security Notice
                     SecurityNoticeCard()
                         .padding(.horizontal, Spacing.lg)
@@ -588,6 +592,67 @@ class AddPaymentMethodViewModel: ObservableObject {
             self.error = "Failed to add card: \(error.localizedDescription)"
             isLoading = false
             return false
+        }
+    }
+}
+
+// MARK: - Apple Subscription Notice
+struct AppleSubscriptionNotice: View {
+    @StateObject private var storeManager = StoreKitManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack(spacing: Spacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.15))
+                        .frame(width: 50, height: 50)
+
+                    Image(systemName: "apple.logo")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.blue)
+                }
+
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text("Subscription Billing")
+                        .font(.appHeadline)
+                        .foregroundColor(.charcoal)
+
+                    if storeManager.hasActiveSubscription,
+                       let plan = storeManager.currentPlan {
+                        Text("Current plan: \(plan.displayName)")
+                            .font(.appCaption)
+                            .foregroundColor(.success)
+                    } else {
+                        Text("Managed by Apple")
+                            .font(.appCaption)
+                            .foregroundColor(.softGray)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.softGray)
+            }
+
+            Text("Your subscription is billed through Apple. Manage or cancel in Settings > Apple ID > Subscriptions.")
+                .font(.appCaption)
+                .foregroundColor(.softGray)
+        }
+        .padding(Spacing.md)
+        .background(Color.blue.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.md)
+                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+        )
+        .onTapGesture {
+            // Open subscription management in Settings
+            if let url = URL(string: "itms-apps://apps.apple.com/account/subscriptions") {
+                UIApplication.shared.open(url)
+            }
         }
     }
 }

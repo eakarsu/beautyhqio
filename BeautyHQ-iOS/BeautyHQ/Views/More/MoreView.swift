@@ -108,7 +108,7 @@ struct MoreView: View {
                             NavigationLink {
                                 SubscriptionsView()
                             } label: {
-                                MoreMenuItem(icon: "rectangle.stack.fill", title: "Subscriptions", gradient: .deepRoseGradient)
+                                MoreMenuItem(icon: "rectangle.stack.fill", title: "All Subscriptions", gradient: .deepRoseGradient)
                             }
 
                             NavigationLink {
@@ -147,6 +147,13 @@ struct MoreView: View {
 
                     // Settings - available to all
                     MoreSection(title: "Account") {
+                        // My Subscription - available to ALL users so Apple reviewers can access
+                        Button {
+                            showingSubscription = true
+                        } label: {
+                            MoreMenuItem(icon: "crown.fill", title: "My Subscription", gradient: .goldGradient)
+                        }
+
                         NavigationLink {
                             SettingsView()
                         } label: {
@@ -178,10 +185,14 @@ struct MoreView: View {
             } message: {
                 Text("Are you sure you want to sign out?")
             }
+            .sheet(isPresented: $showingSubscription) {
+                SubscriptionPurchaseView()
+            }
         }
     }
 
     @State private var showingLogoutAlert = false
+    @State private var showingSubscription = false
 }
 
 struct MoreSection<Content: View>: View {

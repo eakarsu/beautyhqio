@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9775CB322F2B8AB7002DAA16 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9775CB312F2B8AB7002DAA16 /* StoreKitManager.swift */; };
+		9775CB342F2B8AD4002DAA16 /* SubscriptionPurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9775CB332F2B8AD4002DAA16 /* SubscriptionPurchaseView.swift */; };
 		978EC1822F01A3BB00E2D3CE /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = 978EC1812F01A3BB00E2D3CE /* StripePaymentSheet */; };
 		F001000001 /* BeautyHQApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000001 /* BeautyHQApp.swift */; };
 		F001000002 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002000002 /* Config.swift */; };
@@ -73,6 +75,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		9775CB312F2B8AB7002DAA16 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
+		9775CB332F2B8AD4002DAA16 /* SubscriptionPurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionPurchaseView.swift; sourceTree = "<group>"; };
 		F002000000 /* BeautyHQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeautyHQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F002000001 /* BeautyHQApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautyHQApp.swift; sourceTree = "<group>"; };
 		F002000002 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
@@ -209,6 +213,7 @@
 		F004000006 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				9775CB312F2B8AB7002DAA16 /* StoreKitManager.swift */,
 				F002000012 /* APIClient.swift */,
 				F002000059 /* AppleSignInManager.swift */,
 				F002000013 /* AppointmentService.swift */,
@@ -462,6 +467,7 @@
 		F004000032 /* Subscriptions */ = {
 			isa = PBXGroup;
 			children = (
+				9775CB332F2B8AD4002DAA16 /* SubscriptionPurchaseView.swift */,
 				F002000055 /* SubscriptionsView.swift */,
 			);
 			path = Subscriptions;
@@ -549,6 +555,7 @@
 				F001000002 /* Config.swift in Sources */,
 				F001000003 /* ContentView.swift in Sources */,
 				F001000004 /* Appointment.swift in Sources */,
+				9775CB342F2B8AD4002DAA16 /* SubscriptionPurchaseView.swift in Sources */,
 				F001000005 /* Business.swift in Sources */,
 				F001000006 /* Client.swift in Sources */,
 				F001000007 /* Dashboard.swift in Sources */,
@@ -585,6 +592,7 @@
 				F001000041 /* ServicesView.swift in Sources */,
 				F001000042 /* StaffView.swift in Sources */,
 				F001000043 /* ProductsView.swift in Sources */,
+				9775CB322F2B8AB7002DAA16 /* StoreKitManager.swift in Sources */,
 				F001000044 /* LoyaltyView.swift in Sources */,
 				F001000045 /* GiftCardsView.swift in Sources */,
 				F001000046 /* BillingView.swift in Sources */,
