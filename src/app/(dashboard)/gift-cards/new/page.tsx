@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,11 +58,11 @@ export default function NewGiftCardPage() {
         router.push("/gift-cards");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to create gift card");
+        toast({ title: "Error", description: error.error || "Failed to create gift card", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating gift card:", error);
-      alert("Failed to create gift card");
+      toast({ title: "Error", description: "Failed to create gift card", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

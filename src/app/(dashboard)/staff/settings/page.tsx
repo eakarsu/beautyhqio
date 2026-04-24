@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +66,9 @@ export default function MySettingsPage() {
   const [isConnectingStripe, setIsConnectingStripe] = useState(false);
   const [showBankForm, setShowBankForm] = useState(false);
   const [isSavingBank, setIsSavingBank] = useState(false);
+  const [confirmDisconnectStripeOpen, setConfirmDisconnectStripeOpen] = useState(false);
+  const [confirmRemoveBankOpen, setConfirmRemoveBankOpen] = useState(false);
+
   const [bankFormData, setBankFormData] = useState({
     bankAccountHolder: "",
     bankName: "",
@@ -175,7 +180,6 @@ export default function MySettingsPage() {
   };
 
   const handleDisconnectStripe = async () => {
-    if (!confirm("Are you sure you want to disconnect your Stripe account?")) return;
     try {
       const response = await fetch("/api/staff/me/stripe-connect", {
         method: "DELETE",
@@ -219,7 +223,6 @@ export default function MySettingsPage() {
   };
 
   const handleRemoveBankAccount = async () => {
-    if (!confirm("Are you sure you want to remove your bank account?")) return;
     try {
       const response = await fetch("/api/staff/me/payout-settings", {
         method: "DELETE",
@@ -419,7 +422,7 @@ export default function MySettingsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleDisconnectStripe}
+                      onClick={() => setConfirmDisconnectStripeOpen(true)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       Disconnect
@@ -472,7 +475,7 @@ export default function MySettingsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={handleRemoveBankAccount}
+                          onClick={() => setConfirmRemoveBankOpen(true)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -596,6 +599,32 @@ export default function MySettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDisconnectStripeOpen}
+        onConfirm={() => {
+          setConfirmDisconnectStripeOpen(false);
+          handleDisconnectStripe();
+        }}
+        onCancel={() => setConfirmDisconnectStripeOpen(false)}
+        title="Disconnect Stripe"
+        description="Are you sure you want to disconnect your Stripe account?"
+        confirmLabel="Disconnect"
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={confirmRemoveBankOpen}
+        onConfirm={() => {
+          setConfirmRemoveBankOpen(false);
+          handleRemoveBankAccount();
+        }}
+        onCancel={() => setConfirmRemoveBankOpen(false)}
+        title="Remove Bank Account"
+        description="Are you sure you want to remove your bank account?"
+        confirmLabel="Remove"
+        variant="destructive"
+      />
     </div>
   );
 }

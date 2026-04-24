@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,11 +70,11 @@ export default function EditCampaignPage() {
         router.push(`/marketing/campaigns/${params.id}`);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to update campaign");
+        toast({ title: "Error", description: error.error || "Failed to update campaign", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error updating campaign:", error);
-      alert("Failed to update campaign");
+      toast({ title: "Error", description: "Failed to update campaign", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
 import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
@@ -38,6 +40,7 @@ export default function PaymentMethodsPage() {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"methods" | "history">("methods");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "authenticated" && !session?.user?.isClient) {
@@ -131,7 +134,6 @@ export default function PaymentMethodsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this card?")) return;
     try {
       await fetch(`/api/client/payment-methods/${id}`, {
         method: "DELETE",
@@ -301,7 +303,7 @@ export default function PaymentMethodsPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => handleDelete(method.id)}
+                    onClick={() => setConfirmDeleteId(method.id)}
                     className="p-2 text-slate-400 hover:text-red-600 transition-colors"
                     title="Remove card"
                   >
@@ -386,6 +388,19 @@ export default function PaymentMethodsPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onConfirm={() => {
+          if (confirmDeleteId) handleDelete(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+        title="Remove Card"
+        description="Are you sure you want to remove this card?"
+        confirmLabel="Remove"
+        variant="destructive"
+      />
     </div>
   );
 }

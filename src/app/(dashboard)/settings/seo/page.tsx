@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,7 @@ export default function SEOSettingsPage() {
     // Simulate save
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setIsSaving(false);
-    alert("SEO settings saved!");
+    toast({ title: "Success", description: "SEO settings saved!" });
   };
 
   const seoScore = 85;

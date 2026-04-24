@@ -1,0 +1,218 @@
+ Complete Guide: Publishing iOS App to Apple App Store
+
+  Prerequisites Checklist
+
+  | Requirement                        | Status           |
+  |------------------------------------|------------------|
+  | Apple Developer Account ($99/year) | Required         |
+  | Xcode installed                    | ✅ You have it   |
+  | App icons (all sizes)              | Need to verify   |
+  | App builds successfully            | ✅ Confirmed     |
+  | Unique Bundle ID                   | com.beautyhq.app |
+
+  ---
+  Step 1: Apple Developer Program
+
+  1. Go to https://developer.apple.com/programs
+  2. Click Enroll
+  3. Sign in with your Apple ID
+  4. Pay $99/year fee
+  5. Wait for approval (usually 24-48 hours)
+
+  ---
+  Step 2: App Store Connect Setup
+
+  2.1 Create App Record
+
+  1. Go to https://appstoreconnect.apple.com
+  2. Click My Apps → + → New App
+  3. Fill in:
+    - Platform: iOS
+    - Name: BeautyHQ
+    - Primary Language: English
+    - Bundle ID: com.beautyhq.app
+    - SKU: beautyhq-ios-001 (unique identifier)
+
+  2.2 App Information Required
+
+  App Name:           BeautyHQ
+  Subtitle:           Salon & Spa Management
+  Category:           Business
+  Secondary Category: Lifestyle
+  Privacy Policy URL: https://beautyhq.io/privacy
+  Support URL:        https://beautyhq.io/support
+
+  2.3 Prepare App Store Assets
+
+  | Asset              | Size         | Notes                               |
+  |--------------------|--------------|-------------------------------------|
+  | App Icon           | 1024x1024 px | No transparency, no rounded corners |
+  | iPhone Screenshots | 1290x2796 px | 6.7" display (iPhone 15 Pro Max)    |
+  | iPhone Screenshots | 1179x2556 px | 6.1" display (iPhone 15 Pro)        |
+  | iPad Screenshots   | 2048x2732 px | 12.9" iPad Pro                      |
+
+  You need 3-10 screenshots per device size
+
+  ---
+  Step 3: Certificates & Provisioning (Xcode)
+
+  3.1 Automatic Signing (Easiest)
+
+  1. Open BeautyHQ.xcodeproj in Xcode
+  2. Select BeautyHQ target
+  3. Go to Signing & Capabilities tab
+  4. Check Automatically manage signing
+  5. Select your Team (your Apple Developer account)
+
+  3.2 Verify Bundle ID
+
+  Bundle Identifier: com.beautyhq.app
+
+  ---
+  Step 4: Prepare App for Release
+
+  4.1 Update Version Number
+
+  In Xcode, select the target → General tab:
+  Version: 1.0.0
+  Build: 1
+
+  4.2 Set Release Configuration
+
+  1. Product → Scheme → Edit Scheme
+  2. Select Archive on the left
+  3. Set Build Configuration to Release
+
+  4.3 Verify App Icons
+
+  Check BeautyHQ/Assets.xcassets/AppIcon:
+
+⏺ Bash(ls -la
+      /Users/erolakarsu/projects/beauty-wellness-ai/BeautyHQ-iOS/BeautyHQ/Assets.xcassets/AppIcon.appiconset/
+      2>/dev/null || echo "AppIcon folder not found")
+  ⎿  total 8
+     drwxr-xr-x@ 3 erolakarsu  staff   96 Dec 27 12:50 .
+     drwxr-xr-x@ 5 erolakarsu  staff  160 Dec 27 12:50 ..
+     -rw-------@ 1 erolakarsu  staff  177 Dec 27 12:50 Contents.json
+
+⏺ ⚠️ Missing App Icons! You need to add icon images.
+
+⏺ Read(BeautyHQ-iOS/BeautyHQ/Assets.xcassets/AppIcon.appiconset/Contents.json)
+  ⎿  Read 14 lines
+
+⏺ ⚠️ Action Required: Add App Icon
+
+  You need a 1024x1024 PNG app icon. Create one and add it:
+
+  1. Create/design a 1024x1024px PNG icon (no transparency)
+  2. In Xcode, open Assets.xcassets → AppIcon
+  3. Drag your icon into the slot
+
+  ---
+  Step 5: Archive & Upload
+
+  5.1 Create Archive
+
+  # In Xcode:
+  # 1. Select "Any iOS Device (arm64)" as destination
+  # 2. Product → Archive
+  # 3. Wait for build to complete
+
+  Or via command line:
+  cd /Users/erolakarsu/projects/beauty-wellness-ai/BeautyHQ-iOS
+  xcodebuild -scheme BeautyHQ -configuration Release -destination 'generic/platform=iOS' archive -archivePath ./build/BeautyHQ.xcarchive
+
+  5.2 Upload to App Store Connect
+
+  Option A: Xcode Organizer (Recommended)
+  1. After archiving, Organizer window opens automatically
+  2. Select your archive
+  3. Click Distribute App
+  4. Choose App Store Connect
+  5. Click Upload
+  6. Wait for processing
+
+  Option B: Command Line
+  xcodebuild -exportArchive \
+    -archivePath ./build/BeautyHQ.xcarchive \
+    -exportPath ./build/export \
+    -exportOptionsPlist ExportOptions.plist
+
+  ---
+  Step 6: App Store Connect Submission
+
+  6.1 Complete App Information
+
+  1. Go to App Store Connect → Your App
+  2. Fill in all sections:
+
+  Version Information:
+  What's New:     Initial release of BeautyHQ - your complete salon management solution
+  Description:    BeautyHQ is the all-in-one salon and spa management platform...
+  Keywords:       salon, spa, booking, appointments, beauty, wellness, scheduling
+  Support URL:    https://beautyhq.io/support
+  Marketing URL:  https://beautyhq.io
+
+  App Review Information:
+  Contact Name:   Your Name
+  Contact Phone:  Your Phone
+  Contact Email:  your@email.com
+  Demo Account:   (provide test login credentials)
+  Notes:          Any special instructions for reviewers
+
+  6.2 Upload Screenshots
+
+  - Add screenshots for each device size
+  - Use iPhone 15 Pro Max simulator for best quality
+
+  6.3 Select Build
+
+  1. In App Store Connect, go to your app version
+  2. Under Build, click +
+  3. Select your uploaded build
+
+  6.4 Submit for Review
+
+  1. Complete all required fields (check for red exclamation marks)
+  2. Click Add for Review
+  3. Click Submit to App Review
+
+  ---
+  Step 7: App Review Process
+
+  | Timeline     | Stage                 |
+  |--------------|-----------------------|
+  | 24-48 hours  | Initial review        |
+  | 1-3 days     | Average approval time |
+  | Up to 7 days | If issues found       |
+
+  Common Rejection Reasons to Avoid:
+
+  - ❌ Crashes or bugs
+  - ❌ Incomplete features (placeholder content)
+  - ❌ Missing privacy policy
+  - ❌ Login required without demo account
+  - ❌ Missing app icon
+
+  ---
+  Quick Checklist Before Submitting
+
+  [ ] Apple Developer membership active ($99/year)
+  [ ] App icon 1024x1024 added
+  [ ] Screenshots prepared (all device sizes)
+  [ ] Privacy Policy URL live
+  [ ] Version/Build numbers set
+  [ ] Release build configuration
+  [ ] Test on real device
+  [ ] Demo login credentials ready for reviewers
+  [ ] App description & keywords written
+
+  ---
+  Need Help With Any Step?
+
+  Let me know which step you're on and I can help with specifics:
+  1. Creating app icons
+  2. Taking screenshots
+  3. Writing app description
+  4. Fixing archive/upload issues
+  5. Preparing demo account for reviewers

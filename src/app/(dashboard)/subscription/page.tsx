@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -107,7 +108,7 @@ export default function MySubscriptionPage() {
 
   const handleUpgrade = async (plan: string) => {
     // In real app, this would redirect to Stripe checkout
-    alert(`Upgrade to ${plan} - Stripe checkout would open here`);
+    toast({ title: "Success", description: `Upgrade to ${plan} - Stripe checkout would open here` });
   };
 
   if (status === "loading" || loading) {

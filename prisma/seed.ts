@@ -1556,6 +1556,222 @@ async function main() {
   }
   console.log("Created Sales CRM leads:", salesLeads.length);
 
+  // ============ STAFF SCHEDULES ============
+  let scheduleCount = 0;
+  for (const staff of staffMembers) {
+    for (let day = 0; day < 7; day++) {
+      const isWeekend = day === 0 || day === 6;
+      await prisma.staffSchedule.create({
+        data: {
+          staffId: staff.id,
+          dayOfWeek: day,
+          startTime: isWeekend ? "10:00" : "09:00",
+          endTime: isWeekend ? "17:00" : "18:00",
+          isWorking: day !== 0, // Sunday off
+        },
+      });
+      scheduleCount++;
+    }
+  }
+  console.log("Created staff schedules:", scheduleCount);
+
+  // ============ TIME OFF ============
+  const timeOffData = [
+    { staffId: staffMembers[0].id, type: "vacation", startDate: new Date(Date.now() + 14 * 86400000), endDate: new Date(Date.now() + 21 * 86400000), notes: "Annual vacation - Hawaii trip", status: "approved" },
+    { staffId: staffMembers[0].id, type: "personal", startDate: new Date(Date.now() + 45 * 86400000), endDate: new Date(Date.now() + 45 * 86400000), notes: "Doctor appointment", status: "approved" },
+    { staffId: staffMembers[1].id, type: "sick", startDate: new Date(Date.now() - 3 * 86400000), endDate: new Date(Date.now() - 2 * 86400000), notes: "Flu - called in sick", status: "approved" },
+    { staffId: staffMembers[1].id, type: "training", startDate: new Date(Date.now() + 30 * 86400000), endDate: new Date(Date.now() + 31 * 86400000), notes: "Advanced coloring techniques workshop", status: "approved" },
+    { staffId: staffMembers[2].id, type: "vacation", startDate: new Date(Date.now() + 60 * 86400000), endDate: new Date(Date.now() + 67 * 86400000), notes: "Family reunion", status: "pending" },
+    { staffId: staffMembers[2].id, type: "personal", startDate: new Date(Date.now() + 10 * 86400000), endDate: new Date(Date.now() + 10 * 86400000), notes: "Moving day", status: "approved" },
+    { staffId: staffMembers[3].id, type: "training", startDate: new Date(Date.now() + 20 * 86400000), endDate: new Date(Date.now() + 22 * 86400000), notes: "Nail art masterclass", status: "approved" },
+    { staffId: staffMembers[3].id, type: "sick", startDate: new Date(Date.now() - 10 * 86400000), endDate: new Date(Date.now() - 9 * 86400000), notes: "Migraine", status: "approved" },
+    { staffId: staffMembers[4].id, type: "vacation", startDate: new Date(Date.now() + 90 * 86400000), endDate: new Date(Date.now() + 97 * 86400000), notes: "Summer vacation", status: "pending" },
+    { staffId: staffMembers[4].id, type: "personal", startDate: new Date(Date.now() + 5 * 86400000), endDate: new Date(Date.now() + 5 * 86400000), notes: "Wedding anniversary", status: "approved" },
+  ];
+  for (const timeOff of timeOffData) {
+    await prisma.timeOff.create({ data: timeOff });
+  }
+  console.log("Created time off records:", timeOffData.length);
+
+  // ============ CLIENT NOTES ============
+  const clientNotesData = [
+    { clientId: clients[0].id, content: "Prefers organic products only. Sensitive scalp.", isPinned: true, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[0].id, content: "Interested in trying balayage next visit.", isPinned: false, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[1].id, content: "Allergic to ammonia-based dyes. Use ammonia-free alternatives.", isPinned: true, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[2].id, content: "Birthday coming up next month - consider offering special discount.", isPinned: false, isPrivate: true, createdById: adminUser.id },
+    { clientId: clients[3].id, content: "Referred by client Jessica M. Send thank-you note.", isPinned: false, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[4].id, content: "Requested the same stylist (Sarah) every visit.", isPinned: true, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[5].id, content: "Chronic dry scalp - recommend moisturizing treatment series.", isPinned: false, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[6].id, content: "VIP client - always offer complimentary beverage.", isPinned: true, isPrivate: true, createdById: adminUser.id },
+    { clientId: clients[7].id, content: "Prefers appointments before 10am on weekdays.", isPinned: false, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[8].id, content: "Has a gift card balance - remind at next checkout.", isPinned: false, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[9].id, content: "Interested in monthly membership package.", isPinned: false, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[10].id, content: "Color formula: 6N + 7G (50/50 mix), 20 vol developer.", isPinned: true, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[11].id, content: "Tends to run 10 minutes late - schedule buffer.", isPinned: false, isPrivate: true, createdById: adminUser.id },
+    { clientId: clients[12].id, content: "Purchased styling products last visit - follow up on satisfaction.", isPinned: false, isPrivate: false, createdById: adminUser.id },
+    { clientId: clients[13].id, content: "Wedding scheduled for June - book full bridal party package.", isPinned: true, isPrivate: false, createdById: adminUser.id },
+  ];
+  for (const note of clientNotesData) {
+    await prisma.clientNote.create({ data: note });
+  }
+  console.log("Created client notes:", clientNotesData.length);
+
+  // ============ CLIENT PREFERENCES ============
+  const clientPreferencesData = [
+    { clientId: clients[0].id, category: "stylist", value: "Sarah Johnson", notes: "Has been seeing Sarah for 2 years" },
+    { clientId: clients[0].id, category: "beverage", value: "Green tea", notes: "No sugar" },
+    { clientId: clients[1].id, category: "music", value: "Jazz", notes: "Relaxing instrumental" },
+    { clientId: clients[1].id, category: "products", value: "Olaplex", notes: "Uses full Olaplex line at home" },
+    { clientId: clients[2].id, category: "communication", value: "Text only", notes: "Do not call" },
+    { clientId: clients[3].id, category: "stylist", value: "Ashley Brown", notes: "Prefers Ashley for color services" },
+    { clientId: clients[3].id, category: "beverage", value: "Sparkling water", notes: "With lemon" },
+    { clientId: clients[4].id, category: "products", value: "Moroccan Oil", notes: "Buys the argan oil treatment" },
+    { clientId: clients[5].id, category: "communication", value: "Email", notes: "Prefers email for appointment reminders" },
+    { clientId: clients[6].id, category: "music", value: "Pop", notes: "Current hits" },
+    { clientId: clients[7].id, category: "stylist", value: "Michelle Lee", notes: "Only sees Michelle for nails" },
+    { clientId: clients[8].id, category: "beverage", value: "Cappuccino", notes: "Extra foam" },
+    { clientId: clients[9].id, category: "products", value: "Kevin Murphy", notes: "Interested in trying new products" },
+    { clientId: clients[10].id, category: "communication", value: "SMS + Email", notes: "Both channels OK" },
+    { clientId: clients[11].id, category: "beverage", value: "Still water", notes: "Room temperature" },
+  ];
+  for (const pref of clientPreferencesData) {
+    await prisma.clientPreference.create({ data: pref });
+  }
+  console.log("Created client preferences:", clientPreferencesData.length);
+
+  // ============ WAITLIST ENTRIES ============
+  const waitlistStatuses = ["WAITING", "NOTIFIED", "SEATED", "LEFT", "CANCELLED"] as const;
+  const waitlistData = [
+    { clientId: clients[0].id, locationId: locations[0].id, position: 1, estimatedWait: 15, status: "WAITING" as const, serviceNotes: "Haircut and style", estimatedDuration: 45, phone: "5551001001" },
+    { clientId: clients[1].id, locationId: locations[0].id, position: 2, estimatedWait: 30, status: "WAITING" as const, serviceNotes: "Color touch-up", estimatedDuration: 60, phone: "5551001002" },
+    { clientId: clients[2].id, locationId: locations[0].id, position: 3, estimatedWait: 45, status: "NOTIFIED" as const, serviceNotes: "Blowout", estimatedDuration: 30, phone: "5551001003", notificationSent: true },
+    { clientId: clients[3].id, locationId: locations[0].id, position: 4, estimatedWait: 60, status: "WAITING" as const, serviceNotes: "Full highlights", estimatedDuration: 120, phone: "5551001004" },
+    { clientId: clients[4].id, locationId: locations[0].id, position: 5, estimatedWait: 20, status: "SEATED" as const, serviceNotes: "Beard trim", estimatedDuration: 20, phone: "5551001005", seatedAt: new Date() },
+    { clientId: clients[5].id, locationId: locations[1].id, position: 1, estimatedWait: 10, status: "WAITING" as const, serviceNotes: "Express manicure", estimatedDuration: 25, phone: "5551001006" },
+    { clientId: clients[6].id, locationId: locations[1].id, position: 2, estimatedWait: 25, status: "WAITING" as const, serviceNotes: "Gel nails", estimatedDuration: 45, phone: "5551001007" },
+    { clientId: clients[7].id, locationId: locations[0].id, position: 6, estimatedWait: 75, status: "NO_SHOW" as const, serviceNotes: "Deep conditioning", estimatedDuration: 40, phone: "5551001008", leftAt: new Date() },
+    { clientId: clients[8].id, locationId: locations[0].id, position: 7, estimatedWait: 35, status: "SEATED" as const, serviceNotes: "Men's haircut", estimatedDuration: 30, phone: "5551001009", seatedAt: new Date(Date.now() - 15 * 60000) },
+    { clientId: clients[9].id, locationId: locations[0].id, position: 8, estimatedWait: 50, status: "LEFT" as const, serviceNotes: "Updo styling", estimatedDuration: 60, phone: "5551001010", leftAt: new Date(Date.now() - 30 * 60000) },
+    { clientId: clients[10].id, locationId: locations[1].id, position: 3, estimatedWait: 40, status: "NOTIFIED" as const, serviceNotes: "Facial treatment", estimatedDuration: 50, phone: "5551001011", notificationSent: true },
+    { clientId: clients[11].id, locationId: locations[0].id, position: 9, estimatedWait: 55, status: "WAITING" as const, serviceNotes: "Keratin treatment", estimatedDuration: 90, phone: "5551001012" },
+    { clientId: clients[12].id, locationId: locations[1].id, position: 4, estimatedWait: 30, status: "WAITING" as const, serviceNotes: "Pedicure", estimatedDuration: 45, phone: "5551001013" },
+    { clientId: clients[13].id, locationId: locations[0].id, position: 10, estimatedWait: 65, status: "WAITING" as const, serviceNotes: "Balayage", estimatedDuration: 150, phone: "5551001014" },
+    { clientId: clients[14].id, locationId: locations[0].id, position: 11, estimatedWait: 40, status: "SEATED" as const, serviceNotes: "Trim and layers", estimatedDuration: 35, phone: "5551001015", seatedAt: new Date(Date.now() - 10 * 60000) },
+  ];
+  for (const entry of waitlistData) {
+    await prisma.waitlistEntry.create({ data: entry });
+  }
+  console.log("Created waitlist entries:", waitlistData.length);
+
+  // ============ COMMISSIONS ============
+  const allTransactions = await prisma.transaction.findMany({ take: 15 });
+  let commissionCount = 0;
+  for (let i = 0; i < Math.min(15, allTransactions.length); i++) {
+    const txn = allTransactions[i];
+    const staff = staffMembers[i % staffMembers.length];
+    const baseAmount = Number(txn.totalAmount);
+    const rate = [0.30, 0.35, 0.40, 0.45, 0.50][i % 5];
+    const amount = Math.round(baseAmount * rate * 100) / 100;
+    await prisma.commission.create({
+      data: {
+        staff: { connect: { id: staff.id } },
+        transaction: { connect: { id: txn.id } },
+        amount: amount,
+        type: i % 3 === 0 ? "SERVICE" : i % 3 === 1 ? "PRODUCT" : "TIP",
+        rate: rate,
+        baseAmount: baseAmount,
+      },
+    });
+    commissionCount++;
+  }
+  console.log("Created commissions:", commissionCount);
+
+  // ============ PACKAGES ============
+  const packagesData = [
+    { name: "Hair Care Essentials", description: "3 haircuts + 1 deep conditioning treatment", price: 180, originalValue: 220, savingsAmount: 40, savingsPercent: 18.18, validityDays: 180, isPopular: true },
+    { name: "Color Lover Package", description: "4 color touch-ups throughout the year", price: 320, originalValue: 400, savingsAmount: 80, savingsPercent: 20, validityDays: 365, isPopular: true },
+    { name: "Bridal Bliss", description: "Trial + wedding day hair & makeup for bride", price: 450, originalValue: 550, savingsAmount: 100, savingsPercent: 18.18, validityDays: 90, isPopular: false },
+    { name: "Monthly Maintenance", description: "1 haircut + 1 style per month for 6 months", price: 480, originalValue: 600, savingsAmount: 120, savingsPercent: 20, validityDays: 180, isPopular: true },
+    { name: "Nail Art Lover", description: "6 gel manicures with art design", price: 270, originalValue: 330, savingsAmount: 60, savingsPercent: 18.18, validityDays: 180, isPopular: false },
+    { name: "Spa Day Retreat", description: "Facial + massage + mani/pedi combo", price: 200, originalValue: 260, savingsAmount: 60, savingsPercent: 23.08, validityDays: 90, isPopular: false },
+    { name: "Men's Grooming Club", description: "6 haircuts + 3 beard trims", price: 195, originalValue: 240, savingsAmount: 45, savingsPercent: 18.75, validityDays: 180, isPopular: true },
+    { name: "Highlights Special", description: "2 full highlight sessions", price: 280, originalValue: 350, savingsAmount: 70, savingsPercent: 20, validityDays: 180, isPopular: false },
+    { name: "Kids Cuts Bundle", description: "5 children's haircuts", price: 100, originalValue: 125, savingsAmount: 25, savingsPercent: 20, validityDays: 365, isPopular: false },
+    { name: "Keratin Smooth", description: "2 keratin treatments + maintenance products", price: 400, originalValue: 500, savingsAmount: 100, savingsPercent: 20, validityDays: 365, isPopular: false },
+    { name: "Blowout Pass", description: "10 blowout sessions", price: 300, originalValue: 400, savingsAmount: 100, savingsPercent: 25, validityDays: 180, isPopular: true },
+    { name: "Skin Glow Package", description: "4 facials + 1 chemical peel", price: 350, originalValue: 450, savingsAmount: 100, savingsPercent: 22.22, validityDays: 180, isPopular: false },
+    { name: "Lash & Brow Bundle", description: "3 lash lifts + 3 brow shaping sessions", price: 240, originalValue: 300, savingsAmount: 60, savingsPercent: 20, validityDays: 180, isPopular: false },
+    { name: "Pedicure Perfection", description: "6 luxury pedicure sessions", price: 270, originalValue: 330, savingsAmount: 60, savingsPercent: 18.18, validityDays: 180, isPopular: false },
+    { name: "Ultimate VIP", description: "Monthly haircut, color, facial & mani for 3 months", price: 900, originalValue: 1200, savingsAmount: 300, savingsPercent: 25, validityDays: 90, isPopular: true },
+  ];
+  for (const pkg of packagesData) {
+    await prisma.package.create({
+      data: {
+        businessId: business.id,
+        ...pkg,
+      },
+    });
+  }
+  console.log("Created packages:", packagesData.length);
+
+  // ============ FAMILY GROUPS ============
+  const familyGroupsData = [
+    { name: "The Johnson Family", members: [
+      { clientIndex: 0, relationship: "Mother" },
+      { clientIndex: 1, relationship: "Daughter" },
+      { clientIndex: 2, relationship: "Daughter" },
+    ]},
+    { name: "The Smith Family", members: [
+      { clientIndex: 3, relationship: "Wife" },
+      { clientIndex: 4, relationship: "Husband" },
+    ]},
+    { name: "The Garcia Family", members: [
+      { clientIndex: 5, relationship: "Mother" },
+      { clientIndex: 6, relationship: "Son" },
+      { clientIndex: 7, relationship: "Daughter" },
+      { clientIndex: 8, relationship: "Father" },
+    ]},
+    { name: "The Williams Family", members: [
+      { clientIndex: 9, relationship: "Sister" },
+      { clientIndex: 10, relationship: "Sister" },
+    ]},
+    { name: "The Brown Family", members: [
+      { clientIndex: 11, relationship: "Mother" },
+      { clientIndex: 12, relationship: "Daughter" },
+      { clientIndex: 13, relationship: "Grandmother" },
+    ]},
+  ];
+  let familyCount = 0;
+  for (const familyData of familyGroupsData) {
+    const family = await prisma.familyGroup.create({
+      data: {
+        name: familyData.name,
+        primaryContactId: clients[familyData.members[0].clientIndex].id,
+      },
+    });
+    for (const member of familyData.members) {
+      await prisma.familyMember.create({
+        data: {
+          familyId: family.id,
+          clientId: clients[member.clientIndex].id,
+          relationship: member.relationship,
+        },
+      });
+    }
+    familyCount++;
+  }
+  console.log("Created family groups:", familyCount);
+
+  console.log("\n--- Additional Seed Data ---");
+  console.log(`   - Staff Schedules: ${scheduleCount}`);
+  console.log(`   - Time Off: ${timeOffData.length}`);
+  console.log(`   - Client Notes: ${clientNotesData.length}`);
+  console.log(`   - Client Preferences: ${clientPreferencesData.length}`);
+  console.log(`   - Waitlist Entries: ${waitlistData.length}`);
+  console.log(`   - Commissions: ${commissionCount}`);
+  console.log(`   - Packages: ${packagesData.length}`);
+  console.log(`   - Family Groups: ${familyCount}`);
+
   console.log(`   - Appointments: 110+ (18 per staff member + extras)`);
   console.log(`   - Sales: 50 transactions`);
   console.log(`   - Gift Cards: ${giftCardCodes.length} (25 gift cards)`);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -71,7 +72,7 @@ export default function KioskPage() {
         setConfirmedName("");
       }, 5000);
     } catch (error) {
-      alert("Failed to check in");
+      toast({ title: "Error", description: "Failed to check in", variant: "destructive" });
     }
   };
 

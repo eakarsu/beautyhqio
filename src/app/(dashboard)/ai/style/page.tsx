@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -388,10 +389,10 @@ export default function StyleRecommenderPage() {
                             const newSaved = new Set(prev);
                             if (newSaved.has(rec.id)) {
                               newSaved.delete(rec.id);
-                              alert(`"${rec.name}" removed from saved styles`);
+                              toast({ title: "Success", description: `"${rec.name}" removed from saved styles` });
                             } else {
                               newSaved.add(rec.id);
-                              alert(`"${rec.name}" saved to your collection!`);
+                              toast({ title: "Success", description: `"${rec.name}" saved to your collection!` });
                             }
                             return newSaved;
                           });
@@ -410,7 +411,7 @@ export default function StyleRecommenderPage() {
                             navigator.share({ title: rec.name, text: shareText });
                           } else {
                             navigator.clipboard.writeText(shareText);
-                            alert('Style copied to clipboard!');
+                            toast({ title: "Success", description: "Style copied to clipboard!" });
                           }
                         }}
                       >

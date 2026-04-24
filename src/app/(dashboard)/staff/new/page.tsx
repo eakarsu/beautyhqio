@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -84,11 +85,11 @@ export default function NewStaffPage() {
         router.push("/staff");
       } else {
         const error = await staffResponse.json();
-        alert(error.error || "Failed to create staff member");
+        toast({ title: "Error", description: error.error || "Failed to create staff member", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating staff:", error);
-      alert("Failed to create staff member");
+      toast({ title: "Error", description: "Failed to create staff member", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

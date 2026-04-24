@@ -16,6 +16,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { formatCurrency, getInitials } from "@/lib/utils";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface Staff {
   id: string;
@@ -36,6 +39,8 @@ export default function StaffPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
@@ -47,11 +52,11 @@ export default function StaffPage() {
         fetchStaff();
         setDeleteId(null);
       } else {
-        alert("Failed to delete staff member");
+        toast({ title: "Error", description: "Failed to delete staff member", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting staff:", error);
-      alert("Failed to delete staff member");
+      toast({ title: "Error", description: "Failed to delete staff member", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -169,7 +174,7 @@ export default function StaffPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {staff.map((member) => (
-            <Card key={member.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push(`/staff/${member.id}`)}>
+            <Card key={member.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedStaff(member)}>
               <div
                 className="h-2"
                 style={{ backgroundColor: member.color || "#94a3b8" }}
@@ -235,6 +240,66 @@ export default function StaffPage() {
           ))}
         </div>
       )}
+
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedStaff}
+        onClose={() => setSelectedStaff(null)}
+        title={selectedStaff ? getStaffName(selectedStaff) : "Staff Details"}
+        onEdit={() => {
+          if (selectedStaff) router.push(`/staff/${selectedStaff.id}`);
+        }}
+        onDelete={() => setDeleteDialogOpen(true)}
+      >
+        {selectedStaff && (
+          <div className="space-y-1">
+            <DetailField label="Name" value={getStaffName(selectedStaff)} />
+            <DetailField label="Title" value={selectedStaff.title || "Staff"} />
+            <DetailField
+              label="Status"
+              value={
+                <Badge variant={selectedStaff.isActive ? "success" : "secondary"}>
+                  {selectedStaff.isActive ? "Active" : "Inactive"}
+                </Badge>
+              }
+            />
+            <DetailField
+              label="Specialties"
+              value={
+                selectedStaff.specialties && selectedStaff.specialties.length > 0
+                  ? selectedStaff.specialties.join(", ")
+                  : "—"
+              }
+            />
+          </div>
+        )}
+      </DetailSheet>
+
+      {/* Confirm Delete Dialog (via DetailSheet) */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete Staff Member"
+        description="Are you sure you want to delete this staff member? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!selectedStaff) return;
+          try {
+            const response = await fetch(`/api/staff/${selectedStaff.id}`, { method: "DELETE" });
+            if (response.ok) {
+              toast({ title: "Success", description: "Staff member deleted successfully" });
+              fetchStaff();
+              setSelectedStaff(null);
+            } else {
+              toast({ title: "Error", description: "Failed to delete staff member", variant: "destructive" });
+            }
+          } catch (error) {
+            toast({ title: "Error", description: "Failed to delete staff member", variant: "destructive" });
+          }
+          setDeleteDialogOpen(false);
+        }}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
 
       {/* Delete Confirmation Dialog */}
       {deleteId && (

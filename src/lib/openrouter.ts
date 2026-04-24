@@ -41,7 +41,7 @@ class OpenRouterClient {
   }
 
   async generate(options: AIGenerateOptions): Promise<string> {
-    const { messages, maxTokens = 1024, temperature = 0.7 } = options;
+    const { messages, maxTokens = 10000, temperature = 0.7 } = options;
 
     if (!this.apiKey) {
       throw new Error("OpenRouter API key is not configured");
@@ -265,7 +265,7 @@ Provide 3 recommendations sorted by confidence (highest first). Make the descrip
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
-      maxTokens: 2048,
+      maxTokens: 10000,
     });
 
     try {
@@ -530,7 +530,7 @@ export async function openRouterChat(
 ): Promise<string> {
   return openRouter.generate({
     messages,
-    maxTokens: options?.maxTokens ?? 2048,
+    maxTokens: options?.maxTokens ?? 10000,
     temperature: options?.temperature ?? 0.7,
   });
 }

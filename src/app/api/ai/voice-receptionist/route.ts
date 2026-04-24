@@ -133,7 +133,7 @@ Respond naturally as if speaking on the phone. Just speak - no stage directions 
         { role: "system", content: systemPrompt },
         { role: "user", content: speechInput },
       ],
-      { maxTokens: 200, temperature: 0.7 }
+      { maxTokens: 10000, temperature: 0.7 }
     );
 
     // Determine if we need to take any actions

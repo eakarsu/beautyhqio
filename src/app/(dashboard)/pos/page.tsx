@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -444,7 +445,7 @@ export default function POSPage() {
     }
 
     if (!selectedPaymentMethod) {
-      alert("Please select a payment method");
+      toast({ title: "Error", description: "Please select a payment method", variant: "destructive" });
       return;
     }
 
@@ -501,11 +502,11 @@ export default function POSPage() {
           resetTransaction();
         }, 2000);
       } else {
-        alert(data.error || "Payment failed");
+        toast({ title: "Error", description: data.error || "Payment failed", variant: "destructive" });
       }
     } catch (error) {
       console.error("Payment error:", error);
-      alert("Payment failed. Please try again.");
+      toast({ title: "Error", description: "Payment failed. Please try again.", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }

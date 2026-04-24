@@ -48,6 +48,8 @@ import {
   UserX,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface User {
   id: string;
@@ -85,6 +87,9 @@ export default function UsersSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<User | null>(null);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -156,11 +161,11 @@ export default function UsersSettingsPage() {
         fetchUsers();
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to save user");
+        toast({ title: "Error", description: error.error || "Failed to save user", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error saving user:", error);
-      alert("Failed to save user");
+      toast({ title: "Error", description: "Failed to save user", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -198,11 +203,17 @@ export default function UsersSettingsPage() {
     }
   };
 
-  const handleDeleteUser = async (user: User) => {
-    if (!confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) return;
+  const handleDeleteUser = (user: User) => {
+    setPendingDeleteUser(user);
+    setConfirmDeleteOpen(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!pendingDeleteUser) return;
+    setConfirmDeleteOpen(false);
 
     try {
-      const response = await fetch(`/api/users/${user.id}`, {
+      const response = await fetch(`/api/users/${pendingDeleteUser.id}`, {
         method: "DELETE",
       });
 
@@ -211,6 +222,8 @@ export default function UsersSettingsPage() {
       }
     } catch (error) {
       console.error("Error deleting user:", error);
+    } finally {
+      setPendingDeleteUser(null);
     }
   };
 
@@ -371,7 +384,7 @@ export default function UsersSettingsPage() {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                          <DropdownMenuItem onClick={() => alert(`Invitation email sent to ${user.email}`)}>
+                          <DropdownMenuItem onClick={() => toast({ title: "Success", description: `Invitation email sent to ${user.email}` })}>
                             <Mail className="h-4 w-4 mr-2" />
                             Send Invite
                           </DropdownMenuItem>
@@ -506,6 +519,23 @@ export default function UsersSettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onConfirm={confirmDeleteUser}
+        onCancel={() => {
+          setConfirmDeleteOpen(false);
+          setPendingDeleteUser(null);
+        }}
+        title="Delete User"
+        description={
+          pendingDeleteUser
+            ? `Are you sure you want to delete ${pendingDeleteUser.firstName} ${pendingDeleteUser.lastName}?`
+            : "Are you sure you want to delete this user?"
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

@@ -17,6 +17,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { formatDate, getInitials } from "@/lib/utils";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface Review {
   id: string;
@@ -40,6 +43,8 @@ export default function ReviewsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
@@ -51,11 +56,11 @@ export default function ReviewsPage() {
         setReviews(reviews.filter(r => r.id !== id));
         setDeleteId(null);
       } else {
-        alert("Failed to delete review");
+        toast({ title: "Error", description: "Failed to delete review", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting review:", error);
-      alert("Failed to delete review");
+      toast({ title: "Error", description: "Failed to delete review", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -276,7 +281,7 @@ export default function ReviewsPage() {
                     <div
                       key={review.id}
                       className="p-4 rounded-lg border hover:border-slate-300 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/reviews/${review.id}`)}
+                      onClick={() => setSelectedReview(review)}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
@@ -322,7 +327,7 @@ export default function ReviewsPage() {
                             Respond
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); alert("Review flagged for moderation"); }}>
+                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toast({ title: "Success", description: "Review flagged for moderation" }); }}>
                           <Flag className="h-3 w-3 mr-1" />
                           Flag
                         </Button>
@@ -347,6 +352,70 @@ export default function ReviewsPage() {
           </Card>
         </>
       )}
+
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedReview}
+        onClose={() => setSelectedReview(null)}
+        title="Review Details"
+        onDelete={() => setDeleteDialogOpen(true)}
+      >
+        {selectedReview && (
+          <div className="space-y-1">
+            <DetailField
+              label="Client"
+              value={`${selectedReview.client.firstName} ${selectedReview.client.lastName}`}
+            />
+            <DetailField
+              label="Rating"
+              value={renderStars(selectedReview.rating)}
+            />
+            <DetailField label="Comment" value={selectedReview.comment || "No comment provided."} />
+            <DetailField label="Source" value={selectedReview.source} />
+            <DetailField label="Date" value={formatDate(new Date(selectedReview.createdAt))} />
+            <DetailField label="Public" value={selectedReview.isPublic ? "Yes" : "No"} />
+            <DetailField
+              label="Response Status"
+              value={
+                selectedReview.response ? (
+                  <Badge variant="success">Responded</Badge>
+                ) : (
+                  <Badge variant="outline">Pending</Badge>
+                )
+              }
+            />
+            {selectedReview.response && (
+              <DetailField label="Response" value={selectedReview.response} />
+            )}
+          </div>
+        )}
+      </DetailSheet>
+
+      {/* Confirm Delete Dialog (via DetailSheet) */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete Review"
+        description="Are you sure you want to delete this review? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!selectedReview) return;
+          try {
+            const response = await fetch(`/api/reviews/${selectedReview.id}`, { method: "DELETE" });
+            if (response.ok) {
+              toast({ title: "Success", description: "Review deleted successfully" });
+              setReviews(reviews.filter(r => r.id !== selectedReview.id));
+              setSelectedReview(null);
+            } else {
+              toast({ title: "Error", description: "Failed to delete review", variant: "destructive" });
+            }
+          } catch (error) {
+            toast({ title: "Error", description: "Failed to delete review", variant: "destructive" });
+          }
+          setDeleteDialogOpen(false);
+        }}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
 
       {/* Delete Confirmation Dialog */}
       {deleteId && (

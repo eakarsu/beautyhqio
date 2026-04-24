@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -73,6 +76,7 @@ export default function AppointmentsPage() {
   const [activeTab, setActiveTab] = useState("today");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   // Check if user is staff or receptionist (limited permissions)
   const isLimitedRole = session?.user?.role === "STAFF" || session?.user?.role === "RECEPTIONIST";
@@ -87,11 +91,11 @@ export default function AppointmentsPage() {
         fetchAppointments();
         setDeleteId(null);
       } else {
-        alert("Failed to delete appointment");
+        toast({ title: "Error", description: "Failed to delete appointment", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting appointment:", error);
-      alert("Failed to delete appointment");
+      toast({ title: "Error", description: "Failed to delete appointment", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -275,7 +279,7 @@ export default function AppointmentsPage() {
                 <div
                   key={apt.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => router.push(`/appointments/${apt.id}`)}
+                  onClick={() => setSelectedAppointment(apt)}
                 >
                   <div className="flex items-center gap-4">
                     <div className="text-center min-w-[60px]">
@@ -348,6 +352,55 @@ export default function AppointmentsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedAppointment}
+        onClose={() => setSelectedAppointment(null)}
+        title="Appointment Details"
+      >
+        {selectedAppointment && (
+          <div className="space-y-1">
+            <DetailField label="Client" value={getClientName(selectedAppointment)} />
+            <DetailField
+              label="Service(s)"
+              value={selectedAppointment.services.map((s) => s.service.name).join(", ")}
+            />
+            <DetailField
+              label="Staff"
+              value={
+                selectedAppointment.staff.displayName ||
+                `${selectedAppointment.staff.user.firstName} ${selectedAppointment.staff.user.lastName}`
+              }
+            />
+            <DetailField
+              label="Date"
+              value={format(new Date(selectedAppointment.scheduledStart), "EEEE, MMMM d, yyyy")}
+            />
+            <DetailField
+              label="Time"
+              value={`${format(new Date(selectedAppointment.scheduledStart), "h:mm a")} - ${format(new Date(selectedAppointment.scheduledEnd), "h:mm a")}`}
+            />
+            <DetailField
+              label="Status"
+              value={<Badge className={statusColors[selectedAppointment.status]}>{selectedAppointment.status}</Badge>}
+            />
+            <DetailField
+              label="Total"
+              value={`$${selectedAppointment.services.reduce((sum, s) => sum + Number(s.service.price), 0).toFixed(2)}`}
+            />
+            {selectedAppointment.client?.phone && (
+              <DetailField label="Phone" value={selectedAppointment.client.phone} />
+            )}
+            {selectedAppointment.client?.email && (
+              <DetailField label="Email" value={selectedAppointment.client.email} />
+            )}
+            {selectedAppointment.notes && (
+              <DetailField label="Notes" value={selectedAppointment.notes} />
+            )}
+          </div>
+        )}
+      </DetailSheet>
 
       {/* Delete Confirmation Dialog */}
       {deleteId && (

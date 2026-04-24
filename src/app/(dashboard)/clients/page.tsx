@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { formatPhone, getInitials, formatDate } from "@/lib/utils";
+import { Pagination } from "@/components/ui/pagination";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Client {
   id: string;
@@ -67,6 +70,9 @@ export default function ClientsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   // Check if user is staff or receptionist (limited permissions)
   const isLimitedRole = session?.user?.role === "STAFF" || session?.user?.role === "RECEPTIONIST";
@@ -78,28 +84,31 @@ export default function ClientsPage() {
         method: "DELETE",
       });
       if (response.ok) {
-        fetchClients(searchQuery);
+        toast({ title: "Success", description: "Client deleted successfully" });
+        setSelectedClient(null);
+        fetchClients(searchQuery, currentPage, pageSize);
         setDeleteId(null);
       } else {
-        alert("Failed to delete client");
+        toast({ title: "Error", description: "Failed to delete client", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting client:", error);
-      alert("Failed to delete client");
+      toast({ title: "Error", description: "Failed to delete client", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
   };
 
   useEffect(() => {
-    fetchClients();
+    fetchClients(undefined, 1, pageSize);
   }, []);
 
-  const fetchClients = async (search?: string) => {
+  const fetchClients = async (search?: string, page?: number, limit?: number) => {
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
-      params.set("limit", "100"); // Get more clients
+      params.set("page", String(page || currentPage));
+      params.set("limit", String(limit || pageSize));
 
       const response = await fetch(`/api/clients?${params.toString()}`);
       if (response.ok) {
@@ -115,10 +124,22 @@ export default function ClientsPage() {
 
   useEffect(() => {
     const debounce = setTimeout(() => {
-      fetchClients(searchQuery);
+      setCurrentPage(1);
+      fetchClients(searchQuery, 1, pageSize);
     }, 300);
     return () => clearTimeout(debounce);
   }, [searchQuery]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchClients(searchQuery, page, pageSize);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+    fetchClients(searchQuery, 1, size);
+  };
 
   const clients = clientsData?.clients || [];
   const totalClients = clientsData?.pagination?.total || 0;
@@ -205,7 +226,7 @@ export default function ClientsPage() {
                   className="pl-9 w-64"
                 />
               </div>
-              <Button variant="outline" size="icon" onClick={() => alert("Filter options: Status, Tags, Last Visit Date")}>
+              <Button variant="outline" size="icon" onClick={() => toast({ title: "Filter Options", description: "Status, Tags, Last Visit Date" })}>
                 <Filter className="h-4 w-4" />
               </Button>
             </div>
@@ -228,10 +249,9 @@ export default function ClientsPage() {
             <TableBody>
               {clients.length > 0 ? (
                 clients.map((client) => (
-                  <TableRow key={client.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/clients/${client.id}`)}>
+                  <TableRow key={client.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelectedClient(client)}>
                     <TableCell>
-                      <Link
-                        href={`/clients/${client.id}`}
+                      <div
                         className="flex items-center gap-3 hover:opacity-80"
                       >
                         <Avatar>
@@ -244,7 +264,7 @@ export default function ClientsPage() {
                             {client.firstName} {client.lastName}
                           </p>
                         </div>
-                      </Link>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
@@ -349,32 +369,106 @@ export default function ClientsPage() {
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {clientsData?.pagination && (
+            <Pagination
+              page={currentPage}
+              totalPages={clientsData.pagination.totalPages}
+              onPageChange={handlePageChange}
+              totalItems={clientsData.pagination.total}
+              pageSize={pageSize}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          )}
         </CardContent>
       </Card>
 
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedClient}
+        onClose={() => setSelectedClient(null)}
+        title={selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : ""}
+        onEdit={
+          selectedClient && !isLimitedRole
+            ? () => router.push(`/clients/${selectedClient.id}/edit`)
+            : undefined
+        }
+        onDelete={
+          selectedClient && !isLimitedRole
+            ? () => {
+                setDeleteId(selectedClient.id);
+              }
+            : undefined
+        }
+      >
+        {selectedClient && (
+          <dl className="divide-y">
+            <DetailField
+              label="Name"
+              value={`${selectedClient.firstName} ${selectedClient.lastName}`}
+            />
+            <DetailField label="Email" value={selectedClient.email} />
+            <DetailField label="Phone" value={formatPhone(selectedClient.phone)} />
+            <DetailField
+              label="Status"
+              value={
+                <Badge
+                  variant={
+                    selectedClient.status === "VIP"
+                      ? "default"
+                      : selectedClient.status === "ACTIVE"
+                      ? "success"
+                      : "secondary"
+                  }
+                >
+                  {selectedClient.status}
+                </Badge>
+              }
+            />
+            <DetailField
+              label="Tags"
+              value={
+                selectedClient.tags?.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedClient.tags.map((tag) => (
+                      <Badge key={tag} variant="outline" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null
+              }
+            />
+            <DetailField label="Total Visits" value={selectedClient.totalVisits} />
+            <DetailField
+              label="Total Spent"
+              value={`$${(selectedClient.totalSpent || 0).toLocaleString()}`}
+            />
+            <DetailField
+              label="Last Visit"
+              value={
+                selectedClient.lastVisit
+                  ? formatDate(new Date(selectedClient.lastVisit))
+                  : "No visits"
+              }
+            />
+          </dl>
+        )}
+      </DetailSheet>
+
       {/* Delete Confirmation Dialog */}
-      {deleteId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-2">Delete Client</h3>
-            <p className="text-slate-600 mb-4">
-              Are you sure you want to delete this client? This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDeleteId(null)} disabled={isDeleting}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => handleDelete(deleteId)}
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onCancel={() => setDeleteId(null)}
+        onConfirm={() => {
+          if (deleteId) handleDelete(deleteId);
+        }}
+        title="Delete Client"
+        description="Are you sure you want to delete this client? This action cannot be undone."
+        confirmLabel={isDeleting ? "Deleting..." : "Delete"}
+        variant="destructive"
+      />
     </div>
   );
 }

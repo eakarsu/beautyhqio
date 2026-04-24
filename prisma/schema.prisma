@@ -146,6 +146,9 @@ model User {
   businessId    String?    // Optional for PLATFORM_ADMIN and CLIENT roles
   staff         Staff?
   client        Client?    // Link to client profile (for CLIENT role users)
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
   auditLogs     AuditLog[]
   savedFilters  SavedFilter[]
   accounts      Account[]
@@ -1812,4 +1815,187 @@ model PublicSalonProfile {
 
   business          Business @relation(fields: [businessId], references: [id])
   businessId        String   @unique
+}
+
+// ============ HEALTHCARE AI FEATURES ============
+
+model SymptomCheck {
+  id            String    @id @default(cuid())
+  clientId      String?
+  sessionId     String
+
+  // Input
+  symptoms      String[]
+  duration      String?
+  severity      String?
+  additionalInfo String?
+
+  // AI Analysis
+  possibleConditions Json?
+  recommendations   Json?
+  urgencyLevel     String?   // low, medium, high, emergency
+  shouldSeekCare   Boolean   @default(false)
+
+  // Metadata
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model MentalHealthSession {
+  id            String    @id @default(cuid())
+  clientId      String?
+  sessionId     String
+
+  // Session data
+  moodScore     Int?      // 1-10
+  stressLevel   Int?      // 1-10
+  anxietyLevel  Int?      // 1-10
+  sleepQuality  Int?      // 1-10
+
+  // Conversation
+  messages      Json?     // Array of chat messages
+
+  // AI Analysis
+  insights      Json?
+  copingStrategies Json?
+  resourcesRecommended Json?
+
+  // Flags
+  needsProfessionalHelp Boolean @default(false)
+  crisisDetected  Boolean   @default(false)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model SkinAnalysis {
+  id            String    @id @default(cuid())
+  clientId      String?
+
+  // Input
+  skinType      String?   // oily, dry, combination, normal, sensitive
+  concerns      String[]
+  age           Int?
+  lifestyle     String?
+  currentRoutine Json?
+
+  // AI Analysis
+  skinCondition Json?
+  recommendations Json?
+  productSuggestions Json?
+  routineAdvice Json?
+  treatmentSuggestions Json?
+
+  // Images (optional)
+  imageUrl      String?
+  analysisResults Json?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model SleepRecord {
+  id            String    @id @default(cuid())
+  clientId      String?
+  date          DateTime  @default(now())
+
+  // Sleep data
+  bedtime       String?
+  wakeTime      String?
+  sleepDuration Decimal?  @db.Decimal(4, 2)
+  sleepQuality  Int?      // 1-10
+
+  // Factors
+  caffeineIntake Boolean  @default(false)
+  screenTime    Int?      // minutes before bed
+  exercise      Boolean   @default(false)
+  stress        Int?      // 1-10
+
+  // Environment
+  roomTemp      String?
+  noiseLevel    String?
+  lightLevel    String?
+
+  // AI Coaching
+  insights      Json?
+  recommendations Json?
+  sleepScore    Int?      // 0-100
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model PostureAssessment {
+  id            String    @id @default(cuid())
+  clientId      String?
+
+  // Assessment input
+  occupation    String?
+  hoursSeated   Int?
+  painAreas     String[]
+  currentIssues String[]
+  activityLevel String?
+
+  // AI Analysis
+  postureScore  Int?      // 0-100
+  issues        Json?
+  exercises     Json?
+  ergonomicTips Json?
+  improvementPlan Json?
+
+  // Progress tracking
+  previousScore Int?
+  improvement   Int?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model AIProductRecommendation {
+  id            String    @id @default(cuid())
+  clientId      String?
+
+  // Client profile
+  skinType      String?
+  hairType      String?
+  concerns      String[]
+  allergies     String[]
+  budget        String?
+  preferences   Json?
+
+  // Recommendations
+  products      Json?     // Array of recommended products
+  routines      Json?     // Daily/weekly routines
+  alternatives  Json?     // Budget-friendly alternatives
+
+  // Feedback
+  purchased     String[]  // Product IDs purchased
+  rating        Int?      // 1-5
+  feedback      String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model AILoyaltyOptimization {
+  id            String    @id @default(cuid())
+  businessId    String
+
+  // Analysis input
+  programData   Json?
+  memberData    Json?
+  transactionData Json?
+
+  // AI Recommendations
+  programSuggestions Json?
+  rewardOptimizations Json?
+  engagementStrategies Json?
+  retentionTactics Json?
+
+  // Metrics
+  projectedROI  Decimal?  @db.Decimal(10, 2)
+  projectedRetention Decimal? @db.Decimal(5, 2)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

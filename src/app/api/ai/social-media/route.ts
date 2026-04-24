@@ -150,7 +150,7 @@ Generate content as JSON:
         },
         { role: "user", content: prompt },
       ],
-      { maxTokens: 1000, temperature: 0.8 }
+      { maxTokens: 10000, temperature: 0.8 }
     );
 
     let content;
@@ -234,7 +234,7 @@ Return as JSON:
         },
         { role: "user", content: prompt },
       ],
-      { maxTokens: 2000, temperature: 0.7 }
+      { maxTokens: 10000, temperature: 0.7 }
     );
 
     let calendar;

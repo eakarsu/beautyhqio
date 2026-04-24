@@ -29,6 +29,9 @@ import {
   Clock,
   DollarSign,
 } from "lucide-react";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatDuration } from "@/lib/utils";
 
 interface ServiceCategory {
@@ -53,6 +56,8 @@ export default function ServicesPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchServices();
@@ -256,7 +261,7 @@ export default function ServicesPage() {
                 </TableHeader>
                 <TableBody>
                   {searchedServices.map((service) => (
-                    <TableRow key={service.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/services/${service.id}`)}>
+                    <TableRow key={service.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelectedService(service)}>
                       <TableCell className="font-medium">
                         {service.name}
                       </TableCell>
@@ -314,19 +319,10 @@ export default function ServicesPage() {
                             }}>
                               {service.isActive ? "Deactivate" : "Activate"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600" onClick={async (e) => {
+                            <DropdownMenuItem className="text-red-600" onClick={(e) => {
                               e.stopPropagation();
-                              if (!confirm("Are you sure you want to delete this service?")) return;
-                              try {
-                                const response = await fetch(`/api/services/${service.id}`, {
-                                  method: "DELETE",
-                                });
-                                if (response.ok) {
-                                  fetchServices();
-                                }
-                              } catch (error) {
-                                console.error("Error deleting service:", error);
-                              }
+                              setSelectedService(service);
+                              setDeleteDialogOpen(true);
                             }}>
                               Delete
                             </DropdownMenuItem>
@@ -341,6 +337,60 @@ export default function ServicesPage() {
           </Tabs>
         </CardContent>
       </Card>
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedService}
+        onClose={() => setSelectedService(null)}
+        title={selectedService?.name || "Service Details"}
+        onEdit={() => {
+          if (selectedService) router.push(`/services/${selectedService.id}/edit`);
+        }}
+        onDelete={() => setDeleteDialogOpen(true)}
+      >
+        {selectedService && (
+          <div className="space-y-1">
+            <DetailField label="Service Name" value={selectedService.name} />
+            <DetailField label="Duration" value={formatDuration(selectedService.duration)} />
+            <DetailField label="Price" value={formatCurrency(Number(selectedService.price))} />
+            <DetailField label="Price Type" value={selectedService.priceType || "Fixed"} />
+            <DetailField label="Category" value={selectedService.category?.name || "Uncategorized"} />
+            <DetailField
+              label="Status"
+              value={
+                <Badge variant={selectedService.isActive ? "success" : "secondary"}>
+                  {selectedService.isActive ? "Active" : "Inactive"}
+                </Badge>
+              }
+            />
+          </div>
+        )}
+      </DetailSheet>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete Service"
+        description="Are you sure you want to delete this service? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!selectedService) return;
+          try {
+            const response = await fetch(`/api/services/${selectedService.id}`, { method: "DELETE" });
+            if (response.ok) {
+              toast({ title: "Success", description: "Service deleted successfully" });
+              fetchServices();
+              setSelectedService(null);
+            } else {
+              toast({ title: "Error", description: "Failed to delete service", variant: "destructive" });
+            }
+          } catch (error) {
+            toast({ title: "Error", description: "Failed to delete service", variant: "destructive" });
+          }
+          setDeleteDialogOpen(false);
+        }}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </div>
   );
 }

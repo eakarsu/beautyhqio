@@ -123,7 +123,7 @@ Provide comprehensive client insights in JSON format:
         },
         { role: "user", content: prompt },
       ],
-      { maxTokens: 2048, temperature: 0.6 }
+      { maxTokens: 10000, temperature: 0.6 }
     );
 
     // Parse JSON from response

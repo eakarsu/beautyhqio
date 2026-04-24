@@ -26,6 +26,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface Campaign {
   id: string;
@@ -112,11 +115,11 @@ export default function MarketingPage() {
         setCampaigns(campaigns.filter(c => c.id !== id));
         setDeleteId(null);
       } else {
-        alert("Failed to delete campaign");
+        toast({ title: "Error", description: "Failed to delete campaign", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting campaign:", error);
-      alert("Failed to delete campaign");
+      toast({ title: "Error", description: "Failed to delete campaign", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }

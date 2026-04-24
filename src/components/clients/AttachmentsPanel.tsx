@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,8 @@ export function AttachmentsPanel({ clientId }: AttachmentsPanelProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -102,19 +105,25 @@ export function AttachmentsPanel({ clientId }: AttachmentsPanelProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this attachment?")) return;
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+    setDeleteDialogOpen(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
     try {
-      const response = await fetch(`/api/clients/${clientId}/attachments/${id}`, {
+      const response = await fetch(`/api/clients/${clientId}/attachments/${pendingDeleteId}`, {
         method: "DELETE",
       });
       if (response.ok) {
-        setAttachments((prev) => prev.filter((a) => a.id !== id));
+        setAttachments((prev) => prev.filter((a) => a.id !== pendingDeleteId));
       }
     } catch (error) {
       console.error("Error deleting attachment:", error);
     }
+    setDeleteDialogOpen(false);
+    setPendingDeleteId(null);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -303,6 +312,16 @@ export function AttachmentsPanel({ clientId }: AttachmentsPanelProps) {
           </DialogContent>
         </Dialog>
       </CardContent>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onConfirm={confirmDelete}
+        onCancel={() => { setDeleteDialogOpen(false); setPendingDeleteId(null); }}
+        title="Delete Attachment?"
+        description="Are you sure you want to delete this attachment? This cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </Card>
   );
 }

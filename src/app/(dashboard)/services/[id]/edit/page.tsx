@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -108,11 +109,11 @@ export default function EditServicePage() {
         router.push(`/services/${params.id}`);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to update service");
+        toast({ title: "Error", description: error.error || "Failed to update service", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error updating service:", error);
-      alert("Failed to update service");
+      toast({ title: "Error", description: "Failed to update service", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

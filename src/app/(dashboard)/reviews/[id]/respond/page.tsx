@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,7 +62,7 @@ export default function RespondToReviewPage() {
 
     // Simulate sending response
     setTimeout(() => {
-      alert("Response sent successfully!");
+      toast({ title: "Success", description: "Response sent successfully!" });
       router.push("/reviews");
     }, 1000);
   };

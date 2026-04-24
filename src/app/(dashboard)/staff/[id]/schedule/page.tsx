@@ -16,6 +16,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface WorkingHours {
   day: string;
@@ -127,11 +128,11 @@ export default function StaffSchedulePage({ params }: { params: Promise<{ id: st
       if (response.ok) {
         router.push(`/staff/${id}`);
       } else {
-        alert("Failed to save schedule");
+        toast({ title: "Error", description: "Failed to save schedule", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error saving schedule:", error);
-      alert("Failed to save schedule");
+      toast({ title: "Error", description: "Failed to save schedule", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }

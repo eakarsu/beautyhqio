@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -77,11 +78,11 @@ export default function AdjustStockPage() {
         router.push(`/products/${params.id}`);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to adjust stock");
+        toast({ title: "Error", description: error.error || "Failed to adjust stock", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error adjusting stock:", error);
-      alert("Failed to adjust stock");
+      toast({ title: "Error", description: "Failed to adjust stock", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

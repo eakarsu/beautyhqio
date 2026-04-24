@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
 import {
   DollarSign,
   TrendingUp,
@@ -56,6 +58,7 @@ export default function StaffCompensationPage() {
   const [dailyData, setDailyData] = useState<
     { date: string; commissions: number; tips: number }[]
   >([]);
+  const [detailStaff, setDetailStaff] = useState<StaffMember | null>(null);
 
   // Fetch staff list
   useEffect(() => {
@@ -169,7 +172,7 @@ export default function StaffCompensationPage() {
             className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             onClick={() => {
               if (!staffCompensation || !selectedStaff) {
-                alert('Please select a staff member first');
+                toast({ title: "Error", description: "Please select a staff member first", variant: "destructive" });
                 return;
               }
               const csvContent = [

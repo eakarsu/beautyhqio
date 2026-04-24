@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -38,7 +39,7 @@ export default function VoiceReceptionistSettingsPage() {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsSaving(false);
-    alert("Settings saved successfully!");
+    toast({ title: "Success", description: "Settings saved successfully!" });
   };
 
   return (

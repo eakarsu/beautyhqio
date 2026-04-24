@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +53,7 @@ export default function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -140,19 +143,22 @@ export default function ProductDetailPage() {
         setIsEditing(false);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to update product");
+        toast({ title: "Error", description: error.error || "Failed to update product", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error updating product:", error);
-      alert("Failed to update product");
+      toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+  const handleDelete = () => {
+    setShowDeleteDialog(true);
+  };
 
+  const confirmDelete = async () => {
+    setShowDeleteDialog(false);
     try {
       const response = await fetch(`/api/products/${productId}`, {
         method: "DELETE",
@@ -162,11 +168,11 @@ export default function ProductDetailPage() {
         router.push("/products");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to delete product");
+        toast({ title: "Error", description: error.error || "Failed to delete product", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting product:", error);
-      alert("Failed to delete product");
+      toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
     }
   };
 
@@ -431,6 +437,16 @@ export default function ProductDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onCancel={() => setShowDeleteDialog(false)}
+        title="Delete Product"
+        description="Are you sure you want to delete this product?"
+        onConfirm={confirmDelete}
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

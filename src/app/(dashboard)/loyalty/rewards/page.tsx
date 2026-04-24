@@ -15,6 +15,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft, Plus, Search, Gift, Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface LoyaltyReward {
   id: string;
@@ -33,6 +36,8 @@ export default function ManageRewardsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedReward, setSelectedReward] = useState<LoyaltyReward | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
@@ -44,11 +49,11 @@ export default function ManageRewardsPage() {
         setRewards(rewards.filter(r => r.id !== id));
         setDeleteId(null);
       } else {
-        alert("Failed to delete reward");
+        toast({ title: "Error", description: "Failed to delete reward", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting reward:", error);
-      alert("Failed to delete reward");
+      toast({ title: "Error", description: "Failed to delete reward", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -167,7 +172,7 @@ export default function ManageRewardsPage() {
               </TableHeader>
               <TableBody>
                 {filteredRewards.map((reward) => (
-                  <TableRow key={reward.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/loyalty/rewards/${reward.id}`)}>
+                  <TableRow key={reward.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelectedReward(reward)}>
                     <TableCell>
                       <div>
                         <p className="font-medium">{reward.name}</p>
@@ -221,29 +226,67 @@ export default function ManageRewardsPage() {
         </CardContent>
       </Card>
 
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedReward}
+        onClose={() => setSelectedReward(null)}
+        title={selectedReward?.name || "Reward Details"}
+        onEdit={() => {
+          if (selectedReward) {
+            router.push(`/loyalty/rewards/${selectedReward.id}`);
+          }
+        }}
+        onDelete={() => {
+          if (selectedReward) {
+            setDeleteDialogOpen(true);
+          }
+        }}
+      >
+        {selectedReward && (
+          <dl className="space-y-1">
+            <DetailField label="Name" value={selectedReward.name} />
+            <DetailField label="Description" value={selectedReward.description} />
+            <DetailField label="Points Cost" value={`${selectedReward.pointsCost} pts`} />
+            <DetailField label="Type" value={getTypeLabel(selectedReward.type)} />
+            <DetailField
+              label="Value"
+              value={
+                toNumber(selectedReward.value) > 0
+                  ? selectedReward.type.toLowerCase().includes("percent")
+                    ? `${toNumber(selectedReward.value)}%`
+                    : `$${toNumber(selectedReward.value)}`
+                  : "—"
+              }
+            />
+            <DetailField
+              label="Status"
+              value={
+                <Badge variant={selectedReward.isActive ? "success" : "destructive"}>
+                  {selectedReward.isActive ? "Active" : "Inactive"}
+                </Badge>
+              }
+            />
+          </dl>
+        )}
+      </DetailSheet>
+
       {/* Delete Confirmation Dialog */}
-      {deleteId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-2">Delete Reward</h3>
-            <p className="text-slate-600 mb-4">
-              Are you sure you want to delete this reward? This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDeleteId(null)} disabled={isDeleting}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => handleDelete(deleteId)}
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete Reward"
+        description="Are you sure you want to delete this reward? This action cannot be undone."
+        confirmLabel={isDeleting ? "Deleting..." : "Delete"}
+        variant="destructive"
+        onConfirm={() => {
+          if (selectedReward) {
+            handleDelete(selectedReward.id).then(() => {
+              setDeleteDialogOpen(false);
+              setSelectedReward(null);
+            });
+          }
+        }}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </div>
   );
 }

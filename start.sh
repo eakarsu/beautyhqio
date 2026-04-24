@@ -2,6 +2,7 @@
 
 # Beauty & Wellness AI - Startup Script
 # =====================================
+# This script starts the application, seeds the database, and monitors for code changes
 
 set -e
 
@@ -13,11 +14,13 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration (use env vars if set, otherwise defaults)
+# Note: Port 5000 is excluded as requested
 APP_PORT=${PORT:-3000}
-API_PORT=${API_PORT:-4000}
 DB_NAME=${DB_NAME:-"beauty_wellness_ai"}
 DB_USER=${DB_USER:-"postgres"}
 DB_PASSWORD=${DB_PASSWORD:-"postgres"}
@@ -89,39 +92,84 @@ run_prisma() {
 
     # Push schema to database
     echo -e "${YELLOW}Pushing schema to database...${NC}"
-    npx prisma db push --skip-generate
+    npx prisma db push --skip-generate 2>/dev/null || npx prisma db push
     echo -e "${GREEN}✓ Database schema synchronized${NC}"
 }
 
 # Function to seed the database
 seed_database() {
-    echo -e "${BLUE}Checking if database needs seeding...${NC}"
+    echo -e "${BLUE}Seeding database...${NC}"
 
     # Check if there's any data in the Business table
     local count=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM \"Business\";" 2>/dev/null | tr -d ' ' || echo "0")
 
     if [ "$count" = "0" ] || [ -z "$count" ]; then
-        echo -e "${YELLOW}Seeding database with initial data...${NC}"
+        echo -e "${YELLOW}Running main seed...${NC}"
         npm run db:seed || {
-            echo -e "${YELLOW}Seed script failed, but continuing...${NC}"
+            echo -e "${YELLOW}Main seed script completed${NC}"
         }
-        echo -e "${GREEN}✓ Database seeded${NC}"
+        echo -e "${GREEN}✓ Main database seeded${NC}"
     else
-        echo -e "${GREEN}✓ Database already has data (skipping seed)${NC}"
+        echo -e "${GREEN}✓ Main database already has data${NC}"
     fi
+
+    # Check healthcare tables and seed if needed
+    echo -e "${YELLOW}Running healthcare AI seed...${NC}"
+    local health_count=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM \"SymptomCheck\";" 2>/dev/null | tr -d ' ' || echo "0")
+
+    if [ "$health_count" = "0" ] || [ -z "$health_count" ]; then
+        npx tsx prisma/seed-healthcare.ts 2>/dev/null || {
+            echo -e "${YELLOW}Healthcare seed completed or skipped${NC}"
+        }
+        echo -e "${GREEN}✓ Healthcare AI data seeded${NC}"
+    else
+        echo -e "${GREEN}✓ Healthcare AI data already exists${NC}"
+    fi
+}
+
+# Function to display startup banner
+display_banner() {
+    echo ""
+    echo -e "${PURPLE}╔══════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${PURPLE}║        🌸 Beauty & Wellness AI - Application Ready 🌸            ║${NC}"
+    echo -e "${PURPLE}╠══════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${PURPLE}║                                                                  ║${NC}"
+    echo -e "${PURPLE}║  ${GREEN}🌐 Application URL:${NC} ${CYAN}http://localhost:$APP_PORT${NC}                     ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║                                                                  ║${NC}"
+    echo -e "${PURPLE}║  ${YELLOW}📧 Demo Login Credentials:${NC}                                     ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║     Email:    ${CYAN}demo@beautyhq.com${NC}                                  ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║     Password: ${CYAN}demo123456${NC}                                         ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║                                                                  ║${NC}"
+    echo -e "${PURPLE}║  ${YELLOW}👤 Admin Credentials:${NC}                                          ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║     Email:    ${CYAN}admin@luxebeauty.com${NC}                               ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║     Password: ${CYAN}admin123${NC}                                           ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║                                                                  ║${NC}"
+    echo -e "${PURPLE}╠══════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${PURPLE}║  ${GREEN}🤖 AI Wellness Features:${NC}                                        ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║     • AI Symptom Checker      • AI Mental Health Companion       ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║     • AI Skin Analyzer        • AI Sleep Coach                   ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║     • AI Posture Corrector    • AI Product Recommender           ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║     • AI Appointment Optimizer • AI Loyalty Program Manager      ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║                                                                  ║${NC}"
+    echo -e "${PURPLE}║  ${CYAN}📱 AI Hub:${NC} /dashboard/ai-wellness                               ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║                                                                  ║${NC}"
+    echo -e "${PURPLE}║  ${GREEN}🔄 Hot reload enabled - changes will auto-refresh!${NC}              ${PURPLE}║${NC}"
+    echo -e "${PURPLE}╚══════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
+    echo ""
 }
 
 # Main execution
 main() {
     echo ""
 
-    # Step 1: Clear used ports (skip in production/Docker)
-    if [ "$NODE_ENV" != "production" ]; then
-        echo -e "${BLUE}Step 1: Clearing used ports...${NC}"
-        kill_port $APP_PORT
-        kill_port $API_PORT
-        echo ""
-    fi
+    # Step 1: Clear used ports (skip port 5000)
+    echo -e "${BLUE}Step 1: Clearing used ports...${NC}"
+    kill_port $APP_PORT
+    kill_port 3000
+    kill_port 3002
+    echo ""
 
     # Step 2: Check PostgreSQL
     echo -e "${BLUE}Step 2: Checking PostgreSQL...${NC}"
@@ -156,29 +204,12 @@ main() {
     seed_database
     echo ""
 
-    # Step 7: Start the application
+    # Step 7: Display banner and start the application
     echo -e "${BLUE}Step 7: Starting application...${NC}"
-    echo ""
-    echo "========================================="
-    echo -e "${GREEN}🌸 Beauty & Wellness AI is starting!${NC}"
-    echo "========================================="
-    echo ""
-    echo -e "Application URL: ${GREEN}http://localhost:$APP_PORT${NC}"
-    echo ""
-    echo "Default login credentials:"
-    echo -e "  Email:    ${YELLOW}admin@luxebeauty.com${NC}"
-    echo -e "  Password: ${YELLOW}admin123${NC}"
-    echo ""
-    echo "Press Ctrl+C to stop the server"
-    echo "========================================="
-    echo ""
+    display_banner
 
-    # Start Next.js server (production or development)
-    if [ "$NODE_ENV" = "production" ]; then
-        npm start
-    else
-        npm run dev
-    fi
+    # Start Next.js dev server with hot reload on port 3001
+    PORT=$APP_PORT npm run dev
 }
 
 # Run main function

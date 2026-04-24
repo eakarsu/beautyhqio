@@ -30,6 +30,9 @@ import {
   AlertTriangle,
   TrendingUp,
 } from "lucide-react";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 
 interface ProductCategory {
@@ -57,6 +60,8 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -270,7 +275,7 @@ export default function ProductsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.map((product) => (
-                    <TableRow key={product.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/products/${product.id}`)}>
+                    <TableRow key={product.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelectedProduct(product)}>
                       <TableCell>
                         <div>
                           <p className="font-medium">{product.name}</p>
@@ -330,19 +335,10 @@ export default function ProductsPage() {
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/products/${product.id}/history`); }}>
                               View History
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600" onClick={async (e) => {
+                            <DropdownMenuItem className="text-red-600" onClick={(e) => {
                               e.stopPropagation();
-                              if (!confirm("Are you sure you want to delete this product?")) return;
-                              try {
-                                const response = await fetch(`/api/products/${product.id}`, {
-                                  method: "DELETE",
-                                });
-                                if (response.ok) {
-                                  fetchProducts();
-                                }
-                              } catch (error) {
-                                console.error("Error deleting product:", error);
-                              }
+                              setSelectedProduct(product);
+                              setDeleteDialogOpen(true);
                             }}>
                               Delete
                             </DropdownMenuItem>
@@ -357,6 +353,63 @@ export default function ProductsPage() {
           </Tabs>
         </CardContent>
       </Card>
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        title={selectedProduct?.name || "Product Details"}
+        onEdit={() => {
+          if (selectedProduct) router.push(`/products/${selectedProduct.id}/edit`);
+        }}
+        onDelete={() => setDeleteDialogOpen(true)}
+      >
+        {selectedProduct && (
+          <div className="space-y-1">
+            <DetailField label="Product Name" value={selectedProduct.name} />
+            <DetailField label="Brand" value={selectedProduct.brand || "—"} />
+            <DetailField label="SKU" value={selectedProduct.sku || "—"} />
+            <DetailField label="Price" value={formatCurrency(Number(selectedProduct.price))} />
+            <DetailField label="Cost" value={selectedProduct.cost ? formatCurrency(Number(selectedProduct.cost)) : "—"} />
+            <DetailField label="Stock" value={selectedProduct.quantityOnHand} />
+            <DetailField label="Reorder Level" value={selectedProduct.reorderLevel ?? "—"} />
+            <DetailField label="Category" value={selectedProduct.category?.name || "Uncategorized"} />
+            <DetailField
+              label="Status"
+              value={
+                <Badge variant={selectedProduct.isActive ? "success" : "secondary"}>
+                  {selectedProduct.isActive ? "Active" : "Inactive"}
+                </Badge>
+              }
+            />
+          </div>
+        )}
+      </DetailSheet>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete Product"
+        description="Are you sure you want to delete this product? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!selectedProduct) return;
+          try {
+            const response = await fetch(`/api/products/${selectedProduct.id}`, { method: "DELETE" });
+            if (response.ok) {
+              toast({ title: "Success", description: "Product deleted successfully" });
+              fetchProducts();
+              setSelectedProduct(null);
+            } else {
+              toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
+            }
+          } catch (error) {
+            toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
+          }
+          setDeleteDialogOpen(false);
+        }}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </div>
   );
 }

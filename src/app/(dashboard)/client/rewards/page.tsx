@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Gift, Star, Trophy, ArrowRight } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Reward {
   id: string;
@@ -25,6 +27,8 @@ export default function RewardsPage() {
   const [account, setAccount] = useState<LoyaltyAccount | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingRedeemId, setPendingRedeemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "authenticated" && !session?.user?.isClient) {
@@ -59,18 +63,26 @@ export default function RewardsPage() {
     }
   };
 
-  const handleRedeem = async (rewardId: string) => {
-    if (!confirm("Are you sure you want to redeem this reward?")) return;
+  const handleRedeemClick = (rewardId: string) => {
+    setPendingRedeemId(rewardId);
+    setConfirmDialogOpen(true);
+  };
+
+  const handleRedeemConfirm = async () => {
+    if (!pendingRedeemId) return;
+    setConfirmDialogOpen(false);
     try {
-      const response = await fetch(`/api/client/rewards/${rewardId}/redeem`, {
+      const response = await fetch(`/api/client/rewards/${pendingRedeemId}/redeem`, {
         method: "POST",
       });
       if (response.ok) {
-        alert("Reward redeemed successfully!");
+        toast({ title: "Success", description: "Reward redeemed successfully!" });
         fetchRewardsData();
       }
     } catch (error) {
       console.error("Error redeeming reward:", error);
+    } finally {
+      setPendingRedeemId(null);
     }
   };
 
@@ -189,7 +201,7 @@ export default function RewardsPage() {
                     {reward.pointsCost} points
                   </span>
                   <button
-                    onClick={() => handleRedeem(reward.id)}
+                    onClick={() => handleRedeemClick(reward.id)}
                     disabled={(account?.pointsBalance || 0) < reward.pointsCost}
                     className="flex items-center gap-1 text-sm text-rose-600 hover:text-rose-700 disabled:text-slate-300 disabled:cursor-not-allowed"
                   >
@@ -206,6 +218,15 @@ export default function RewardsPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        onCancel={() => { setConfirmDialogOpen(false); setPendingRedeemId(null); }}
+        title="Redeem Reward"
+        description="Are you sure you want to redeem this reward?"
+        onConfirm={handleRedeemConfirm}
+        confirmLabel="Redeem"
+      />
     </div>
   );
 }

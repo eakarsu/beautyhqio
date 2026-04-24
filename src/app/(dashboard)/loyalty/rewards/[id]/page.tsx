@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Save, Trash2, Gift } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface LoyaltyReward {
   id: string;
@@ -92,11 +93,11 @@ export default function RewardDetailPage() {
       if (response.ok) {
         router.push("/loyalty/rewards");
       } else {
-        alert("Failed to update reward");
+        toast({ title: "Error", description: "Failed to update reward", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error updating reward:", error);
-      alert("Failed to update reward");
+      toast({ title: "Error", description: "Failed to update reward", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -112,11 +113,11 @@ export default function RewardDetailPage() {
       if (response.ok) {
         router.push("/loyalty/rewards");
       } else {
-        alert("Failed to delete reward");
+        toast({ title: "Error", description: "Failed to delete reward", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting reward:", error);
-      alert("Failed to delete reward");
+      toast({ title: "Error", description: "Failed to delete reward", variant: "destructive" });
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

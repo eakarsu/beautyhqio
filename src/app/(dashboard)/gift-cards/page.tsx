@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -52,6 +55,8 @@ export default function GiftCardsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<GiftCard | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Check if user is staff or receptionist (limited permissions)
   const isLimitedRole = session?.user?.role === "STAFF" || session?.user?.role === "RECEPTIONIST";
@@ -66,11 +71,11 @@ export default function GiftCardsPage() {
         setGiftCards(giftCards.filter(g => g.id !== id));
         setDeleteId(null);
       } else {
-        alert("Failed to delete gift card");
+        toast({ title: "Error", description: "Failed to delete gift card", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting gift card:", error);
-      alert("Failed to delete gift card");
+      toast({ title: "Error", description: "Failed to delete gift card", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -250,7 +255,7 @@ export default function GiftCardsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredCards.map((card) => (
-                    <TableRow key={card.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/gift-cards/${card.id}`)}>
+                    <TableRow key={card.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelectedCard(card)}>
                       <TableCell className="font-mono text-sm">
                         {card.code}
                       </TableCell>
@@ -323,6 +328,71 @@ export default function GiftCardsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedCard}
+        onClose={() => setSelectedCard(null)}
+        title={selectedCard ? `Gift Card: ${selectedCard.code}` : "Gift Card Details"}
+        onDelete={() => setDeleteDialogOpen(true)}
+      >
+        {selectedCard && (
+          <div className="space-y-1">
+            <DetailField label="Code" value={<span className="font-mono">{selectedCard.code}</span>} />
+            <DetailField label="Current Balance" value={formatCurrency(toNumber(selectedCard.currentBalance))} />
+            <DetailField label="Original Amount" value={formatCurrency(toNumber(selectedCard.initialBalance))} />
+            <DetailField
+              label="Status"
+              value={<Badge variant={getStatusVariant(selectedCard.status)}>{selectedCard.status}</Badge>}
+            />
+            <DetailField label="Recipient" value={selectedCard.recipientName || "—"} />
+            <DetailField label="Recipient Email" value={selectedCard.recipientEmail || "—"} />
+            <DetailField
+              label="Purchased By"
+              value={
+                selectedCard.purchasedBy
+                  ? `${selectedCard.purchasedBy.firstName} ${selectedCard.purchasedBy.lastName}`
+                  : "—"
+              }
+            />
+            <DetailField label="Purchased At" value={formatDate(new Date(selectedCard.purchasedAt))} />
+            <DetailField
+              label="Expires"
+              value={selectedCard.expiresAt ? formatDate(new Date(selectedCard.expiresAt)) : "No expiry"}
+            />
+            <DetailField
+              label="Last Used"
+              value={selectedCard.lastUsedAt ? formatDate(new Date(selectedCard.lastUsedAt)) : "Never"}
+            />
+          </div>
+        )}
+      </DetailSheet>
+
+      {/* Confirm Delete Dialog (via DetailSheet) */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete Gift Card"
+        description="Are you sure you want to delete this gift card? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!selectedCard) return;
+          try {
+            const response = await fetch(`/api/gift-cards/${selectedCard.id}`, { method: "DELETE" });
+            if (response.ok) {
+              toast({ title: "Success", description: "Gift card deleted successfully" });
+              setGiftCards(giftCards.filter(g => g.id !== selectedCard.id));
+              setSelectedCard(null);
+            } else {
+              toast({ title: "Error", description: "Failed to delete gift card", variant: "destructive" });
+            }
+          } catch (error) {
+            toast({ title: "Error", description: "Failed to delete gift card", variant: "destructive" });
+          }
+          setDeleteDialogOpen(false);
+        }}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
 
       {/* Delete Confirmation Dialog */}
       {deleteId && (

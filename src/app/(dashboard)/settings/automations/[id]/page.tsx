@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Save, Trash2, Zap, Calendar, Clock, Gift, Star, Mail, MessageSquare } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface Automation {
   id: string;
@@ -104,7 +105,7 @@ export default function AutomationDetailPage() {
 
   const handleSave = async () => {
     if (!name || !triggerType || !actionType) {
-      alert("Please fill in required fields: Name, Trigger, and Action");
+      toast({ title: "Error", description: "Please fill in required fields: Name, Trigger, and Action", variant: "destructive" });
       return;
     }
 
@@ -133,11 +134,11 @@ export default function AutomationDetailPage() {
       if (response.ok) {
         router.push("/settings/automations");
       } else {
-        alert("Failed to update automation");
+        toast({ title: "Error", description: "Failed to update automation", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error updating automation:", error);
-      alert("Failed to update automation");
+      toast({ title: "Error", description: "Failed to update automation", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -153,11 +154,11 @@ export default function AutomationDetailPage() {
       if (response.ok) {
         router.push("/settings/automations");
       } else {
-        alert("Failed to delete automation");
+        toast({ title: "Error", description: "Failed to delete automation", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting automation:", error);
-      alert("Failed to delete automation");
+      toast({ title: "Error", description: "Failed to delete automation", variant: "destructive" });
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

@@ -116,7 +116,7 @@ Return as JSON:
         },
         { role: "user", content: prompt },
       ],
-      { maxTokens: 1500, temperature: 0.3 }
+      { maxTokens: 10000, temperature: 0.3 }
     );
 
     let analysis;

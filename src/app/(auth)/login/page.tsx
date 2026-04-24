@@ -224,6 +224,12 @@ export default function LoginPage() {
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
+
+          <div className="text-center">
+            <Link href="/forgot-password" className="text-sm text-rose-600 hover:underline">
+              Forgot your password?
+            </Link>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4 border-t pt-4">
           <p className="text-sm text-center text-muted-foreground">

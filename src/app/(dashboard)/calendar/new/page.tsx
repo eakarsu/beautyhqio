@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, Calendar, Clock, User, Scissors } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface Client {
   id: string;
@@ -108,11 +109,11 @@ export default function NewAppointmentPage() {
       if (response.ok) {
         router.push("/calendar");
       } else {
-        alert("Failed to create appointment");
+        toast({ title: "Error", description: "Failed to create appointment", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating appointment:", error);
-      alert("Failed to create appointment");
+      toast({ title: "Error", description: "Failed to create appointment", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }

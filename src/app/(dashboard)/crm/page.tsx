@@ -46,6 +46,9 @@ import {
   Users,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface Lead {
   id: string;
@@ -131,6 +134,8 @@ export default function CRMPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [saving, setSaving] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -223,18 +228,20 @@ export default function CRMPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this lead?")) return;
-
     try {
       const response = await fetch(`/api/crm/leads?id=${id}`, {
         method: "DELETE",
       });
 
       if (response.ok) {
+        toast({ title: "Lead deleted", description: "The lead has been removed." });
         fetchLeads();
+      } else {
+        toast({ title: "Error", description: "Failed to delete lead", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting lead:", error);
+      toast({ title: "Error", description: "Failed to delete lead", variant: "destructive" });
     }
   };
 
@@ -659,7 +666,7 @@ export default function CRMPage() {
                 <div
                   key={lead.id}
                   className="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => router.push(`/crm/${lead.id}`)}
+                  onClick={() => setSelectedLead(lead)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
@@ -737,7 +744,10 @@ export default function CRMPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(lead.id)}
+                        onClick={() => {
+                          setSelectedLead(lead);
+                          setDeleteDialogOpen(true);
+                        }}
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
@@ -749,6 +759,95 @@ export default function CRMPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Detail Sheet */}
+      <DetailSheet
+        open={!!selectedLead && !deleteDialogOpen}
+        onClose={() => setSelectedLead(null)}
+        title={selectedLead?.salonName || "Lead Details"}
+        onEdit={() => {
+          if (selectedLead) {
+            router.push(`/crm/${selectedLead.id}`);
+          }
+        }}
+        onDelete={() => {
+          setDeleteDialogOpen(true);
+        }}
+      >
+        {selectedLead && (
+          <dl className="space-y-1">
+            <DetailField label="Salon Name" value={selectedLead.salonName} />
+            <DetailField label="Owner" value={selectedLead.ownerName} />
+            <DetailField label="Email" value={selectedLead.email} />
+            <DetailField label="Phone" value={selectedLead.phone} />
+            <DetailField label="Website" value={selectedLead.website} />
+            <DetailField
+              label="Address"
+              value={
+                [selectedLead.address, selectedLead.city, selectedLead.state, selectedLead.zip]
+                  .filter(Boolean)
+                  .join(", ") || undefined
+              }
+            />
+            <DetailField
+              label="Status"
+              value={
+                <Badge className={statusColors[selectedLead.status]}>
+                  {statusLabels[selectedLead.status]}
+                </Badge>
+              }
+            />
+            <DetailField
+              label="Priority"
+              value={
+                <Badge className={priorityColors[selectedLead.priority]}>
+                  {selectedLead.priority}
+                </Badge>
+              }
+            />
+            <DetailField label="Source" value={sourceLabels[selectedLead.source]} />
+            <DetailField label="Notes" value={selectedLead.notes} />
+            <DetailField
+              label="Last Contact"
+              value={
+                selectedLead.lastContactAt
+                  ? format(new Date(selectedLead.lastContactAt), "MMM d, yyyy")
+                  : undefined
+              }
+            />
+            <DetailField
+              label="Next Follow-up"
+              value={
+                selectedLead.nextFollowUp
+                  ? format(new Date(selectedLead.nextFollowUp), "MMM d, yyyy")
+                  : undefined
+              }
+            />
+            <DetailField
+              label="Created"
+              value={formatDistanceToNow(new Date(selectedLead.createdAt)) + " ago"}
+            />
+          </dl>
+        )}
+      </DetailSheet>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete Lead"
+        description="Are you sure you want to delete this lead? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (selectedLead) {
+            handleDelete(selectedLead.id).then(() => {
+              setDeleteDialogOpen(false);
+              setSelectedLead(null);
+            });
+          }
+        }}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </div>
   );
 }

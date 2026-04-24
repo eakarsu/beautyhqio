@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +46,7 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     async function fetchCampaign() {
@@ -97,20 +100,23 @@ export default function CampaignDetailPage() {
         setCampaign(updatedCampaign);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to send campaign");
+        toast({ title: "Error", description: error.error || "Failed to send campaign", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error sending campaign:", error);
-      alert("Failed to send campaign");
+      toast({ title: "Error", description: "Failed to send campaign", variant: "destructive" });
     } finally {
       setIsSending(false);
     }
   };
 
-  const handleDeleteCampaign = async () => {
+  const handleDeleteCampaign = () => {
     if (!campaign) return;
+    setDeleteDialogOpen(true);
+  };
 
-    if (!confirm("Are you sure you want to delete this campaign?")) return;
+  const confirmDeleteCampaign = async () => {
+    if (!campaign) return;
 
     try {
       const response = await fetch(`/api/marketing/campaigns/${campaign.id}`, {
@@ -120,11 +126,13 @@ export default function CampaignDetailPage() {
       if (response.ok) {
         router.push("/marketing");
       } else {
-        alert("Failed to delete campaign");
+        toast({ title: "Error", description: "Failed to delete campaign", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting campaign:", error);
-      alert("Failed to delete campaign");
+      toast({ title: "Error", description: "Failed to delete campaign", variant: "destructive" });
+    } finally {
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -328,6 +336,16 @@ export default function CampaignDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onCancel={() => setDeleteDialogOpen(false)}
+        title="Delete Campaign"
+        description="Are you sure you want to delete this campaign?"
+        onConfirm={confirmDeleteCampaign}
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

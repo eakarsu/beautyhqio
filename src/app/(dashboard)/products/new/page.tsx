@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, Package } from "lucide-react";
+import { validateForm, productSchema } from "@/lib/validation";
 
 interface ProductCategory {
   id: string;
@@ -41,6 +43,7 @@ export default function NewProductPage() {
     categoryId: "",
     isActive: true,
   });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchCategories();
@@ -86,11 +89,11 @@ export default function NewProductPage() {
         router.push("/products");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to create product");
+        toast({ title: "Error", description: error.error || "Failed to create product", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating product:", error);
-      alert("Failed to create product");
+      toast({ title: "Error", description: "Failed to create product", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

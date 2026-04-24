@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -206,11 +207,11 @@ export default function LeadDetailPage() {
       if (response.ok) {
         router.push("/crm");
       } else {
-        alert("Failed to update lead");
+        toast({ title: "Error", description: "Failed to update lead", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error updating lead:", error);
-      alert("Failed to update lead");
+      toast({ title: "Error", description: "Failed to update lead", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -226,11 +227,11 @@ export default function LeadDetailPage() {
       if (response.ok) {
         router.push("/crm");
       } else {
-        alert("Failed to delete lead");
+        toast({ title: "Error", description: "Failed to delete lead", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting lead:", error);
-      alert("Failed to delete lead");
+      toast({ title: "Error", description: "Failed to delete lead", variant: "destructive" });
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

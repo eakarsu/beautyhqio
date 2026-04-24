@@ -16,6 +16,7 @@ import {
   Trash2,
   ArrowLeft,
 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface Automation {
   id: string;
@@ -135,11 +136,11 @@ export default function AutomationsSettingsPage() {
         setAutomations((prev) => prev.filter((a) => a.id !== id));
         setDeleteId(null);
       } else {
-        alert("Failed to delete automation");
+        toast({ title: "Error", description: "Failed to delete automation", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting automation:", error);
-      alert("Failed to delete automation");
+      toast({ title: "Error", description: "Failed to delete automation", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }

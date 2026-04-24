@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,6 +47,9 @@ export default function ManageAddonsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAddon, setEditingAddon] = useState<ServiceAddOn | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [addonToDelete, setAddonToDelete] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -109,33 +114,40 @@ export default function ManageAddonsPage() {
         fetchService();
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to save add-on");
+        toast({ title: "Error", description: error.error || "Failed to save add-on", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error saving add-on:", error);
-      alert("Failed to save add-on");
+      toast({ title: "Error", description: "Failed to save add-on", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeleteAddon = async (addonId: string) => {
-    if (!service) return;
-    if (!confirm("Are you sure you want to delete this add-on?")) return;
+    setAddonToDelete(addonId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteAddon = async () => {
+    if (!service || !addonToDelete) return;
 
     try {
-      const response = await fetch(`/api/services/${service.id}/addons/${addonId}`, {
+      const response = await fetch(`/api/services/${service.id}/addons/${addonToDelete}`, {
         method: "DELETE",
       });
 
       if (response.ok) {
         fetchService();
       } else {
-        alert("Failed to delete add-on");
+        toast({ title: "Error", description: "Failed to delete add-on", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting add-on:", error);
-      alert("Failed to delete add-on");
+      toast({ title: "Error", description: "Failed to delete add-on", variant: "destructive" });
+    } finally {
+      setDeleteDialogOpen(false);
+      setAddonToDelete(null);
     }
   };
 
@@ -285,6 +297,16 @@ export default function ManageAddonsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onCancel={() => setDeleteDialogOpen(false)}
+        title="Delete Add-on"
+        description="Are you sure you want to delete this add-on?"
+        onConfirm={confirmDeleteAddon}
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

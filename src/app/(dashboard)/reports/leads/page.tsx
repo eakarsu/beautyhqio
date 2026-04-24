@@ -20,6 +20,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Users, DollarSign, TrendingUp, Calendar, Phone, Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Lead {
   id: string;
@@ -40,24 +42,32 @@ export default function LeadsReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const handleDeleteLead = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this lead?")) return;
+  const handleDeleteLeadClick = (id: string) => {
+    setPendingDeleteId(id);
+    setConfirmDialogOpen(true);
+  };
 
+  const handleDeleteLeadConfirm = async () => {
+    if (!pendingDeleteId) return;
+    setConfirmDialogOpen(false);
     setDeleting(true);
     try {
-      const res = await fetch(`/api/test-leads/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/test-leads/${pendingDeleteId}`, { method: "DELETE" });
       if (res.ok) {
-        setLeads(leads.filter(l => l.id !== id));
+        setLeads(leads.filter(l => l.id !== pendingDeleteId));
         setSelectedLead(null);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to delete");
+        toast({ title: "Error", description: data.error || "Failed to delete", variant: "destructive" });
       }
     } catch (err) {
-      alert("Failed to delete lead");
+      toast({ title: "Error", description: "Failed to delete lead", variant: "destructive" });
     } finally {
       setDeleting(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -372,7 +382,7 @@ export default function LeadsReportPage() {
               <div className="flex justify-between pt-4 border-t">
                 <Button
                   variant="destructive"
-                  onClick={() => handleDeleteLead(selectedLead.id)}
+                  onClick={() => handleDeleteLeadClick(selectedLead.id)}
                   disabled={deleting}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -386,6 +396,16 @@ export default function LeadsReportPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        onCancel={() => { setConfirmDialogOpen(false); setPendingDeleteId(null); }}
+        title="Delete Lead"
+        description="Are you sure you want to delete this lead?"
+        onConfirm={handleDeleteLeadConfirm}
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

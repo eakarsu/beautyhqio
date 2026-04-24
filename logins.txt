@@ -1,0 +1,26 @@
+Login Credentials
+
+  | Role                 | Email                            | Password    | Description                                                |
+  |----------------------|----------------------------------|-------------|------------------------------------------------------------|
+  | Platform Admin (You) | admin@beautyai.com               | admin123    | Sees ALL salons, subscribers, revenues across the platform |
+  | Salon Owner          | admin@luxebeauty.com             | admin123    | Owner of "Luxe Beauty Spa" - sees only their salon data    |
+  | Salon Owner          | maria@luxebeauty.com             | password123 | Another owner                                              |
+  | Staff                | jennifer@luxebeauty.com          | password123 | Manager                                                    |
+  | Staff                | lisa@luxebeauty.com              | password123 | Receptionist                                               |
+  | Staff                | sarah@luxebeauty.com             | password123 | Stylist                                                    |
+  | Client               | Any Google/Microsoft/Apple OAuth | N/A         | Self-register via OAuth                                    |
+
+  Login Method
+
+  - Staff & Admins: Use email/password at /login
+  - Clients: Use OAuth (Google, Microsoft, Apple) at /login - they cannot use email/password
+
+  Who sees what:
+
+  | Persona        | Can See                                                                        |
+  |----------------|--------------------------------------------------------------------------------|
+  | Platform Admin | All salons, all subscriptions, platform revenue, all clients                   |
+  | Salon Owner    | Only their salon's dashboard, clients, appointments, revenue                   |
+  | Staff          | Only their salon's data (limited by role - Manager vs Receptionist vs Stylist) |
+  | Client         | Their own appointments, profile, rewards, payments                             |
+

@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +38,7 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const isAdmin = session?.user?.role === "OWNER" || session?.user?.role === "MANAGER";
 
@@ -78,8 +81,6 @@ export default function MessagesPage() {
   };
 
   const deleteMessage = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this message?")) return;
-
     try {
       await fetch(`/api/contact/${id}`, {
         method: "DELETE",
@@ -232,7 +233,7 @@ export default function MessagesPage() {
                       variant="ghost"
                       size="sm"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => deleteMessage(selectedMessage.id)}
+                      onClick={() => setConfirmDeleteId(selectedMessage.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -308,6 +309,19 @@ export default function MessagesPage() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onConfirm={() => {
+          if (confirmDeleteId) deleteMessage(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+        title="Delete Message"
+        description="Are you sure you want to delete this message?"
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

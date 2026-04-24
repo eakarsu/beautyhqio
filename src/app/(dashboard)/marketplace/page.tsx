@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,9 +46,19 @@ export default function MarketplacePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const handleDeleteProfile = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this profile?")) return;
+  const handleDeleteProfile = (id: string) => {
+    setPendingDeleteId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const executeDeleteProfile = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setDeleteDialogOpen(false);
+    setPendingDeleteId(null);
 
     setDeleting(true);
     try {
@@ -56,10 +68,10 @@ export default function MarketplacePage() {
         setSelectedProfile(null);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to delete");
+        toast({ title: "Error", description: data.error || "Failed to delete", variant: "destructive" });
       }
     } catch (err) {
-      alert("Failed to delete profile");
+      toast({ title: "Error", description: "Failed to delete profile", variant: "destructive" });
     } finally {
       setDeleting(false);
     }
@@ -218,6 +230,16 @@ export default function MarketplacePage() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onConfirm={executeDeleteProfile}
+        onCancel={() => { setDeleteDialogOpen(false); setPendingDeleteId(null); }}
+        title="Delete Profile"
+        description="Are you sure you want to delete this profile? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+      />
 
       {/* Profile Detail Dialog */}
       <Dialog open={!!selectedProfile} onOpenChange={() => setSelectedProfile(null)}>

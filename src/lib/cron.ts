@@ -61,11 +61,11 @@ export function initCronJobs() {
     await processReminders();
   });
 
-  // Also run immediately on startup (after a small delay to ensure server is ready)
+  // Also run immediately on startup (after a delay to ensure server is ready)
   setTimeout(async () => {
     console.log("[Cron] Running initial reminder check on startup...");
     await processReminders();
-  }, 5000);
+  }, 15000);
 
   isInitialized = true;
   console.log("[Cron] Cron jobs initialized successfully");

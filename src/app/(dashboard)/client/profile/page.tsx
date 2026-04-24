@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { User, Mail, Phone, Calendar, Save } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 export default function ClientProfilePage() {
   const { data: session, status } = useSession();
@@ -42,7 +43,7 @@ export default function ClientProfilePage() {
         body: JSON.stringify(profile),
       });
       if (response.ok) {
-        alert("Profile updated successfully!");
+        toast({ title: "Success", description: "Profile updated successfully!" });
       }
     } catch (error) {
       console.error("Error updating profile:", error);

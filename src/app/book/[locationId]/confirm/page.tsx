@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import { toast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -134,10 +135,10 @@ export default function ConfirmBookingPage({
         setConfirmationNumber(data.confirmationNumber);
         setConfirmed(true);
       } else {
-        alert(data.error || "Failed to book appointment");
+        toast({ title: "Error", description: data.error || "Failed to book appointment", variant: "destructive" });
       }
     } catch (error) {
-      alert("Failed to book appointment");
+      toast({ title: "Error", description: "Failed to book appointment", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }

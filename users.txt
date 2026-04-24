@@ -1,0 +1,4 @@
+| maria@luxebeauty.com    | OWNER        | Yes               |
+  | jennifer@luxebeauty.com | MANAGER      | Yes               |
+  | lisa@luxebeauty.com     | RECEPTIONIST | No                |
+  | sarah@luxebeauty.com    | STAFF        | No                |

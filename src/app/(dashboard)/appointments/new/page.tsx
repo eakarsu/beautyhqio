@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -121,11 +122,11 @@ export default function NewAppointmentPage() {
         router.push(`/appointments/${appointment.id}`);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to create appointment");
+        toast({ title: "Error", description: error.error || "Failed to create appointment", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating appointment:", error);
-      alert("Failed to create appointment");
+      toast({ title: "Error", description: "Failed to create appointment", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

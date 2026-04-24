@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -74,7 +75,7 @@ export default function KioskWalkInPage() {
       const locationId = locations[0]?.id;
 
       if (!locationId) {
-        alert("No location configured");
+        toast({ title: "Error", description: "No location configured", variant: "destructive" });
         return;
       }
 
@@ -106,7 +107,7 @@ export default function KioskWalkInPage() {
       setEstimatedWait(waitlistData.estimatedWait);
       setStep("confirmed");
     } catch (error) {
-      alert("Failed to join waitlist");
+      toast({ title: "Error", description: "Failed to join waitlist", variant: "destructive" });
     } finally {
       setLoading(false);
     }

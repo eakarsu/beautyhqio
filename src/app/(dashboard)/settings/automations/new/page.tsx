@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Save, Zap, Calendar, Clock, Gift, Star, Mail, MessageSquare } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const TRIGGER_TYPES = [
   { value: "appointment_booked", label: "Appointment Booked", icon: Calendar },
@@ -50,7 +51,7 @@ export default function NewAutomationPage() {
 
   const handleSave = async () => {
     if (!name || !triggerType || !actionType) {
-      alert("Please fill in required fields: Name, Trigger, and Action");
+      toast({ title: "Error", description: "Please fill in required fields: Name, Trigger, and Action", variant: "destructive" });
       return;
     }
 
@@ -67,7 +68,7 @@ export default function NewAutomationPage() {
       }
 
       if (!businessId) {
-        alert("No business found. Please create a business first.");
+        toast({ title: "Error", description: "No business found. Please create a business first.", variant: "destructive" });
         setIsSaving(false);
         return;
       }
@@ -97,11 +98,11 @@ export default function NewAutomationPage() {
         router.push("/settings/automations");
       } else {
         const data = await response.json();
-        alert(data.error || "Failed to create automation");
+        toast({ title: "Error", description: data.error || "Failed to create automation", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating automation:", error);
-      alert("Failed to create automation");
+      toast({ title: "Error", description: "Failed to create automation", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }

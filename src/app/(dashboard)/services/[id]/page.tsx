@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +51,8 @@ export default function ServiceDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -117,19 +121,17 @@ export default function ServiceDetailPage() {
         setIsEditing(false);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to update service");
+        toast({ title: "Error", description: error.error || "Failed to update service", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error updating service:", error);
-      alert("Failed to update service");
+      toast({ title: "Error", description: "Failed to update service", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this service?")) return;
-
     try {
       const response = await fetch(`/api/services/${serviceId}`, {
         method: "DELETE",
@@ -139,11 +141,11 @@ export default function ServiceDetailPage() {
         router.push("/services");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to delete service");
+        toast({ title: "Error", description: error.error || "Failed to delete service", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error deleting service:", error);
-      alert("Failed to delete service");
+      toast({ title: "Error", description: "Failed to delete service", variant: "destructive" });
     }
   };
 
@@ -213,7 +215,7 @@ export default function ServiceDetailPage() {
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 Edit
               </Button>
-              <Button variant="destructive" size="icon" onClick={handleDelete}>
+              <Button variant="destructive" size="icon" onClick={() => setConfirmDeleteOpen(true)}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </>
@@ -346,6 +348,19 @@ export default function ServiceDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          handleDelete();
+        }}
+        onCancel={() => setConfirmDeleteOpen(false)}
+        title="Delete Service"
+        description="Are you sure you want to delete this service?"
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

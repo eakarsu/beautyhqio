@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, Scissors } from "lucide-react";
+import { validateForm, serviceSchema } from "@/lib/validation";
 
 interface ServiceCategory {
   id: string;
@@ -39,6 +41,7 @@ export default function NewServicePage() {
     priceType: "FIXED",
     color: "#F43F5E",
   });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchCategories();
@@ -58,6 +61,23 @@ export default function NewServicePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationErrors({});
+
+    // Validate form data
+    const { valid, errors } = validateForm(serviceSchema, {
+      name: formData.name,
+      description: formData.description || undefined,
+      price: parseFloat(formData.price) || 0,
+      duration: formData.duration,
+      categoryId: formData.categoryId,
+    });
+
+    if (!valid) {
+      setValidationErrors(errors);
+      toast({ title: "Validation Error", description: "Please fix the errors below", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -82,11 +102,11 @@ export default function NewServicePage() {
         router.push(`/services/${service.id}`);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to create service");
+        toast({ title: "Error", description: error.error || "Failed to create service", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating service:", error);
-      alert("Failed to create service");
+      toast({ title: "Error", description: "Failed to create service", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +140,11 @@ export default function NewServicePage() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Enter service name"
                 required
+                className={validationErrors.name ? "border-red-500" : ""}
               />
+              {validationErrors.name && (
+                <p className="text-xs text-red-500">{validationErrors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">

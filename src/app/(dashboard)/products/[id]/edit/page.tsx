@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -116,11 +117,11 @@ export default function EditProductPage() {
         router.push(`/products/${params.id}`);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to update product");
+        toast({ title: "Error", description: error.error || "Failed to update product", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error updating product:", error);
-      alert("Failed to update product");
+      toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

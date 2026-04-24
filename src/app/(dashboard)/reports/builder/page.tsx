@@ -28,6 +28,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 interface ReportField {
   id: string;
@@ -205,7 +206,7 @@ export default function ReportBuilderPage() {
       setHasRun(true);
     } catch (error) {
       console.error("Error running report:", error);
-      alert("Failed to generate report");
+      toast({ title: "Error", description: "Failed to generate report", variant: "destructive" });
     } finally {
       setIsRunning(false);
     }

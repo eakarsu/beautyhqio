@@ -16,6 +16,7 @@ import {
   Star,
   Info,
   UserPlus,
+  UserCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -192,7 +193,7 @@ export default function DashboardPage() {
       icon: Calendar,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
-      href: "/calendar",
+      href: "/appointments",
     },
     {
       title: "Today's Revenue",
@@ -204,6 +205,24 @@ export default function DashboardPage() {
       href: "/reports",
     },
     {
+      title: "Walk-in Queue",
+      value: stats.walkInQueue.toString(),
+      change: stats.avgWaitTime,
+      icon: Clock,
+      color: "text-amber-600",
+      bgColor: "bg-amber-100",
+      href: "/appointments",
+    },
+    {
+      title: "Staff on Duty",
+      value: stats.staffOnDuty.toString(),
+      change: "Currently active",
+      icon: UserCheck,
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-100",
+      href: "/staff",
+    },
+    {
       title: "Total Clients",
       value: stats.totalClients.toString(),
       change: "All time",
@@ -211,15 +230,6 @@ export default function DashboardPage() {
       color: "text-purple-600",
       bgColor: "bg-purple-100",
       href: "/clients",
-    },
-    {
-      title: "Walk-in Queue",
-      value: stats.walkInQueue.toString(),
-      change: stats.avgWaitTime,
-      icon: Clock,
-      color: "text-amber-600",
-      bgColor: "bg-amber-100",
-      href: "/calendar/waitlist",
     },
   ];
 
@@ -236,7 +246,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {statCards.map((stat) => (
           <Card
             key={stat.title}
@@ -265,8 +275,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Appointments */}
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Today&apos;s Schedule</CardTitle>
+          <CardHeader
+            className="cursor-pointer"
+            onClick={() => router.push("/appointments")}
+          >
+            <CardTitle className="text-lg hover:text-rose-600 transition-colors">Today&apos;s Schedule</CardTitle>
           </CardHeader>
           <CardContent>
             {dashboardData?.appointments && dashboardData.appointments.length > 0 ? (

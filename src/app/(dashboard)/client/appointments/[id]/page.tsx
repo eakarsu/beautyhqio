@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import {
   Calendar,
   Clock,
@@ -94,10 +95,10 @@ export default function AppointmentDetailPage({
         router.push("/client/appointments");
       } else {
         const data = await response.json();
-        alert(data.error || "Failed to delete appointment");
+        toast({ title: "Error", description: data.error || "Failed to delete appointment", variant: "destructive" });
       }
     } catch (error) {
-      alert("Failed to delete appointment");
+      toast({ title: "Error", description: "Failed to delete appointment", variant: "destructive" });
     } finally {
       setDeleting(false);
     }

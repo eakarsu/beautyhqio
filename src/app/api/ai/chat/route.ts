@@ -40,7 +40,7 @@ Be helpful, professional, and provide actionable advice. When discussing numbers
     ];
 
     const response = await openRouterChat(formattedMessages, {
-      maxTokens: 2048,
+      maxTokens: 10000,
       temperature: 0.7,
     });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,8 @@ export function ServiceFormula({ clientId }: ServiceFormulaProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingFormula, setEditingFormula] = useState<Formula | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     serviceType: "",
     formula: "",
@@ -83,11 +86,15 @@ export function ServiceFormula({ clientId }: ServiceFormulaProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this formula?")) return;
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+    setDeleteDialogOpen(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
     try {
-      const response = await fetch(`/api/clients/${clientId}/formulas/${id}`, {
+      const response = await fetch(`/api/clients/${clientId}/formulas/${pendingDeleteId}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -96,6 +103,8 @@ export function ServiceFormula({ clientId }: ServiceFormulaProps) {
     } catch (error) {
       console.error("Error deleting formula:", error);
     }
+    setDeleteDialogOpen(false);
+    setPendingDeleteId(null);
   };
 
   const handleEdit = (formula: Formula) => {
@@ -236,6 +245,16 @@ export function ServiceFormula({ clientId }: ServiceFormulaProps) {
           </div>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onConfirm={confirmDelete}
+        onCancel={() => { setDeleteDialogOpen(false); setPendingDeleteId(null); }}
+        title="Delete Formula?"
+        description="Are you sure you want to delete this formula? This cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </Card>
   );
 }

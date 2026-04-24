@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -92,7 +93,7 @@ export default function TwilioSMSChatPage() {
     // Basic phone validation
     const cleanPhone = userPhone.replace(/\D/g, "");
     if (cleanPhone.length < 10) {
-      alert("Please enter a valid phone number");
+      toast({ title: "Error", description: "Please enter a valid phone number", variant: "destructive" });
       return;
     }
 

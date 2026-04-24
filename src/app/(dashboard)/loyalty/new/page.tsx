@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,11 +50,11 @@ export default function NewLoyaltyRewardPage() {
         router.push("/loyalty");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to create reward");
+        toast({ title: "Error", description: error.error || "Failed to create reward", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating reward:", error);
-      alert("Failed to create reward");
+      toast({ title: "Error", description: "Failed to create reward", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

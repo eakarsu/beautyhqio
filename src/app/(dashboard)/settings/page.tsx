@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +63,54 @@ export default function SettingsPage() {
   const [calendarStaff, setCalendarStaff] = useState<CalendarStaff[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [connectingStaffId, setConnectingStaffId] = useState<string | null>(null);
+
+  // Disconnect calendar confirm dialog state
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [pendingDisconnect, setPendingDisconnect] = useState<{ staffId: string; staffName: string } | null>(null);
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    setPasswordError("");
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setPasswordError("Password must be at least 8 characters with uppercase, lowercase, and number");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setPasswordError(data.error || "Failed to change password");
+        toast({ title: "Error", description: data.error || "Failed to change password", variant: "destructive" });
+      } else {
+        toast({ title: "Success", description: "Password updated successfully" });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+      }
+    } catch {
+      setPasswordError("Something went wrong");
+      toast({ title: "Error", description: "Something went wrong", variant: "destructive" });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const [formData, setFormData] = useState<SettingsData>({
     businessName: "",
@@ -154,21 +204,27 @@ export default function SettingsPage() {
         const { authUrl } = await response.json();
         window.location.href = authUrl;
       } else {
-        alert("Failed to start Google Calendar connection");
+        toast({ title: "Error", description: "Failed to start Google Calendar connection", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error connecting calendar:", error);
-      alert("Failed to connect to Google Calendar");
+      toast({ title: "Error", description: "Failed to connect to Google Calendar", variant: "destructive" });
     } finally {
       setConnectingStaffId(null);
     }
   };
 
   // Disconnect staff member from Google Calendar
-  const handleDisconnectCalendar = async (staffId: string, staffName: string) => {
-    if (!confirm(`Are you sure you want to disconnect Google Calendar for ${staffName}? Future appointments will no longer sync.`)) {
-      return;
-    }
+  const handleDisconnectCalendar = (staffId: string, staffName: string) => {
+    setPendingDisconnect({ staffId, staffName });
+    setDisconnectDialogOpen(true);
+  };
+
+  const executeDisconnectCalendar = async () => {
+    if (!pendingDisconnect) return;
+    const { staffId } = pendingDisconnect;
+    setDisconnectDialogOpen(false);
+    setPendingDisconnect(null);
 
     setConnectingStaffId(staffId);
     try {
@@ -182,11 +238,11 @@ export default function SettingsPage() {
           )
         );
       } else {
-        alert("Failed to disconnect Google Calendar");
+        toast({ title: "Error", description: "Failed to disconnect Google Calendar", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error disconnecting calendar:", error);
-      alert("Failed to disconnect Google Calendar");
+      toast({ title: "Error", description: "Failed to disconnect Google Calendar", variant: "destructive" });
     } finally {
       setConnectingStaffId(null);
     }
@@ -231,13 +287,13 @@ export default function SettingsPage() {
       if (response.ok) {
         setOriginalData(formData);
         setHasChanges(false);
-        alert("Settings saved successfully!");
+        toast({ title: "Success", description: "Settings saved successfully!" });
       } else {
-        alert("Failed to save settings");
+        toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error saving settings:", error);
-      alert("Failed to save settings");
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -486,7 +542,7 @@ export default function SettingsPage() {
                         <Badge variant="secondary">Closed</Badge>
                       )}
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => alert(`${schedule.day} schedule updated`)}>
+                    <Button variant="ghost" size="sm" onClick={() => toast({ title: "Success", description: `${schedule.day} schedule updated` })}>
                       {schedule.isOpen ? "Set as Closed" : "Set Hours"}
                     </Button>
                   </div>
@@ -665,7 +721,7 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Team Members</CardTitle>
-                <Button size="sm" onClick={() => alert("Invitation email form opened")}>Invite Member</Button>
+                <Button size="sm" onClick={() => toast({ title: "Success", description: "Invitation email form opened" })}>Invite Member</Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -696,7 +752,7 @@ export default function SettingsPage() {
                           <SelectItem value="staff">Staff</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="ghost" size="sm" onClick={() => alert(`${member.name} removed from team`)}>
+                      <Button variant="ghost" size="sm" onClick={() => toast({ title: "Success", description: `${member.name} removed from team` })}>
                         Remove
                       </Button>
                     </div>
@@ -717,17 +773,59 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input id="currentPassword" type="password" />
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="newPassword">New Password</Label>
-                  <Input id="newPassword" type="password" />
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  {newPassword && (
+                    <div className="space-y-1 text-xs">
+                      <p className={newPassword.length >= 8 ? "text-green-600" : "text-slate-400"}>
+                        {newPassword.length >= 8 ? "\u2713" : "\u2022"} At least 8 characters
+                      </p>
+                      <p className={/[A-Z]/.test(newPassword) ? "text-green-600" : "text-slate-400"}>
+                        {/[A-Z]/.test(newPassword) ? "\u2713" : "\u2022"} One uppercase letter
+                      </p>
+                      <p className={/[a-z]/.test(newPassword) ? "text-green-600" : "text-slate-400"}>
+                        {/[a-z]/.test(newPassword) ? "\u2713" : "\u2022"} One lowercase letter
+                      </p>
+                      <p className={/[0-9]/.test(newPassword) ? "text-green-600" : "text-slate-400"}>
+                        {/[0-9]/.test(newPassword) ? "\u2713" : "\u2022"} One number
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                  <Input id="confirmPassword" type="password" />
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  />
+                  {confirmNewPassword && confirmNewPassword !== newPassword && (
+                    <p className="text-xs text-red-500">Passwords do not match</p>
+                  )}
                 </div>
-                <Button onClick={() => alert("Password updated successfully")}>Update Password</Button>
+                {passwordError && (
+                  <p className="text-sm text-red-500">{passwordError}</p>
+                )}
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={changingPassword || !currentPassword || !newPassword || !confirmNewPassword}
+                >
+                  {changingPassword ? "Updating..." : "Update Password"}
+                </Button>
               </CardContent>
             </Card>
 
@@ -743,7 +841,7 @@ export default function SettingsPage() {
                       Add an extra layer of security to your account
                     </p>
                   </div>
-                  <Button variant="outline" onClick={() => alert("Two-factor authentication setup initiated")}>Enable 2FA</Button>
+                  <Button variant="outline" onClick={() => toast({ title: "Success", description: "Two-factor authentication setup initiated" })}>Enable 2FA</Button>
                 </div>
               </CardContent>
             </Card>
@@ -763,7 +861,7 @@ export default function SettingsPage() {
                   <div className="w-24 h-24 rounded-lg border-2 border-dashed flex items-center justify-center text-slate-400">
                     Logo
                   </div>
-                  <Button variant="outline" onClick={() => alert("File picker opened for logo upload")}>Upload Logo</Button>
+                  <Button variant="outline" onClick={() => toast({ title: "Success", description: "File picker opened for logo upload" })}>Upload Logo</Button>
                 </div>
               </div>
 
@@ -929,7 +1027,7 @@ export default function SettingsPage() {
                         >
                           {integration.status}
                         </Badge>
-                        <Button variant="outline" size="sm" onClick={() => alert(`${integration.name} ${integration.status === "Connected" ? "configuration" : "connection"} opened`)}>
+                        <Button variant="outline" size="sm" onClick={() => toast({ title: "Success", description: `${integration.name} ${integration.status === "Connected" ? "configuration" : "connection"} opened` })}>
                           {integration.status === "Connected"
                             ? "Configure"
                             : "Connect"}
@@ -943,6 +1041,16 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={disconnectDialogOpen}
+        onConfirm={executeDisconnectCalendar}
+        onCancel={() => { setDisconnectDialogOpen(false); setPendingDisconnect(null); }}
+        title="Disconnect Google Calendar"
+        description={pendingDisconnect ? `Are you sure you want to disconnect Google Calendar for ${pendingDisconnect.staffName}? Future appointments will no longer sync.` : ""}
+        confirmLabel="Disconnect"
+        variant="destructive"
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -66,7 +67,7 @@ export default function IssuePointsPage() {
     e.preventDefault();
 
     if (!formData.clientId || !formData.points) {
-      alert("Please select a client and enter points");
+      toast({ title: "Error", description: "Please select a client and enter points", variant: "destructive" });
       return;
     }
 
@@ -88,11 +89,11 @@ export default function IssuePointsPage() {
         router.push("/loyalty");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to issue points");
+        toast({ title: "Error", description: error.error || "Failed to issue points", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error issuing points:", error);
-      alert("Failed to issue points");
+      toast({ title: "Error", description: "Failed to issue points", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
