@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: beauty-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: beauty_wellness_ai
+    volumes:
+      - beauty_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    image: eakarsun4/beauty-wellness-ai:latest
+    container_name: beauty-wellness
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - /root/.env.beautyhqio
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/beauty_wellness_ai
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  beauty_pgdata:
+    name: beauty_pgdata
