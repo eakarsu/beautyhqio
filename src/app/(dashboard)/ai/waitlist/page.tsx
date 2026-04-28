@@ -76,43 +76,25 @@ export default function WaitlistPage() {
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
+    setResult(null);
 
-    // Simulate AI analysis (in production, this would call a real API)
-    setTimeout(() => {
-      const waitCount = parseInt(currentWaitlist) || 5;
-      const serviceTime = parseInt(averageServiceTime) || 45;
-      const staff = parseInt(staffAvailable) || 3;
-
-      const avgWaitTime = Math.round((waitCount * serviceTime) / staff);
-      const cancellationRisk = waitCount > 6 ? "high" : waitCount > 3 ? "medium" : "low";
-
-      setResult({
-        estimatedWaitTime: avgWaitTime,
-        cancellationPredictions: [
-          { position: 3, client: "Walk-in #3", risk: 35, reason: "Long wait time for walk-in" },
-          { position: 5, client: "Walk-in #5", risk: 55, reason: "Over 1 hour wait, first-time visitor" },
-          { position: 7, client: "Sarah M.", risk: 20, reason: "Regular client, usually patient" },
-        ].slice(0, Math.min(waitCount, 3)),
-        optimizationSuggestions: [
-          "Consider offering position #5 a 10% discount to wait",
-          "Notify clients at positions 4-6 of updated wait times",
-          `Current throughput: ${staff} clients per ${serviceTime} min average`,
-          waitCount > 5 ? "Consider opening additional station if available" : "Waitlist is manageable",
-        ],
-        notifyClients: waitCount > 4 ? [
-          { position: waitCount - 1, message: "You're next! Please be ready." },
-          { position: Math.ceil(waitCount / 2), message: `Estimated wait: ${Math.round(avgWaitTime / 2)} min` },
-        ] : [],
-        peakPrediction: {
-          nextPeakHour: dayType === "saturday" ? "2:00 PM" : "5:00 PM",
-          expectedIncrease: dayType === "saturday" ? "+40%" : "+25%",
-        },
-        staffRecommendation: waitCount > staff * 2
-          ? "Consider calling in additional staff"
-          : "Current staffing is adequate",
+    try {
+      const res = await fetch("/api/ai/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dayType: dayType || null }),
       });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to analyze waitlist");
+      }
+      setResult(data.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to analyze waitlist");
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const getRiskColor = (risk: number) => {

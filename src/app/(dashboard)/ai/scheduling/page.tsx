@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,24 +59,17 @@ interface SchedulingResult {
   peakTimeWarning: string | null;
 }
 
-const services = [
-  { id: "haircut", name: "Haircut", duration: 45 },
-  { id: "color", name: "Hair Color", duration: 120 },
-  { id: "balayage", name: "Balayage", duration: 180 },
-  { id: "blowout", name: "Blowout", duration: 30 },
-  { id: "manicure", name: "Manicure", duration: 30 },
-  { id: "pedicure", name: "Pedicure", duration: 45 },
-  { id: "facial", name: "Facial", duration: 60 },
-  { id: "massage", name: "Massage", duration: 60 },
-];
+interface ServiceOpt {
+  id: string;
+  name: string;
+  duration: number;
+}
 
-const staff = [
-  { id: "1", name: "Sarah J.", specialty: "Color & Styling" },
-  { id: "2", name: "Ashley W.", specialty: "Cuts & Blowouts" },
-  { id: "3", name: "Michelle T.", specialty: "Nails" },
-  { id: "4", name: "David C.", specialty: "Men's Grooming" },
-  { id: "5", name: "Emma D.", specialty: "Skincare & Spa" },
-];
+interface StaffOpt {
+  id: string;
+  name: string;
+  specialty: string;
+}
 
 export default function SmartSchedulingPage() {
   const router = useRouter();
@@ -88,6 +81,68 @@ export default function SmartSchedulingPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SchedulingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [services, setServices] = useState<ServiceOpt[]>([]);
+  const [staff, setStaff] = useState<StaffOpt[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [svcRes, staffRes] = await Promise.all([
+          fetch("/api/services?isActive=true"),
+          fetch("/api/staff?isActive=true"),
+        ]);
+        const [svcData, staffData] = await Promise.all([
+          svcRes.json(),
+          staffRes.json(),
+        ]);
+        if (cancelled) return;
+        if (Array.isArray(svcData)) {
+          setServices(
+            svcData.map((s: { id: string; name: string; duration: number }) => ({
+              id: s.id,
+              name: s.name,
+              duration: s.duration,
+            }))
+          );
+        }
+        if (Array.isArray(staffData)) {
+          setStaff(
+            staffData.map(
+              (s: {
+                id: string;
+                displayName?: string | null;
+                title?: string | null;
+                specialties?: string[];
+                user?: { firstName: string; lastName: string };
+              }) => ({
+                id: s.id,
+                name:
+                  s.displayName ||
+                  (s.user
+                    ? `${s.user.firstName} ${s.user.lastName}`
+                    : "Staff"),
+                specialty:
+                  s.title ||
+                  (s.specialties && s.specialties.length
+                    ? s.specialties.join(", ")
+                    : "—"),
+              })
+            )
+          );
+        }
+      } catch (e) {
+        console.error("Failed to load options", e);
+      } finally {
+        if (!cancelled) setOptionsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleService = (serviceId: string) => {
     setSelectedServices((prev) =>
@@ -115,10 +170,14 @@ export default function SmartSchedulingPage() {
           clientName: selectedClient
             ? `${selectedClient.firstName} ${selectedClient.lastName}`
             : "New Client",
+          serviceIds: selectedServices,
           preferredServices: selectedServices.map(
             (id) => services.find((s) => s.id === id)?.name || id
           ),
-          preferredStaff: preferredStaff
+          preferredStaffId: preferredStaff && preferredStaff !== "any"
+            ? preferredStaff
+            : null,
+          preferredStaff: preferredStaff && preferredStaff !== "any"
             ? staff.find((s) => s.id === preferredStaff)?.name
             : null,
           preferredTime,
@@ -183,6 +242,14 @@ export default function SmartSchedulingPage() {
             {/* Services */}
             <div className="space-y-2">
               <Label>Services Needed *</Label>
+              {optionsLoading && (
+                <p className="text-xs text-slate-500">Loading services...</p>
+              )}
+              {!optionsLoading && services.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  No services configured. Add services in Settings → Services.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 {services.map((service) => {
                   const isSelected = selectedServices.includes(service.id);

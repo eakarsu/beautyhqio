@@ -138,24 +138,36 @@ export default function TwilioSMSChatPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Update message status to sent
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === userMessage.id ? { ...msg, status: "sent" } : msg
           )
         );
 
-        // Simulate receiving a response (in real scenario, this would come from webhook)
-        setTimeout(() => {
-          const assistantMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: getAutoResponse(content.trim()),
-            timestamp: new Date(),
-            status: "delivered",
-          };
-          setMessages((prev) => [...prev, assistantMessage]);
-        }, 1500);
+        const aiRes = await fetch("/api/ai/sms-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: content.trim(),
+            clientPhone: userPhone,
+            history: messages
+              .filter((m) => m.id !== "welcome")
+              .slice(-8)
+              .map((m) => ({ role: m.role, content: m.content })),
+          }),
+        });
+        const aiData = await aiRes.json();
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content:
+            aiData.success && aiData.reply
+              ? aiData.reply
+              : "Thanks for your message — a team member will follow up shortly.",
+          timestamp: new Date(),
+          status: "delivered",
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
       } else {
         throw new Error(data.error || "Failed to send SMS");
       }
@@ -178,26 +190,6 @@ export default function TwilioSMSChatPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Simple auto-response for demo (in production, this comes from Twilio webhook)
-  const getAutoResponse = (message: string): string => {
-    const lowerMessage = message.toLowerCase();
-
-    if (lowerMessage.includes("book") || lowerMessage.includes("appointment")) {
-      return "Great! I'd be happy to help you book an appointment. What service are you interested in? We offer:\n\n- Haircuts & Styling\n- Hair Color\n- Manicure & Pedicure\n- Facial Treatments\n- Massage Therapy";
-    }
-    if (lowerMessage.includes("available") || lowerMessage.includes("time")) {
-      return "We have availability this week! Here are some open slots:\n\n- Tomorrow 10:00 AM, 2:00 PM\n- Wednesday 9:00 AM, 11:00 AM, 3:00 PM\n- Thursday 10:00 AM, 1:00 PM\n\nWhich time works best for you?";
-    }
-    if (lowerMessage.includes("price") || lowerMessage.includes("cost") || lowerMessage.includes("service")) {
-      return "Here are our popular services:\n\n- Haircut: $35-65\n- Hair Color: $75-150\n- Manicure: $25\n- Pedicure: $40\n- Facial: $65-95\n- Massage (60 min): $85\n\nWould you like to book any of these?";
-    }
-    if (lowerMessage.includes("hour") || lowerMessage.includes("location") || lowerMessage.includes("address")) {
-      return "Serenity Salon & Spa\n\nHours:\nMon-Fri: 9 AM - 7 PM\nSat: 9 AM - 5 PM\nSun: Closed\n\nLocation:\n123 Beauty Lane\nYour City, ST 12345\n\nPhone: " + (twilioNumber || "(804) 409-2778");
-    }
-
-    return "Thank you for your message! One of our team members will respond shortly. Is there anything specific I can help you with?\n\n- Book an appointment\n- Check availability\n- View services & pricing\n- Get our contact info";
   };
 
   const handleSubmit = (e: React.FormEvent) => {

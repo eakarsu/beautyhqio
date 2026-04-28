@@ -46,23 +46,20 @@ export default function KioskCheckInPage() {
     setIsSearching(true);
     try {
       const cleaned = phoneNumber.replace(/\D/g, "");
-      const response = await fetch(`/api/appointments?phone=${cleaned}&today=true`);
+      const response = await fetch(`/api/kiosk/lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: cleaned }),
+      });
       if (response.ok) {
         const data = await response.json();
         setAppointments(data);
+      } else {
+        setAppointments([]);
       }
     } catch (error) {
       console.error("Error searching:", error);
-      // Demo data
-      setAppointments([
-        {
-          id: "1",
-          scheduledStart: new Date(Date.now() + 1000 * 60 * 30).toISOString(),
-          client: { firstName: "Jane", lastName: "Doe" },
-          staff: { displayName: "Sarah Johnson", user: { firstName: "Sarah", lastName: "Johnson" } },
-          services: [{ service: { name: "Haircut & Style" } }],
-        },
-      ]);
+      setAppointments([]);
     } finally {
       setIsSearching(false);
     }
@@ -70,16 +67,17 @@ export default function KioskCheckInPage() {
 
   const handleCheckIn = async (appointment: Appointment) => {
     try {
-      await fetch(`/api/appointments/${appointment.id}/check-in`, {
+      const res = await fetch(`/api/kiosk/check-in`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId: appointment.id }),
       });
-      setSelectedAppointment(appointment);
-      setCheckedIn(true);
+      if (res.ok) {
+        setSelectedAppointment(appointment);
+        setCheckedIn(true);
+      }
     } catch (error) {
       console.error("Error checking in:", error);
-      // Demo mode
-      setSelectedAppointment(appointment);
-      setCheckedIn(true);
     }
   };
 

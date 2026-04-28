@@ -195,19 +195,11 @@ Provide 3-5 service recommendations with explanations. Respond in JSON format:
       temperature: 0.7,
     });
 
-    try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("Could not parse AI response");
-    } catch {
-      return {
-        recommendations: [],
-        personalizedTips: ["Schedule a consultation for personalized recommendations"],
-        productsToConsider: [],
-      };
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Style recommendation failed: could not parse AI response");
     }
+    return JSON.parse(jsonMatch[0]);
   }
 
   // Analyze Face Photo for Style Recommendations
@@ -268,27 +260,11 @@ Provide 3 recommendations sorted by confidence (highest first). Make the descrip
       maxTokens: 10000,
     });
 
-    try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("Could not parse AI response");
-    } catch {
-      return {
-        faceShape: "Oval",
-        recommendations: [
-          {
-            id: "1",
-            name: "Classic Layers",
-            description: "A versatile layered cut that works with most face shapes and hair types.",
-            confidence: 0.85,
-            tags: ["Medium Length", "Layered", "Versatile"],
-            colorSuggestions: ["Natural Highlights", "Balayage"],
-          },
-        ],
-      };
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Style analysis failed: could not parse AI response");
     }
+    return JSON.parse(jsonMatch[0]);
   }
 
   // Message Generator

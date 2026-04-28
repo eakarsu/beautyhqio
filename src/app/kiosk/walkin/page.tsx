@@ -35,9 +35,9 @@ export default function KioskWalkInPage() {
   });
 
   useEffect(() => {
-    fetch("/api/services?isActive=true")
+    fetch("/api/kiosk/services")
       .then((res) => res.json())
-      .then((data) => setServices(data))
+      .then((data) => setServices(Array.isArray(data) ? data : []))
       .catch(console.error);
   }, []);
 
@@ -52,59 +52,31 @@ export default function KioskWalkInPage() {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      // First, create or find client
-      let clientId = null;
-      if (formData.phone) {
-        const clientRes = await fetch("/api/clients", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            phone: formData.phone,
-            source: "walk_in",
-          }),
-        });
-        const clientData = await clientRes.json();
-        clientId = clientData.id;
-      }
-
-      // Get location ID (use first available for kiosk)
-      const locRes = await fetch("/api/locations?isActive=true");
-      const locations = await locRes.json();
-      const locationId = locations[0]?.id;
-
-      if (!locationId) {
-        toast({ title: "Error", description: "No location configured", variant: "destructive" });
-        return;
-      }
-
-      // Add to waitlist
-      const selectedServiceData = services.filter((s) =>
-        selectedServices.includes(s.id)
-      );
-      const totalDuration = selectedServiceData.reduce(
-        (sum, s) => sum + s.duration,
-        0
-      );
-
-      const waitlistRes = await fetch("/api/waitlist", {
+      const res = await fetch("/api/kiosk/walk-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          locationId,
-          clientId,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
           phone: formData.phone,
-          serviceNotes:
-            selectedServiceData.map((s) => s.name).join(", ") +
-            (formData.notes ? ` - ${formData.notes}` : ""),
-          estimatedDuration: totalDuration,
+          serviceIds: selectedServices,
+          notes: formData.notes,
         }),
       });
 
-      const waitlistData = await waitlistRes.json();
-      setWaitlistPosition(waitlistData.position);
-      setEstimatedWait(waitlistData.estimatedWait);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({
+          title: "Error",
+          description: err.error || "Failed to join waitlist",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const data = await res.json();
+      setWaitlistPosition(data.position);
+      setEstimatedWait(data.estimatedWait);
       setStep("confirmed");
     } catch (error) {
       toast({ title: "Error", description: "Failed to join waitlist", variant: "destructive" });

@@ -24,6 +24,7 @@ import {
   MapPin,
 } from "lucide-react";
 import Link from "next/link";
+import ChatWidget from "@/components/ChatWidget";
 
 export default function HomePage() {
   const router = useRouter();
@@ -513,6 +514,8 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      <ChatWidget />
     </div>
   );
 }

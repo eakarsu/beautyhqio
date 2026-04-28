@@ -86,7 +86,7 @@ const aiFeatures = [
     description: "Smart scheduling optimization to maximize efficiency and reduce no-shows.",
     icon: Calendar,
     color: "bg-blue-500",
-    href: "/dashboard/ai-wellness/appointment-optimizer",
+    href: "/ai/scheduling",
     features: ["No-show prediction", "Optimal scheduling", "Staff matching", "Revenue optimization"],
   },
 ];

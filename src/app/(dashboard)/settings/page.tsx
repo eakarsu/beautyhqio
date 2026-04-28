@@ -68,6 +68,77 @@ export default function SettingsPage() {
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [pendingDisconnect, setPendingDisconnect] = useState<{ staffId: string; staffName: string } | null>(null);
 
+  // QuickBooks state
+  const [qbStatus, setQbStatus] = useState<{
+    connected: boolean;
+    expired: boolean;
+  }>({ connected: false, expired: false });
+  const [qbLoading, setQbLoading] = useState(false);
+  const [qbDisconnectOpen, setQbDisconnectOpen] = useState(false);
+
+  const fetchQuickBooksStatus = async () => {
+    try {
+      const res = await fetch("/api/quickbooks/status");
+      if (res.ok) {
+        const data = await res.json();
+        setQbStatus({
+          connected: !!data.connected,
+          expired: !!data.expired,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to fetch QuickBooks status", e);
+    }
+  };
+
+  const handleConnectQuickBooks = async () => {
+    setQbLoading(true);
+    try {
+      const res = await fetch("/api/quickbooks/auth");
+      const data = await res.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to start QuickBooks connection",
+          variant: "destructive",
+        });
+        setQbLoading(false);
+      }
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to start QuickBooks connection",
+        variant: "destructive",
+      });
+      setQbLoading(false);
+    }
+  };
+
+  const handleDisconnectQuickBooks = async () => {
+    setQbDisconnectOpen(false);
+    setQbLoading(true);
+    try {
+      const res = await fetch("/api/quickbooks/status", { method: "DELETE" });
+      if (res.ok) {
+        setQbStatus({ connected: false, expired: false });
+        toast({
+          title: "Disconnected",
+          description: "QuickBooks has been disconnected",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to disconnect",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setQbLoading(false);
+    }
+  };
+
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -264,9 +335,27 @@ export default function SettingsPage() {
       // Clean up URL
       window.history.replaceState({}, "", "/settings?tab=integrations");
     }
+    if (params.get("quickbooks") === "connected") {
+      setActiveTab("integrations");
+      toast({
+        title: "QuickBooks Connected",
+        description: "Successfully linked to QuickBooks",
+      });
+      window.history.replaceState({}, "", "/settings?tab=integrations");
+    }
+    if (params.get("qb_error")) {
+      toast({
+        title: "QuickBooks Error",
+        description: params.get("qb_error") || "Connection failed",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", "/settings?tab=integrations");
+    }
     if (params.get("tab") === "integrations") {
       setActiveTab("integrations");
     }
+    // Always fetch QB status when entering integrations
+    fetchQuickBooksStatus();
   }, []);
 
   const handleSave = async () => {
@@ -997,10 +1086,69 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* QuickBooks (real connection) */}
+                  <div className="flex items-center justify-between p-4 rounded-lg border">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center font-bold text-emerald-700">
+                        Q
+                      </div>
+                      <div>
+                        <span className="font-medium">QuickBooks</span>
+                        <p className="text-sm text-slate-500">
+                          Sync transactions, customers, and invoices
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge
+                        variant={
+                          qbStatus.connected
+                            ? qbStatus.expired
+                              ? "secondary"
+                              : "success"
+                            : "secondary"
+                        }
+                      >
+                        {qbStatus.connected
+                          ? qbStatus.expired
+                            ? "Token Expired"
+                            : "Connected"
+                          : "Not Connected"}
+                      </Badge>
+                      {qbStatus.connected ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setQbDisconnectOpen(true)}
+                          disabled={qbLoading}
+                        >
+                          {qbLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Disconnect"
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={handleConnectQuickBooks}
+                          disabled={qbLoading}
+                        >
+                          {qbLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              Connect
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   {[
                     { name: "Stripe", status: "Connected", icon: "S", description: "Payment processing" },
                     { name: "Mailchimp", status: "Not Connected", icon: "M", description: "Email marketing" },
-                    { name: "QuickBooks", status: "Not Connected", icon: "Q", description: "Accounting" },
                     { name: "Instagram", status: "Connected", icon: "I", description: "Social media" },
                     { name: "Facebook", status: "Connected", icon: "F", description: "Social media" },
                   ].map((integration) => (
@@ -1048,6 +1196,16 @@ export default function SettingsPage() {
         onCancel={() => { setDisconnectDialogOpen(false); setPendingDisconnect(null); }}
         title="Disconnect Google Calendar"
         description={pendingDisconnect ? `Are you sure you want to disconnect Google Calendar for ${pendingDisconnect.staffName}? Future appointments will no longer sync.` : ""}
+        confirmLabel="Disconnect"
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={qbDisconnectOpen}
+        onConfirm={handleDisconnectQuickBooks}
+        onCancel={() => setQbDisconnectOpen(false)}
+        title="Disconnect QuickBooks"
+        description="Are you sure you want to disconnect QuickBooks? Future transactions will not sync until you reconnect."
         confirmLabel="Disconnect"
         variant="destructive"
       />

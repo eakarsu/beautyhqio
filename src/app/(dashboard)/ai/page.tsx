@@ -258,15 +258,6 @@ const aiFeatures = [
     href: "/dashboard/ai-wellness/loyalty-optimizer",
     badge: "Wellness",
   },
-  {
-    id: "appointment-optimizer",
-    title: "AI Appointment Optimizer",
-    description: "Smart scheduling optimization to maximize efficiency and reduce no-shows",
-    icon: Calendar,
-    color: "from-blue-500 to-cyan-600",
-    href: "/dashboard/ai-wellness/appointment-optimizer",
-    badge: "Wellness",
-  },
 ];
 
 export default function AIDashboardPage() {

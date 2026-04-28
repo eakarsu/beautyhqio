@@ -69,85 +69,25 @@ export default function SentimentPage() {
     setResult(null);
 
     try {
-      // Determine rating from sentiment for API
-      const sentiment = determineSentiment(review);
-      const estimatedRating = sentiment.type === "positive" ? 5 :
-                              sentiment.type === "negative" ? 2 : 3;
-
-      // Use the existing review-response API
-      const response = await fetch("/api/ai/review-response", {
+      const response = await fetch("/api/ai/sentiment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           reviewText: review,
-          rating: estimatedRating,
-          clientName: "Customer",
-          businessName: "Beauty & Wellness Salon",
+          source: source || null,
         }),
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         throw new Error(data.error || "Failed to analyze");
       }
-
-      // Enhanced result with sentiment analysis (reuse sentiment from above)
-      setResult({
-        sentiment,
-        keyThemes: extractKeyThemes(review),
-        suggestedResponse: data.response?.response || data.response,
-        actionItems: sentiment.type === "negative" ? [
-          "Respond within 24 hours",
-          "Offer service recovery",
-          "Follow up personally",
-        ] : sentiment.type === "positive" ? [
-          "Thank the client",
-          "Share on social media (with permission)",
-          "Request referrals",
-        ] : [
-          "Respond professionally",
-          "Ask for more feedback",
-        ],
-        priority: sentiment.type === "negative" ? "high" :
-                  sentiment.type === "neutral" ? "medium" : "low",
-      });
+      setResult(data.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
-  };
-
-  // Simple client-side sentiment helper (real analysis done by AI)
-  const determineSentiment = (text: string) => {
-    const positive = ["amazing", "love", "great", "excellent", "beautiful", "friendly", "best", "wonderful", "fantastic", "perfect"];
-    const negative = ["terrible", "awful", "rude", "worst", "horrible", "ruined", "bad", "disappointed", "never", "waited"];
-
-    const lowerText = text.toLowerCase();
-    const posCount = positive.filter(word => lowerText.includes(word)).length;
-    const negCount = negative.filter(word => lowerText.includes(word)).length;
-
-    if (posCount > negCount + 1) return { type: "positive", score: 85 + Math.random() * 10 };
-    if (negCount > posCount + 1) return { type: "negative", score: 75 + Math.random() * 20 };
-    return { type: "neutral", score: 50 + Math.random() * 20 };
-  };
-
-  // Extract key themes from review text
-  const extractKeyThemes = (text: string) => {
-    const themes: string[] = [];
-    const lowerText = text.toLowerCase();
-
-    if (lowerText.includes("wait") || lowerText.includes("time")) themes.push("Wait Time");
-    if (lowerText.includes("staff") || lowerText.includes("stylist") || lowerText.includes("technician")) themes.push("Staff");
-    if (lowerText.includes("price") || lowerText.includes("cost") || lowerText.includes("expensive")) themes.push("Pricing");
-    if (lowerText.includes("clean") || lowerText.includes("salon") || lowerText.includes("atmosphere")) themes.push("Ambiance");
-    if (lowerText.includes("hair") || lowerText.includes("color") || lowerText.includes("cut")) themes.push("Hair Services");
-    if (lowerText.includes("nail") || lowerText.includes("manicure") || lowerText.includes("pedicure")) themes.push("Nail Services");
-    if (lowerText.includes("service") || lowerText.includes("experience")) themes.push("Service Quality");
-    if (lowerText.includes("book") || lowerText.includes("appointment")) themes.push("Booking");
-
-    return themes.length > 0 ? themes : ["General Feedback"];
   };
 
   const getSentimentColor = (type: string) => {
