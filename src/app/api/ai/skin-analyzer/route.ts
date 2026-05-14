@@ -1,11 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { openRouterChat } from "@/lib/openrouter";
+import {
+  aiRateLimiter,
+  parseAIJson,
+  persistAIResult,
+  identifyAIRequest,
+  DEFAULT_AI_MODEL,
+} from "@/lib/ai-helpers";
+import { getAuthenticatedUser } from "@/lib/api-auth";
+import { getPagination, paginatedResponse } from "@/lib/security";
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthenticatedUser();
+    const identity = identifyAIRequest(user, request);
+    const rl = aiRateLimiter(identity);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "AI rate limit exceeded", resetAt: rl.resetAt },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
-    const { skinType, concerns, age, lifestyle, currentRoutine } = body;
+    const { skinType, concerns, age, lifestyle, currentRoutine, clientId } =
+      body;
+
+    // Wellness consent gate: require explicit AIConsent for skin_analyzer when clientId provided.
+    if (clientId && user?.businessId) {
+      try {
+        const consent = await (prisma as any).aIConsent.findFirst({
+          where: {
+            businessId: user.businessId,
+            clientId,
+            feature: "skin_analyzer",
+            granted: true,
+          },
+          orderBy: { createdAt: "desc" },
+        });
+        if (!consent) {
+          return NextResponse.json(
+            { error: "Client AI consent required for skin_analyzer" },
+            { status: 412 }
+          );
+        }
+      } catch {}
+    }
 
     if (!skinType || !concerns || concerns.length === 0) {
       return NextResponse.json(
@@ -112,15 +153,9 @@ Be specific and personalized based on the skin type and concerns provided.`;
       { temperature: 0.5, maxTokens: 10000 }
     );
 
-    let analysis;
-    try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        analysis = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("Could not parse response");
-      }
-    } catch {
+    // 3-strategy JSON parser
+    let analysis: any = parseAIJson(response);
+    if (!analysis) {
       analysis = {
         skinCondition: {
           hydration: 50,
@@ -165,6 +200,32 @@ Be specific and personalized based on the skin type and concerns provided.`;
       },
     });
 
+    // ai_results pool entry
+    persistAIResult({
+      businessId: user?.businessId || null,
+      userId: user?.id || null,
+      feature: "skin_analyzer",
+      input: { skinType, concerns, age, lifestyle },
+      output: analysis,
+      model: DEFAULT_AI_MODEL,
+    });
+
+    // Wellness audit log
+    if (user?.businessId) {
+      try {
+        await (prisma as any).wellnessAuditLog.create({
+          data: {
+            businessId: user.businessId,
+            userId: user.id,
+            clientId: clientId || null,
+            feature: "skin_analyzer",
+            action: "created",
+            resourceId: savedAnalysis.id,
+          },
+        });
+      } catch {}
+    }
+
     return NextResponse.json({
       success: true,
       id: savedAnalysis.id,
@@ -181,23 +242,27 @@ Be specific and personalized based on the skin type and concerns provided.`;
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const url = new URL(request.url);
+    const id = url.searchParams.get("id");
 
     if (id) {
-      const analysis = await prisma.skinAnalysis.findUnique({
-        where: { id },
-      });
+      const analysis = await prisma.skinAnalysis.findUnique({ where: { id } });
       return NextResponse.json({ success: true, data: analysis });
     }
 
-    const analyses = await prisma.skinAnalysis.findMany({
-      orderBy: { createdAt: "desc" },
-      take: limit,
+    const { page, pageSize, skip, take } = getPagination(url);
+    const [rows, total] = await Promise.all([
+      prisma.skinAnalysis.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.skinAnalysis.count(),
+    ]);
+    return NextResponse.json({
+      success: true,
+      ...paginatedResponse(rows, total, page, pageSize),
     });
-
-    return NextResponse.json({ success: true, data: analyses });
   } catch (error) {
     console.error("Error fetching skin analyses:", error);
     return NextResponse.json(

@@ -37,7 +37,9 @@ class OpenRouterClient {
 
   constructor() {
     this.apiKey = process.env.OPENROUTER_API_KEY || "";
-    this.model = process.env.OPENROUTER_MODEL || "anthropic/claude-3-haiku";
+    // Standardized cross-project default model.
+    this.model =
+      process.env.OPENROUTER_MODEL || "anthropic/claude-3-5-sonnet-20241022";
   }
 
   async generate(options: AIGenerateOptions): Promise<string> {

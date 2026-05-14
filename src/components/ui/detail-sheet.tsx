@@ -1,12 +1,10 @@
 "use client";
 
+import * as React from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogOverlay,
-} from "@/components/ui/alert-dialog";
 import { X, Pencil, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface DetailSheetProps {
   open: boolean;
@@ -25,42 +23,62 @@ export function DetailSheet({
   onEdit,
   onDelete,
 }: DetailSheetProps) {
-  if (!open) return null;
-
   return (
-    <AlertDialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <AlertDialogOverlay className="bg-black/50" />
-      <AlertDialogContent className="fixed right-0 top-0 bottom-0 left-auto h-full w-full max-w-lg translate-x-0 translate-y-0 rounded-none border-l data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:rounded-l-lg">
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b px-6 py-4">
-            <h2 className="text-lg font-semibold">{title}</h2>
-            <div className="flex items-center gap-2">
-              {onEdit && (
-                <Button variant="outline" size="sm" onClick={onEdit}>
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-              )}
-              {onDelete && (
-                <Button variant="outline" size="sm" onClick={onDelete} className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-                <X className="h-4 w-4" />
-              </Button>
+    <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay
+          className={cn(
+            "fixed inset-0 z-[10000] bg-black/50",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          )}
+        />
+        <DialogPrimitive.Content
+          className={cn(
+            "fixed left-1/2 top-1/2 z-[10001] -translate-x-1/2 -translate-y-1/2",
+            "w-[95vw] max-w-2xl max-h-[85vh] rounded-lg border bg-white shadow-lg",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            "duration-200"
+          )}
+        >
+          <div className="flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <DialogPrimitive.Title className="text-lg font-semibold">
+                {title}
+              </DialogPrimitive.Title>
+              <div className="flex items-center gap-2">
+                {onEdit && (
+                  <Button variant="outline" size="sm" onClick={onEdit}>
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onDelete}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
+                )}
+                <DialogPrimitive.Close asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DialogPrimitive.Close>
+              </div>
             </div>
-          </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            {children}
+            <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
           </div>
-        </div>
-      </AlertDialogContent>
-    </AlertDialog>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 

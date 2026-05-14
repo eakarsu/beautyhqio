@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { openRouter } from "@/lib/openrouter";
+import {
+  aiRateLimiter,
+  persistAIResult,
+  identifyAIRequest,
+  DEFAULT_AI_MODEL,
+} from "@/lib/ai-helpers";
+import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // GET /api/ai/no-show-prediction - Get upcoming appointments with risk scores
 export async function GET() {
@@ -149,6 +156,17 @@ export async function GET() {
 // POST /api/ai/no-show-prediction
 export async function POST(request: NextRequest) {
   try {
+    // AI rate limit: 20/hr per user
+    const user = await getAuthenticatedUser();
+    const identity = identifyAIRequest(user, request);
+    const rl = aiRateLimiter(identity);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "AI rate limit exceeded", resetAt: rl.resetAt },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { appointmentId, clientId } = body;
 
@@ -244,6 +262,16 @@ export async function POST(request: NextRequest) {
         time: new Date(appointmentDate).toLocaleTimeString(),
         dayOfWeek,
       },
+    });
+
+    // Persist AI result to ai_results pool for observability + analytics.
+    persistAIResult({
+      businessId: user?.businessId || null,
+      userId: user?.id || null,
+      feature: "no_show_prediction",
+      input: { clientId: client.id, appointmentId },
+      output: prediction,
+      model: DEFAULT_AI_MODEL,
     });
 
     return NextResponse.json({

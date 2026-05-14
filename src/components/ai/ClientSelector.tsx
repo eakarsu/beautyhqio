@@ -38,71 +38,10 @@ export default function ClientSelector({
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Mock clients for demo - replace with actual API call
-  const mockClients: Client[] = [
-    {
-      id: "1",
-      firstName: "Sarah",
-      lastName: "Johnson",
-      email: "sarah.j@email.com",
-      phone: "(555) 123-4567",
-      totalVisits: 24,
-      lastVisit: "Dec 2, 2024",
-      loyaltyTier: "Gold",
-    },
-    {
-      id: "2",
-      firstName: "Emily",
-      lastName: "Chen",
-      email: "emily.c@email.com",
-      phone: "(555) 234-5678",
-      totalVisits: 12,
-      lastVisit: "Nov 28, 2024",
-      loyaltyTier: "Silver",
-    },
-    {
-      id: "3",
-      firstName: "Jessica",
-      lastName: "Williams",
-      email: "jess.w@email.com",
-      phone: "(555) 345-6789",
-      totalVisits: 8,
-      lastVisit: "Nov 15, 2024",
-      loyaltyTier: "Bronze",
-    },
-    {
-      id: "4",
-      firstName: "Amanda",
-      lastName: "Garcia",
-      email: "amanda.g@email.com",
-      phone: "(555) 456-7890",
-      totalVisits: 45,
-      lastVisit: "Dec 1, 2024",
-      loyaltyTier: "Platinum",
-    },
-    {
-      id: "5",
-      firstName: "Michael",
-      lastName: "Brown",
-      email: "michael.b@email.com",
-      phone: "(555) 567-8901",
-      totalVisits: 6,
-      lastVisit: "Oct 20, 2024",
-    },
-    {
-      id: "6",
-      firstName: "Lisa",
-      lastName: "Martinez",
-      email: "lisa.m@email.com",
-      phone: "(555) 678-9012",
-      totalVisits: 18,
-      lastVisit: "Nov 30, 2024",
-      loyaltyTier: "Gold",
-    },
-  ];
-
-  // Search clients
+  // Search clients against the real DB
   useEffect(() => {
+    const controller = new AbortController();
+
     const searchClients = async () => {
       if (search.length < 1) {
         setClients([]);
@@ -111,24 +50,29 @@ export default function ClientSelector({
 
       setLoading(true);
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Filter mock clients
-      const filtered = mockClients.filter(
-        (c) =>
-          c.firstName.toLowerCase().includes(search.toLowerCase()) ||
-          c.lastName.toLowerCase().includes(search.toLowerCase()) ||
-          c.email.toLowerCase().includes(search.toLowerCase()) ||
-          c.phone?.includes(search)
-      );
-
-      setClients(filtered);
-      setLoading(false);
+      try {
+        const res = await fetch(
+          `/api/clients?search=${encodeURIComponent(search)}&limit=10`,
+          { signal: controller.signal }
+        );
+        if (!res.ok) throw new Error("Failed to fetch clients");
+        const data = await res.json();
+        setClients(data.clients || []);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("ClientSelector search error:", err);
+          setClients([]);
+        }
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const timer = setTimeout(searchClients, 150);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(searchClients, 200);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [search]);
 
   // Close dropdown on outside click

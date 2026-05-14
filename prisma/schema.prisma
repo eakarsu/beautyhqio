@@ -1999,3 +1999,60 @@ model AILoyaltyOptimization {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
+
+
+// ============================================
+// AI RESULTS POOL (JSONB observability)
+// ============================================
+
+model AiResult {
+  id          String   @id @default(cuid())
+  feature     String
+  businessId  String?
+  userId      String?
+  model       String
+  input       Json
+  output      Json
+  tokens      Int?
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, feature])
+  @@index([feature, createdAt])
+}
+
+// ============================================
+// CONSENT + AUDIT TRAIL FOR WELLNESS AI
+// ============================================
+
+model AIConsent {
+  id          String   @id @default(cuid())
+  businessId  String
+  clientId    String?
+  userId      String?
+  feature     String   // skin_analyzer, mental_health, symptom_checker, posture, sleep
+  granted     Boolean  @default(true)
+  signature   String?  // base64 signature, optional
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([clientId, feature])
+  @@index([businessId, feature])
+}
+
+model WellnessAuditLog {
+  id          String   @id @default(cuid())
+  businessId  String
+  clientId    String?
+  userId      String?
+  feature     String
+  action      String   // viewed, created, exported, deleted
+  resourceId  String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, feature, createdAt])
+  @@index([clientId, createdAt])
+}
+
