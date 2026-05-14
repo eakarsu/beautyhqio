@@ -1,0 +1,103 @@
+history | grep "docker run"
+   60   docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+   63  docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+   65   docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+   67   docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+   68  docker run -d -p 5020:3000 --env-file .env.getfirmflow --name getfirmflow eakarsun4/smalllawfirm-ai
+   91  docker run -d -p 5020:3000 --env-file .env.getfirmflow --name getfirmflow eakarsun4/smallawfirm-ai
+   93  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+   95  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+   97   docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  100  docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  101  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  103  docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  104  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  106  docker run -d --name beauty-wellness -p 5021:3000 --env-file .env.beautyhqio  eakarsun4/beauty-wellness-ai
+  108  docker run -d --name beauty-wellness -p 5021:3000 --env-file .env.beautyhqio  eakarsun4/beauty-wellness-ai
+  109   docker run -d --env-file .env.gov -p 5013:5013 --name goverment_contracts eakarsun4/government_contracts
+  112  docker run -d --env-file .env.gov -p 5013:5013 --name goverment_contracts eakarsun4/government_contracts
+  125  docker run -d -p 5020:3000 --env-file .env.getfirmflow --name getfirmflow eakarsun4/smallawfirm-ai
+  148   docker run -d --name legalaiforms -p 5002:3000 --env-file .env.legalaiforms eakarsun4/legal_forms
+  150  ls .env.docker run -d --name legalaiforms 5002:3000 --env-file .env.legalpracticeai eakarsun4/legal_forms
+  151  ls .env.docker run -d --name legalaiforms -p 5002:3000 --env-file .env.legalpracticeai eakarsun4/legal_forms
+  152  ls .env.docker run -d --name legalaiforms --p 5002:3000 --env-file .env.legalpracticeai eakarsun4/legal_forms
+  154   docker run -d --name legalaiforms -p 5002:3000 --env-file .env.legalaiforms eakarsun4/legal_forms
+  155   docker run -d --name legalaiforms -p 5002:3000 --env-file .env.legalpracticeai eakarsun4/legal_forms
+  159  docker run -d --name norshin --env-file .env.norshin eakarsun4/legal_forms
+  167   docker run -d --name norshin -p 3000:3000 --env-file .env.norshin eakarsun4/pdfgenius
+  225  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      --restart unless-stopped     eakarsun4/alliance-crm:latest
+  238  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      --restart unless-stopped     eakarsun4/alliance-crm:latest
+  247  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  251  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  263  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  268  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  272  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  290  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       --restart unless-stopped       eakarsun4/muhittin:latest
+  298  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       --restart unless-stopped       eakarsun4/muhittin:latest
+  304  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       --restart unless-stopped       eakarsun4/muhittin:latest
+  309  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       --restart unless-stopped       eakarsun4/muhittin:latest
+  334  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023 -e FRONTEND_PORT=5024       --restart unless-stopped       eakarsun4/muhittin:latest
+  339  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       -e FRONTEND_PORT=5024       --restart unless-stopped       eakarsun4/muhittin:latest
+  353   docker run -d --name muhittin --network host --env-file .env.muhittin -e BACKEND_PORT=5023 -e FRONTEND_PORT=5024 --restart unless-stopped eakarsun4/muhittin:latest
+  358   docker run -d --name muhittin --network host --env-file .env.muhittin -e BACKEND_PORT=5023 -e FRONTEND_PORT=5024 --restart unless-stopped eakarsun4/muhittin:latest
+  374   docker run -d --name akarsu --network host --env-file /root/.env.akarsu --restart unless-stopped eakarsun4/akarsu-advisory-app:latest
+  384  docker run -d --name akarsu --network host --env-file /root/.env.akarsu --restart unless-stopped eakarsun4/akarsu-advisory-app:latest
+  441  history  | grep "docker run"
+  442  history  | grep "docker run" | sort -u
+  443  history  | grep "docker run" | sort -u
+  444    100  docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  445    101  docker run -d -p 5020:3000 --env-file .env.getfirmflow --name getfirmflow eakarsun4/smalllawfirm-ai
+  446    102  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  447    103  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  448    105  docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  449    157   docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  450    160  docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  451    162   docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  452    164   docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  453    165  docker run -d -p 5020:3000 --env-file .env.getfirmflow --name getfirmflow eakarsun4/smalllawfirm-ai
+  454    188  docker run -d -p 5020:3000 --env-file .env.getfirmflow --name getfirmflow eakarsun4/smallawfirm-ai
+  455    190  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  456    192  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  457    194   docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  458    197  docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  459    198  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  460    200  docker run -d -p 5020:3000 --env-file .env.legalpracticeai --name legalpracticeai  eakarsun4/legalpracticeai:latest
+  461    201  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
+  462    203  docker run -d --name beauty-wellness -p 5021:3000 --env-file .env.beautyhqio  eakarsun4/beauty-wellness-ai
+  463    205  docker run -d --name beauty-wellness -p 5021:3000 --env-file .env.beautyhqio  eakarsun4/beauty-wellness-ai
+  464    206   docker run -d --env-file .env.gov -p 5013:5013 --name goverment_contracts eakarsun4/government_contracts
+  465    209  docker run -d --env-file .env.gov -p 5013:5013 --name goverment_contracts eakarsun4/government_contracts
+  466    222  docker run -d -p 5020:3000 --env-file .env.getfirmflow --name getfirmflow eakarsun4/smallawfirm-ai
+  467    245   docker run -d --name legalaiforms -p 5002:3000 --env-file .env.legalaiforms eakarsun4/legal_forms
+  468    247  ls .env.docker run -d --name legalaiforms 5002:3000 --env-file .env.legalpracticeai eakarsun4/legal_forms
+  469    248  ls .env.docker run -d --name legalaiforms -p 5002:3000 --env-file .env.legalpracticeai eakarsun4/legal_forms
+  470    249  ls .env.docker run -d --name legalaiforms --p 5002:3000 --env-file .env.legalpracticeai eakarsun4/legal_forms
+  471    251   docker run -d --name legalaiforms -p 5002:3000 --env-file .env.legalaiforms eakarsun4/legal_forms
+  472    252   docker run -d --name legalaiforms -p 5002:3000 --env-file .env.legalpracticeai eakarsun4/legal_forms
+  473    256  docker run -d --name norshin --env-file .env.norshin eakarsun4/legal_forms
+  474    264   docker run -d --name norshin -p 3000:3000 --env-file .env.norshin eakarsun4/pdfgenius
+  475    322  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      --restart unless-stopped     eakarsun4/alliance-crm:latest
+  476    335  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      --restart unless-stopped     eakarsun4/alliance-crm:latest
+  477    344  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  478    348  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  479    360  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  480    365  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  481    369  docker run -d     --name alliance-crm     --network host     --env-file .env.alliancecrm.site      -e BACKEND_PORT=5022     --restart unless-stopped     eakarsun4/alliance-crm:latest
+  482    387  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       --restart unless-stopped       eakarsun4/muhittin:latest
+  483    395  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       --restart unless-stopped       eakarsun4/muhittin:latest
+  484    401  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       --restart unless-stopped       eakarsun4/muhittin:latest
+  485    406  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       --restart unless-stopped       eakarsun4/muhittin:latest
+  486    431  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023 -e FRONTEND_PORT=5024       --restart unless-stopped       eakarsun4/muhittin:latest
+  487    436  docker run -d       --name muhittin       --network host       --env-file .env.muhittin       -e BACKEND_PORT=5023       -e FRONTEND_PORT=5024       --restart unless-stopped       eakarsun4/muhittin:latest
+  488    450   docker run -d --name muhittin --network host --env-file .env.muhittin -e BACKEND_PORT=5023 -e FRONTEND_PORT=5024 --restart unless-stopped eakarsun4/muhittin:latest
+  489    455   docker run -d --name muhittin --network host --env-file .env.muhittin -e BACKEND_PORT=5023 -e FRONTEND_PORT=5024 --restart unless-stopped eakarsun4/muhittin:latest
+  490    471   docker run -d --name akarsu --network host --env-file /root/.env.akarsu --restart unless-stopped eakarsun4/akarsu-advisory-app:latest
+  491    481  docker run -d --name akarsu --network host --env-file /root/.env.akarsu --restart unless-stopped eakarsun4/akarsu-advisory-app:latest
+  492    538  history  | grep "docker run"
+  493    539  history  | grep "docker run" | sort -u
+  494     66  docker run -d --name beauty-wellness -p 5021:3000 --env-file .env.beautyhqio  eakarsun4/beauty-wellness-ai
+  495     68  docker run -d --name beauty-wellness -p 5021:3000 --env-file .env.beautyhqio  eakarsun4/beauty-wellness-ai
+  496     92  docker run -d --name beauty-wellness -p 5021:3000 --env-file .env.beautyhqio  eakarsun4/beauty-wellness-ai
+  497     94  docker run -d --name beauty-wellness -p 5021:3000 --env-file .env.beautyhqio  eakarsun4/beauty-wellness-ai
+  498     98  docker run -d --env-file .env.gov -p 5013:5013 --name goverment_contracts eakarsun4/government_contracts
+  499     99  docker run -d -p 5019:3000 --env-file .env.servicecrewai --name servicecrewai eakarsun4/homeservices-ai
