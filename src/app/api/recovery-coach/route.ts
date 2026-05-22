@@ -1,75 +1,172 @@
 /**
- * Recovery coach (apply pass 5 — PRODUCT-DECISION).
+ * Recovery coach (apply pass 7 — backlog #6).
  *
- * PRODUCT-DECISION: post-service follow-up reuses the existing AI prompt pattern
- * (no new model integration). Schedule defaults to: 24h, 72h, 7d post-appointment.
- * Persistence is a single `recovery_check_ins` table created via raw SQL.
+ * PRODUCT-DECISION: wraps the same OpenRouter chat pattern used by
+ * `/api/ai/sleep-coach` but specializes the system prompt for post-service
+ * recovery follow-up. Caller supplies `post_service_context` (free-form notes
+ * about the just-completed service) plus optional client metadata.
  *
- * If OPENROUTER_API_KEY is unset, returns 503 with missing: OPENROUTER_API_KEY.
+ * Every response carries `disclaimer` + `requires_human_review: true` per the
+ * project's safety policy. Sessions are persisted to `recovery_coach_sessions`.
+ *
+ * If OPENROUTER_API_KEY is not configured, the route returns a non-AI fallback
+ * envelope (still with disclaimer + requires_human_review) so the UI flow
+ * keeps working in dev without credentials.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-const DEFAULT_INTERVALS_HOURS = [24, 72, 168]; // 1d, 3d, 7d
-let tableEnsured = false;
-
-async function ensureTable() {
-  if (tableEnsured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS recovery_check_ins (
-      id SERIAL PRIMARY KEY,
-      appointment_id TEXT,
-      client_id TEXT,
-      offset_hours INTEGER NOT NULL,
-      due_at TIMESTAMP NOT NULL,
-      sent_at TIMESTAMP,
-      status TEXT DEFAULT 'pending',
-      message TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `).catch(() => {});
-  tableEnsured = true;
-}
+import { openRouterChat } from "@/lib/openrouter";
+import {
+  ensureRecoveryCoachSessionsTable,
+  PASS7_DISCLAIMER,
+} from "@/lib/db-pass7";
 
 export async function POST(req: NextRequest) {
-  await ensureTable();
+  await ensureRecoveryCoachSessionsTable();
   const body = await req.json().catch(() => ({}));
-  const { appointmentId, clientId, completedAt, intervals } = body || {};
-  if (!appointmentId) return NextResponse.json({ error: "appointmentId required" }, { status: 400 });
-  const baseTs = completedAt ? new Date(completedAt).getTime() : Date.now();
-  const offsets: number[] = Array.isArray(intervals) && intervals.length ? intervals : DEFAULT_INTERVALS_HOURS;
+  const {
+    clientId,
+    appointmentId,
+    serviceName,
+    post_service_context,
+    postServiceContext,
+    sensitivities,
+    skinType,
+  } = body || {};
 
-  const created: any[] = [];
-  for (const off of offsets) {
-    const dueAt = new Date(baseTs + off * 3600 * 1000);
-    try {
-      const r: any = await prisma.$queryRawUnsafe(
-        `INSERT INTO recovery_check_ins (appointment_id, client_id, offset_hours, due_at, message)
-         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-        appointmentId, clientId || null, off, dueAt,
-        `Default check-in at +${off}h. Replace with personalized AI message via /api/ai/sleep-coach pattern.`
-      );
-      created.push(r[0]);
-    } catch (e) { /* keep going */ }
+  const ctx: string | undefined = post_service_context ?? postServiceContext;
+  if (!ctx || typeof ctx !== "string" || !ctx.trim()) {
+    return NextResponse.json(
+      { error: "post_service_context required" },
+      { status: 400 }
+    );
   }
-  return NextResponse.json({ success: true, scheduled: created.length, items: created }, { status: 201 });
+
+  const prompt = `You are a recovery / aftercare specialist for a beauty + wellness clinic. The client just completed a service. Produce safe post-service guidance.
+
+Service: ${serviceName || "unspecified"}
+Skin type: ${skinType || "unspecified"}
+Known sensitivities: ${sensitivities || "none reported"}
+Post-service context (provider notes): ${ctx}
+
+Respond with JSON ONLY in this shape:
+{
+  "summary": "1-2 sentence overview of what the client should focus on",
+  "do_today": ["list of immediate self-care actions for the next 24h"],
+  "avoid_24h": ["list of things to avoid in the next 24h"],
+  "warning_signs": ["symptoms that should trigger a call back to the clinic"],
+  "followup_in_days": 3,
+  "products_to_consider": ["optional product or service suggestions"]
+}
+
+Stay general; do not prescribe medication or diagnose conditions.`;
+
+  let guidance: any;
+  let aiUsed = false;
+  try {
+    if (process.env.OPENROUTER_API_KEY) {
+      const response = await openRouterChat(
+        [
+          {
+            role: "system",
+            content:
+              "You are a licensed esthetician + recovery coach. Give safe, conservative post-service aftercare guidance. Output valid JSON only. Never diagnose. Always include warning signs that warrant escalation to a human practitioner.",
+          },
+          { role: "user", content: prompt },
+        ],
+        { temperature: 0.4, maxTokens: 1200 }
+      );
+      const m = response.match(/\{[\s\S]*\}/);
+      if (m) {
+        guidance = JSON.parse(m[0]);
+        aiUsed = true;
+      }
+    }
+  } catch (e) {
+    // fall through to safe fallback
+  }
+
+  if (!guidance) {
+    guidance = {
+      summary:
+        "Keep the treated area clean, avoid irritation, and monitor for unexpected symptoms.",
+      do_today: [
+        "Stay hydrated",
+        "Gentle skincare only (no actives)",
+        "Apply SPF if treated area is sun-exposed",
+      ],
+      avoid_24h: [
+        "Direct sun exposure",
+        "Hot showers / saunas",
+        "Heavy exercise",
+        "Exfoliants and retinoids",
+      ],
+      warning_signs: [
+        "Persistent redness >48h",
+        "Blistering",
+        "Severe pain",
+        "Signs of infection (warmth, pus, fever)",
+      ],
+      followup_in_days: 3,
+      products_to_consider: [],
+    };
+  }
+
+  const envelope = {
+    success: true,
+    ai_used: aiUsed,
+    guidance,
+    disclaimer: PASS7_DISCLAIMER,
+    requires_human_review: true,
+  };
+
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO recovery_coach_sessions
+       (client_id, appointment_id, service_name, post_service_context, guidance, disclaimer, requires_human_review)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7)`,
+      clientId || null,
+      appointmentId || null,
+      serviceName || null,
+      ctx,
+      JSON.stringify(guidance),
+      PASS7_DISCLAIMER,
+      true
+    );
+  } catch (_e) {
+    // persistence is best-effort; the envelope is still returned
+  }
+
+  return NextResponse.json(envelope);
 }
 
 export async function GET(req: NextRequest) {
-  await ensureTable();
+  await ensureRecoveryCoachSessionsTable();
   const { searchParams } = new URL(req.url);
+  const clientId = searchParams.get("clientId");
   const appointmentId = searchParams.get("appointmentId");
   try {
-    const rows: any = appointmentId
-      ? await prisma.$queryRawUnsafe(
-          `SELECT * FROM recovery_check_ins WHERE appointment_id = $1 ORDER BY due_at ASC`,
-          appointmentId
-        )
-      : await prisma.$queryRawUnsafe(
-          `SELECT * FROM recovery_check_ins ORDER BY due_at DESC LIMIT 200`
-        );
-    return NextResponse.json(rows);
+    const clauses: string[] = [];
+    const vals: any[] = [];
+    let i = 1;
+    if (clientId) {
+      clauses.push(`client_id = $${i++}`);
+      vals.push(clientId);
+    }
+    if (appointmentId) {
+      clauses.push(`appointment_id = $${i++}`);
+      vals.push(appointmentId);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows: any = await prisma.$queryRawUnsafe(
+      `SELECT * FROM recovery_coach_sessions ${where} ORDER BY created_at DESC LIMIT 100`,
+      ...vals
+    );
+    return NextResponse.json({ count: rows.length, items: rows });
   } catch (e: any) {
-    return NextResponse.json({ error: "Read failed", details: e.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "read failed", details: e.message },
+      { status: 500 }
+    );
   }
 }

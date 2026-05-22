@@ -95,6 +95,12 @@ const navigation: NavigationItem[] = [
     icon: Clock,
     roles: ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"],
   },
+  {
+    name: "Room Turnover",
+    href: "/treatment-room-turnover",
+    icon: Clock,
+    roles: ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"],
+  },
 
   // Point of Sale - Checkout roles
   {

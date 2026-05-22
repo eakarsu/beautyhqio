@@ -12,6 +12,7 @@ secrets.json
 service-account*.json
 gcp-key*.json
 config.local.*
+token.txt
 *.local
 
 # Node
@@ -68,3 +69,12 @@ tmp/
 coverage/
 .nyc_output/
 htmlcov/
+
+# --- secrets (auto-added) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+**/credentials*.json
+**/serviceAccount*.json

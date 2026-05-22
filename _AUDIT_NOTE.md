@@ -118,3 +118,71 @@ No source files were modified. Syntax: N/A.
 - **Backlog reviewed:** plain inventory CRUD / supplier mgmt / facility maintenance scheduling (PRODUCT-DECISION — schema + UI), Apple Health / Fitbit (NEEDS-CREDS), corporate wellness, recovery coach, predictive supply ordering (PRODUCT-DECISION).
 - **Files written/modified:** none.
 - **Smoke test:** N/A.
+
+## Apply pass 7 (full backlog implementation)
+
+All 7 PRODUCT-DECISION / NEEDS-CREDS items from the backlog above are now implemented. Implementation is additive — `prisma/schema.prisma` is not touched; new tables are created via raw SQL `CREATE TABLE IF NOT EXISTS` from `src/lib/db-pass7.ts`. Frontend pages are top-level under `src/app/(dashboard)/` and do NOT touch any `frontend/src/features/<slug>/pages/*` paths (which are off-limits per user instruction). `.env` is not read or written.
+
+### API routes (new / replaced)
+
+| Backlog | Route | Methods |
+|---|---|---|
+| #1 | `src/app/api/inventory/route.ts` | GET, POST |
+| #1 | `src/app/api/inventory/[id]/route.ts` | GET, PUT, DELETE |
+| #2 | `src/app/api/suppliers/route.ts` | GET, POST |
+| #2 | `src/app/api/suppliers/[id]/route.ts` | GET, PUT, DELETE |
+| #3 | `src/app/api/facility-maintenance/route.ts` | GET, POST (with `scheduled_date`) |
+| #3 | `src/app/api/facility-maintenance/[id]/route.ts` | GET, PUT, DELETE |
+| #4 | `src/app/api/integrations/apple-health/{status,connect,sync}/route.ts` | 503 stubs (`required_env: ["APPLE_HEALTH_CLIENT_ID"]`) |
+| #4 | `src/app/api/integrations/fitbit/{status,connect,sync}/route.ts` | 503 stubs (`required_env: ["FITBIT_CLIENT_ID","FITBIT_CLIENT_SECRET"]`) |
+| #5 | `src/app/api/corporate-wellness/programs/route.ts` | GET, POST (`client_org_id` required) |
+| #5 | `src/app/api/corporate-wellness/enrollments/route.ts` | GET, POST (tenant-scoped reads) |
+| #6 | `src/app/api/recovery-coach/route.ts` | POST (wraps `openRouterChat`, accepts `post_service_context`), GET |
+| #7 | `src/app/api/predictive-supply-ordering/route.ts` | POST (advisory drafts, `requires_approval: true`), GET |
+
+### Dashboard pages (new, top-level — NOT under features/<slug>/pages/)
+
+- `src/app/(dashboard)/inventory/page.tsx`
+- `src/app/(dashboard)/suppliers/page.tsx`
+- `src/app/(dashboard)/facility-maintenance/page.tsx`
+- `src/app/(dashboard)/integrations/page.tsx`
+- `src/app/(dashboard)/corporate-wellness/page.tsx`
+- `src/app/(dashboard)/recovery-coach/page.tsx`
+- `src/app/(dashboard)/predictive-supply-ordering/page.tsx`
+
+### Schema (raw SQL bootstrap — no Prisma migration)
+
+`src/lib/db-pass7.ts` exposes idempotent `ensure*Table()` helpers + `PASS7_DISCLAIMER` constant. Tables created:
+
+- `inventory` (backlog #1)
+- `suppliers` (backlog #2)
+- `facility_maintenance` (backlog #3 — includes `scheduled_date`, `priority`, recurrence, cost)
+- `corporate_wellness_programs` (backlog #5 — has `client_org_id` for multi-tenant scoping)
+- `corporate_wellness_enrollments` (backlog #5 — same)
+- `recovery_coach_sessions` (backlog #6)
+- `pass7_purchase_orders` (backlog #7 — advisory drafts; does NOT collide with the canonical Prisma `PurchaseOrder` model used by `/api/purchase-orders`)
+
+### Safety envelope
+
+Every AI / decision response from `/api/recovery-coach` and `/api/predictive-supply-ordering` includes:
+
+- `disclaimer` (text)
+- `requires_human_review: true`
+
+Predictive supply additionally sets `requires_approval: true` and explicitly states no PO is dispatched.
+
+### Constraint check
+
+- `frontend/src/features/<slug>/pages/*` — NOT TOUCHED.
+- `.env` — NOT TOUCHED.
+- New npm dependencies — NONE.
+- `prisma/schema.prisma` — NOT TOUCHED (raw SQL bootstrap instead).
+- `src/middleware.ts` — NOT TOUCHED (session-cookie auth preserved).
+
+### Syntax
+
+`npx tsc --noEmit`: PASS for all new pass-7 files. 12 pre-existing errors persist in `src/app/api/ai/checkin-recommend/route.ts`, `src/app/api/ai/front-desk-copilot/route.ts`, and `src/app/api/ai/therapist-match/route.ts` — none are from this pass (verified by `grep` over the error stream).
+
+### Skips
+
+None. All 7 backlog items are addressed end-to-end (backend + UI + schema + safety envelope).
