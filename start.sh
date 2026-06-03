@@ -151,7 +151,7 @@ display_banner() {
     echo -e "${PURPLE}║     • AI Posture Corrector    • AI Product Recommender           ${PURPLE}║${NC}"
     echo -e "${PURPLE}║     • AI Appointment Optimizer • AI Loyalty Program Manager      ${PURPLE}║${NC}"
     echo -e "${PURPLE}║                                                                  ║${NC}"
-    echo -e "${PURPLE}║  ${CYAN}📱 AI Hub:${NC} /dashboard/ai-wellness                               ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║  ${CYAN}📱 AI Hub:${NC} /ai                                                  ${PURPLE}║${NC}"
     echo -e "${PURPLE}║                                                                  ║${NC}"
     echo -e "${PURPLE}║  ${GREEN}🔄 Hot reload enabled - changes will auto-refresh!${NC}              ${PURPLE}║${NC}"
     echo -e "${PURPLE}╚══════════════════════════════════════════════════════════════════╝${NC}"

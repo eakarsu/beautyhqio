@@ -124,7 +124,7 @@ export default function ProductRecommenderPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/dashboard/ai-wellness" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+              <Link href="/ai" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                 <ArrowLeft className="h-5 w-5" />
               </Link>
               <div className="p-3 bg-orange-500 rounded-xl">
