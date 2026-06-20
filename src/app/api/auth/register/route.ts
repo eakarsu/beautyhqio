@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "beautyhq-secret-key";
 
 // Generate URL-friendly slug from business name
 function generateSlug(name: string): string {
@@ -133,14 +136,29 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        businessId: user.businessId,
+      },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
     return NextResponse.json(
       {
         message: "Account created successfully",
+        token,
         user: {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: user.role,
+          businessId: user.businessId,
+          businessName: business?.name,
         },
       },
       { status: 201 }
