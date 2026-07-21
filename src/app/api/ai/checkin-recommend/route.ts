@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const services = await prisma.service.findMany({
       where: { businessId: user.businessId || undefined, isActive: true },
       take: 30,
-      select: { id: true, name: true, category: true, durationMinutes: true, price: true },
+      select: { id: true, name: true, category: true, duration: true, price: true },
     });
 
     const history = client.appointments.map((a: any) => ({

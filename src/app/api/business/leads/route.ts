@@ -3,8 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
+import { authSecret } from "@/lib/runtime-env";
 
 // GET /api/business/leads - List marketplace leads
 export async function GET(request: NextRequest) {
@@ -26,7 +25,8 @@ export async function GET(request: NextRequest) {
       if (authHeader?.startsWith("Bearer ")) {
         const token = authHeader.substring(7);
         try {
-          const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; businessId: string };
+          const decoded = jwt.verify(token, authSecret(), { algorithms: ["HS256"], issuer: "beautyhq", audience: "beautyhq-mobile" }) as { userId: string; businessId: string; type: string };
+          if (decoded.type !== "access") throw new Error("invalid token type");
           user = await prisma.user.findUnique({
             where: { id: decoded.userId },
             include: { business: true },

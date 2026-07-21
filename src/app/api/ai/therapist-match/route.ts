@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
     if (!client) return NextResponse.json({ error: "client not found" }, { status: 404 });
 
     const staff = await prisma.staff.findMany({
-      where: { businessId: user.businessId || undefined, isActive: true },
+      where: { location: { businessId: user.businessId || undefined }, isActive: true },
       take: 30,
-      select: { id: true, displayName: true, specialties: true, rating: true },
+      select: { id: true, displayName: true, specialties: true, avgRating: true },
     });
 
     const pastAppointments = await prisma.appointment.findMany({

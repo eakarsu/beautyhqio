@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
+import { authSecret } from "@/lib/runtime-env";
 
 // GET /api/auth/me - Get current user from JWT token
 export async function GET(request: NextRequest) {
@@ -21,7 +20,8 @@ export async function GET(request: NextRequest) {
     // Verify token
     let decoded: any;
     try {
-      decoded = jwt.verify(token, JWT_SECRET);
+      decoded = jwt.verify(token, authSecret(), { algorithms: ["HS256"], issuer: "beautyhq", audience: "beautyhq-mobile" });
+      if (decoded.type !== "access") throw new Error("invalid token type");
     } catch {
       return NextResponse.json(
         { error: "Invalid or expired token" },

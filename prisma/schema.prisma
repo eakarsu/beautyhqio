@@ -11,59 +11,62 @@ datasource db {
 // ============ BUSINESS & LOCATIONS ============
 
 model Business {
-  id            String    @id @default(cuid())
-  name          String
-  type          BusinessType
-  phone         String?
-  email         String?
-  website       String?
-  logo          String?
+  id      String       @id @default(cuid())
+  name    String
+  type    BusinessType
+  phone   String?
+  email   String?
+  website String?
+  logo    String?
 
   // Address
-  address       String?
-  city          String?
-  state         String?
-  zipCode       String?
-  country       String    @default("US")
+  address String?
+  city    String?
+  state   String?
+  zipCode String?
+  country String  @default("US")
 
-  timezone      String    @default("America/New_York")
-  defaultLanguage String  @default("en")
+  timezone           String   @default("America/New_York")
+  defaultLanguage    String   @default("en")
   supportedLanguages String[] @default(["en"])
 
   // Social
-  instagram     String?
-  facebook      String?
-  tiktok        String?
-  yelp          String?
+  instagram      String?
+  facebook       String?
+  tiktok         String?
+  yelp           String?
   googleBusiness String?
 
   // Tax
-  taxRate       Decimal   @db.Decimal(5, 4) @default(0)
+  taxRate Decimal @default(0) @db.Decimal(5, 4)
 
   // Stripe
   stripeCustomerId String?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  locations     Location[]
-  users         User[]
-  clients       Client[]
-  services      Service[]
-  serviceCategories ServiceCategory[]
-  products      Product[]
-  productCategories ProductCategory[]
-  loyaltyProgram LoyaltyProgram?
-  giftCards     GiftCard[]
-  campaigns     Campaign[]
-  automations   Automation[]
-  savedFilters  SavedFilter[]
+  locations             Location[]
+  users                 User[]
+  clients               Client[]
+  services              Service[]
+  serviceCategories     ServiceCategory[]
+  products              Product[]
+  productCategories     ProductCategory[]
+  loyaltyProgram        LoyaltyProgram?
+  giftCards             GiftCard[]
+  campaigns             Campaign[]
+  automations           Automation[]
+  savedFilters          SavedFilter[]
+  appointments          Appointment[]
+  integrationDeliveries IntegrationDelivery[]
+  businessAuditLogs     AuditLog[]            @relation("BusinessAuditLogs")
 
   // Marketplace & Lead Generation
-  subscription      BusinessSubscription?
-  publicProfile     PublicSalonProfile?
-  marketplaceLeads  MarketplaceLead[]
+  subscription     BusinessSubscription?
+  publicProfile    PublicSalonProfile?
+  marketplaceLeads MarketplaceLead[]
 }
 
 enum BusinessType {
@@ -81,43 +84,43 @@ enum BusinessType {
 }
 
 model Location {
-  id            String    @id @default(cuid())
-  name          String
-  phone         String?
-  email         String?
+  id    String  @id @default(cuid())
+  name  String
+  phone String?
+  email String?
 
   // Address
-  address       String
-  address2      String?
-  city          String
-  state         String
-  zip           String
-  country       String    @default("USA")
+  address  String
+  address2 String?
+  city     String
+  state    String
+  zip      String
+  country  String  @default("USA")
 
   // Coordinates (for map)
-  latitude      Decimal?  @db.Decimal(10, 7)
-  longitude     Decimal?  @db.Decimal(10, 7)
+  latitude  Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
 
   // Hours (JSON for flexibility)
   operatingHours Json?
 
   // Booking settings
   allowOnlineBooking Boolean @default(true)
-  bookingUrl    String?
-  advanceBookingDays Int   @default(30)
-  cancellationHours Int    @default(24)
+  bookingUrl         String?
+  advanceBookingDays Int     @default(30)
+  cancellationHours  Int     @default(24)
 
-  isActive      Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business      Business  @relation(fields: [businessId], references: [id])
-  businessId    String
-  staff         Staff[]
-  appointments  Appointment[]
-  waitlist      WaitlistEntry[]
-  transactions  Transaction[]
+  business         Business          @relation(fields: [businessId], references: [id])
+  businessId       String
+  staff            Staff[]
+  appointments     Appointment[]
+  waitlist         WaitlistEntry[]
+  transactions     Transaction[]
   marketplaceLeads MarketplaceLead[]
 }
 
@@ -127,7 +130,7 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   emailVerified DateTime?
-  password      String?   // Optional for OAuth users
+  password      String? // Optional for OAuth users
   firstName     String
   lastName      String
   phone         String?
@@ -137,21 +140,22 @@ model User {
   isActive      Boolean   @default(true)
 
   // Permissions (JSON for flexibility)
-  permissions   Json?
+  permissions Json?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business      Business?  @relation(fields: [businessId], references: [id])
-  businessId    String?    // Optional for PLATFORM_ADMIN and CLIENT roles
-  staff         Staff?
-  client        Client?    // Link to client profile (for CLIENT role users)
+  business         Business? @relation(fields: [businessId], references: [id])
+  businessId       String? // Optional for PLATFORM_ADMIN and CLIENT roles
+  staff            Staff?
+  client           Client? // Link to client profile (for CLIENT role users)
   resetToken       String?
   resetTokenExpiry DateTime?
 
-  auditLogs     AuditLog[]
-  savedFilters  SavedFilter[]
-  accounts      Account[]
+  auditLogs      AuditLog[]
+  savedFilters   SavedFilter[]
+  accounts       Account[]
+  mobileSessions MobileSession[]
 }
 
 // OAuth Account model for social login (Google, Microsoft, Apple)
@@ -174,54 +178,76 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
+model MobileSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+
+  @@index([userId, expiresAt])
+}
+
+model LoginAttempt {
+  id           String   @id @default(cuid())
+  identityHash String
+  succeeded    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([identityHash, createdAt])
+}
+
 enum UserRole {
-  PLATFORM_ADMIN  // Platform owner - sees all salons, revenues, subscribers
-  OWNER           // Salon owner - full access to their salon only
-  MANAGER         // Day-to-day operations
-  RECEPTIONIST    // Front desk & check-in
-  STAFF           // Service providers/stylists
-  CLIENT          // Customer - books appointments, pays for services
+  PLATFORM_ADMIN // Platform owner - sees all salons, revenues, subscribers
+  OWNER // Salon owner - full access to their salon only
+  MANAGER // Day-to-day operations
+  RECEPTIONIST // Front desk & check-in
+  STAFF // Service providers/stylists
+  CLIENT // Customer - books appointments, pays for services
 }
 
 model Staff {
-  id            String    @id @default(cuid())
-  displayName   String?
-  title         String?
-  bio           String?
-  color         String?
-  photo         String?
+  id          String  @id @default(cuid())
+  displayName String?
+  title       String?
+  bio         String?
+  color       String?
+  photo       String?
 
   // Skills
-  specialties   String[]
-  serviceIds    String[]
+  specialties String[]
+  serviceIds  String[]
 
   // Employment
   employmentType EmploymentType @default(EMPLOYEE)
-  hireDate      DateTime?
+  hireDate       DateTime?
 
   // Compensation
-  payType       PayType?
-  hourlyRate    Decimal?  @db.Decimal(10, 2)
-  commissionPct Decimal?  @db.Decimal(5, 2)
+  payType              PayType?
+  hourlyRate           Decimal? @db.Decimal(10, 2)
+  commissionPct        Decimal? @db.Decimal(5, 2)
   productCommissionPct Decimal? @db.Decimal(5, 2)
 
   // For booth renters
-  boothRent     Decimal?  @db.Decimal(10, 2)
+  boothRent     Decimal? @db.Decimal(10, 2)
   rentFrequency String?
 
   // Performance metrics
-  avgRating     Decimal?  @db.Decimal(3, 2)
-  reviewCount   Int       @default(0)
-  rebookRate    Decimal?  @db.Decimal(5, 2)
+  avgRating   Decimal? @db.Decimal(3, 2)
+  reviewCount Int      @default(0)
+  rebookRate  Decimal? @db.Decimal(5, 2)
 
-  isActive      Boolean   @default(true)
-  acceptsWalkIns Boolean  @default(true)
+  isActive         Boolean @default(true)
+  acceptsWalkIns   Boolean @default(true)
   isBookableOnline Boolean @default(true)
 
   // Google Calendar integration
   googleCalendarToken String?
-  googleRefreshToken String?
-  googleCalendarId String?
+  googleRefreshToken  String?
+  googleCalendarId    String?
 
   // Outlook Calendar integration
   outlookCalendarToken String?
@@ -231,35 +257,35 @@ model Staff {
 
   // Stripe Connect (for payouts)
   stripeAccountId     String?
-  stripeAccountStatus String?   @default("not_connected") // not_connected, pending, active, restricted
+  stripeAccountStatus String? @default("not_connected") // not_connected, pending, active, restricted
 
   // Bank Account (for manual payouts)
-  bankAccountHolder   String?   // Account holder name
-  bankName            String?   // Bank name
-  bankAccountLast4    String?   // Last 4 digits only (for display)
-  bankRoutingNumber   String?   // Routing number (consider encrypting in production)
-  bankAccountNumber   String?   // Account number (consider encrypting in production)
-  bankAccountType     String?   @default("checking") // checking, savings
+  bankAccountHolder String? // Account holder name
+  bankName          String? // Bank name
+  bankAccountLast4  String? // Last 4 digits only (for display)
+  bankRoutingNumber String? // Routing number (consider encrypting in production)
+  bankAccountNumber String? // Account number (consider encrypting in production)
+  bankAccountType   String? @default("checking") // checking, savings
 
   // Payout preference
-  payoutMethod        String?   @default("manual") // stripe_connect, bank_transfer, check, manual
+  payoutMethod String? @default("manual") // stripe_connect, bank_transfer, check, manual
 
   // Working hours (JSON)
-  workingHours  Json?
+  workingHours Json?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user          User      @relation(fields: [userId], references: [id])
-  userId        String    @unique
-  location      Location  @relation(fields: [locationId], references: [id])
-  locationId    String
-  schedules     StaffSchedule[]
-  timeOff       TimeOff[]
-  appointments  Appointment[]
-  transactions  Transaction[]
-  tips          Tip[]
-  commissions   Commission[]
+  user           User            @relation(fields: [userId], references: [id])
+  userId         String          @unique
+  location       Location        @relation(fields: [locationId], references: [id])
+  locationId     String
+  schedules      StaffSchedule[]
+  timeOff        TimeOff[]
+  appointments   Appointment[]
+  transactions   Transaction[]
+  tips           Tip[]
+  commissions    Commission[]
   dailyCloseouts DailyCloseout[]
 }
 
@@ -277,67 +303,67 @@ enum PayType {
 }
 
 model StaffSchedule {
-  id            String    @id @default(cuid())
-  dayOfWeek     Int
-  startTime     String
-  endTime       String
-  isWorking     Boolean   @default(true)
+  id        String  @id @default(cuid())
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  isWorking Boolean @default(true)
 
-  staff         Staff     @relation(fields: [staffId], references: [id])
-  staffId       String
-  breaks        ScheduleBreak[]
+  staff   Staff           @relation(fields: [staffId], references: [id])
+  staffId String
+  breaks  ScheduleBreak[]
 
   @@index([staffId, dayOfWeek])
 }
 
 model ScheduleBreak {
-  id            String    @id @default(cuid())
-  startTime     String
-  endTime       String
-  label         String?   // Optional label like "Lunch", "Short break"
+  id        String  @id @default(cuid())
+  startTime String
+  endTime   String
+  label     String? // Optional label like "Lunch", "Short break"
 
-  schedule      StaffSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  scheduleId    String
+  schedule   StaffSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId String
 }
 
 model TimeOff {
-  id            String    @id @default(cuid())
-  type          String
-  startDate     DateTime
-  endDate       DateTime
-  allDay        Boolean   @default(true)
-  startTime     String?
-  endTime       String?
-  notes         String?
-  status        String    @default("approved")
+  id        String   @id @default(cuid())
+  type      String
+  startDate DateTime
+  endDate   DateTime
+  allDay    Boolean  @default(true)
+  startTime String?
+  endTime   String?
+  notes     String?
+  status    String   @default("approved")
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  staff         Staff     @relation(fields: [staffId], references: [id])
-  staffId       String
+  staff   Staff  @relation(fields: [staffId], references: [id])
+  staffId String
 }
 
 // ============ CLIENTS ============
 
 model Client {
-  id            String        @id @default(cuid())
-  firstName     String
-  lastName      String
-  email         String?
-  phone         String
-  mobile        String?
+  id        String  @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String
+  mobile    String?
 
   // Business association - clients belong to a specific salon
-  business      Business      @relation(fields: [businessId], references: [id])
-  businessId    String
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
 
   // Link to User account (for authenticated clients)
-  user          User?         @relation(fields: [userId], references: [id])
-  userId        String?       @unique
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String? @unique
 
   // Preferences
-  preferredLanguage String?  @default("en")
-  preferredStaffId String?
+  preferredLanguage      String? @default("en")
+  preferredStaffId       String?
   preferredContactMethod String? @default("sms")
 
   // Birthday
@@ -346,28 +372,28 @@ model Client {
   birthdayDay   Int?
 
   // Marketing
-  allowSms      Boolean       @default(true)
-  allowEmail    Boolean       @default(true)
+  allowSms       Boolean @default(true)
+  allowEmail     Boolean @default(true)
   referralSource String?
-  referredById  String?
+  referredById   String?
 
   // Notes
   notes         String?
   internalNotes String?
 
   // Tags
-  tags          String[]
+  tags String[]
 
   // Status
-  status        ClientStatus  @default(ACTIVE)
+  status ClientStatus @default(ACTIVE)
 
   // Stripe
   stripeCustomerId String?
 
   // Google Calendar integration (for client)
   googleCalendarToken String?
-  googleRefreshToken String?
-  googleCalendarId String?
+  googleRefreshToken  String?
+  googleCalendarId    String?
 
   // Outlook Calendar integration (for client)
   outlookCalendarToken String?
@@ -375,29 +401,29 @@ model Client {
   outlookCalendarId    String?
   outlookTokenExpiry   DateTime?
 
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  appointments  Appointment[]
-  photos        ClientPhoto[]
-  formulas      ServiceFormula[]
-  preferences   ClientPreference[]
-  loyaltyAccount LoyaltyAccount?
-  giftCards     GiftCard[]    @relation("GiftCardOwner")
-  purchasedGiftCards GiftCard[] @relation("GiftCardPurchaser")
-  transactions  Transaction[]
-  reviews       Review[]
-  referrals     Referral[]    @relation("Referrer")
-  referredBy    Referral?     @relation("Referred")
-  communications Communication[]
-  waitlistEntries WaitlistEntry[]
-  activities    Activity[]
-  clientNotes   ClientNote[]
-  attachments   Attachment[]
-  familyMemberships FamilyMember[]
-  primaryFamilyGroups FamilyGroup[] @relation("PrimaryFamilyContact")
-  marketplaceLeads MarketplaceLead[]
+  appointments        Appointment[]
+  photos              ClientPhoto[]
+  formulas            ServiceFormula[]
+  preferences         ClientPreference[]
+  loyaltyAccount      LoyaltyAccount?
+  giftCards           GiftCard[]         @relation("GiftCardOwner")
+  purchasedGiftCards  GiftCard[]         @relation("GiftCardPurchaser")
+  transactions        Transaction[]
+  reviews             Review[]
+  referrals           Referral[]         @relation("Referrer")
+  referredBy          Referral?          @relation("Referred")
+  communications      Communication[]
+  waitlistEntries     WaitlistEntry[]
+  activities          Activity[]
+  clientNotes         ClientNote[]
+  attachments         Attachment[]
+  familyMemberships   FamilyMember[]
+  primaryFamilyGroups FamilyGroup[]      @relation("PrimaryFamilyContact")
+  marketplaceLeads    MarketplaceLead[]
 }
 
 enum ClientStatus {
@@ -408,15 +434,15 @@ enum ClientStatus {
 }
 
 model ClientPhoto {
-  id            String    @id @default(cuid())
-  type          PhotoType @default(AFTER)
-  filePath      String
-  caption       String?
-  serviceDate   DateTime?
-  isPortfolio   Boolean   @default(false)
-  takenAt       DateTime  @default(now())
+  id          String    @id @default(cuid())
+  type        PhotoType @default(AFTER)
+  filePath    String
+  caption     String?
+  serviceDate DateTime?
+  isPortfolio Boolean   @default(false)
+  takenAt     DateTime  @default(now())
 
-  client        Client    @relation(fields: [clientId], references: [id])
+  client        Client       @relation(fields: [clientId], references: [id])
   clientId      String
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
   appointmentId String?
@@ -430,26 +456,26 @@ enum PhotoType {
 }
 
 model ServiceFormula {
-  id            String    @id @default(cuid())
-  serviceType   String
-  formula       String
-  notes         String?
-  lastUsed      DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  serviceType String
+  formula     String
+  notes       String?
+  lastUsed    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String
+  client   Client @relation(fields: [clientId], references: [id])
+  clientId String
 }
 
 model ClientPreference {
-  id            String    @id @default(cuid())
-  category      String
-  value         String
-  notes         String?
+  id       String  @id @default(cuid())
+  category String
+  value    String
+  notes    String?
 
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String
+  client   Client @relation(fields: [clientId], references: [id])
+  clientId String
 
   @@unique([clientId, category])
 }
@@ -457,17 +483,17 @@ model ClientPreference {
 // ============ ACTIVITY TIMELINE ============
 
 model Activity {
-  id            String    @id @default(cuid())
-  type          ActivityType
-  title         String
-  description   String?
-  metadata      Json?
+  id          String       @id @default(cuid())
+  type        ActivityType
+  title       String
+  description String?
+  metadata    Json?
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String
-  userId        String?
+  client   Client  @relation(fields: [clientId], references: [id])
+  clientId String
+  userId   String?
 }
 
 enum ActivityType {
@@ -492,94 +518,94 @@ enum ActivityType {
 }
 
 model ClientNote {
-  id            String    @id @default(cuid())
-  content       String
-  isPinned      Boolean   @default(false)
-  isPrivate     Boolean   @default(false)
+  id        String  @id @default(cuid())
+  content   String
+  isPinned  Boolean @default(false)
+  isPrivate Boolean @default(false)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String
-  createdById   String
+  client      Client @relation(fields: [clientId], references: [id])
+  clientId    String
+  createdById String
 }
 
 model Attachment {
-  id            String    @id @default(cuid())
-  fileName      String
-  fileType      String
-  fileSize      Int
-  filePath      String
-  description   String?
+  id          String  @id @default(cuid())
+  fileName    String
+  fileType    String
+  fileSize    Int
+  filePath    String
+  description String?
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String
-  uploadedById  String
+  client       Client @relation(fields: [clientId], references: [id])
+  clientId     String
+  uploadedById String
 }
 
 // ============ SERVICES ============
 
 model ServiceCategory {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
-  sortOrder     Int       @default(0)
-  color         String?
-  icon          String?
-  isActive      Boolean   @default(true)
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  sortOrder   Int     @default(0)
+  color       String?
+  icon        String?
+  isActive    Boolean @default(true)
 
-  business      Business  @relation(fields: [businessId], references: [id])
-  businessId    String
-  services      Service[]
+  business   Business  @relation(fields: [businessId], references: [id])
+  businessId String
+  services   Service[]
 
   @@unique([businessId, name])
 }
 
 model Service {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
-  duration      Int
-  price         Decimal   @db.Decimal(10, 2)
-  priceType     PriceType @default(FIXED)
-  priceFrom     Decimal?  @db.Decimal(10, 2)
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  duration    Int
+  price       Decimal   @db.Decimal(10, 2)
+  priceType   PriceType @default(FIXED)
+  priceFrom   Decimal?  @db.Decimal(10, 2)
 
   // Display
-  color         String?
-  image         String?
-  sortOrder     Int       @default(0)
+  color     String?
+  image     String?
+  sortOrder Int     @default(0)
 
   // Booking settings
-  allowOnline   Boolean   @default(true)
+  allowOnline    Boolean  @default(true)
   requireDeposit Boolean  @default(false)
-  depositAmount Decimal?  @db.Decimal(10, 2)
+  depositAmount  Decimal? @db.Decimal(10, 2)
   depositPercent Decimal? @db.Decimal(5, 2)
 
   // Capacity
-  canDoubleBook Boolean   @default(false)
-  maxConcurrent Int       @default(1)
+  canDoubleBook Boolean @default(false)
+  maxConcurrent Int     @default(1)
 
   // Processing time
   processingTime Int?
 
   // Buffer time between appointments
-  bufferTime    Int?      @default(15)
+  bufferTime Int? @default(15)
 
-  isActive      Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business      Business  @relation(fields: [businessId], references: [id])
-  businessId    String
-  category      ServiceCategory? @relation(fields: [categoryId], references: [id])
-  categoryId    String?
-  addOns        ServiceAddOn[]
+  business            Business              @relation(fields: [businessId], references: [id])
+  businessId          String
+  category            ServiceCategory?      @relation(fields: [categoryId], references: [id])
+  categoryId          String?
+  addOns              ServiceAddOn[]
   appointmentServices AppointmentService[]
-  lineItems     TransactionLineItem[]
+  lineItems           TransactionLineItem[]
 
   @@unique([businessId, name])
 }
@@ -592,73 +618,73 @@ enum PriceType {
 }
 
 model ServiceAddOn {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
-  duration      Int
-  price         Decimal   @db.Decimal(10, 2)
-  isActive      Boolean   @default(true)
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  duration    Int
+  price       Decimal @db.Decimal(10, 2)
+  isActive    Boolean @default(true)
 
-  service       Service   @relation(fields: [serviceId], references: [id])
-  serviceId     String
+  service           Service            @relation(fields: [serviceId], references: [id])
+  serviceId         String
   appointmentAddOns AppointmentAddOn[]
 }
 
 // ============ APPOINTMENTS ============
 
 model Appointment {
-  id            String            @id @default(cuid())
-  status        AppointmentStatus @default(BOOKED)
+  id     String            @id @default(cuid())
+  status AppointmentStatus @default(BOOKED)
 
   // Timing
   scheduledStart DateTime
-  scheduledEnd  DateTime
-  actualStart   DateTime?
-  actualEnd     DateTime?
+  scheduledEnd   DateTime
+  actualStart    DateTime?
+  actualEnd      DateTime?
 
   // Check-in
-  checkedInAt   DateTime?
-  checkedOutAt  DateTime?
+  checkedInAt  DateTime?
+  checkedOutAt DateTime?
 
   // Client info (for walk-ins)
-  clientName    String?
-  clientPhone   String?
-  clientEmail   String?
+  clientName  String?
+  clientPhone String?
+  clientEmail String?
 
   // Booking source
-  source        BookingSource     @default(PHONE)
+  source BookingSource @default(PHONE)
 
   // Notes
   notes         String?
   internalNotes String?
 
   // Confirmation
-  isConfirmed   Boolean           @default(false)
-  confirmedAt   DateTime?
-  confirmationSent Boolean        @default(false)
+  isConfirmed      Boolean   @default(false)
+  confirmedAt      DateTime?
+  confirmationSent Boolean   @default(false)
 
   // SMS Reminders
-  reminderSent  Boolean           @default(false)
+  reminderSent   Boolean   @default(false)
   reminderSentAt DateTime?
 
   // Email Reminders
-  emailReminderSent Boolean       @default(false)
+  emailReminderSent   Boolean   @default(false)
   emailReminderSentAt DateTime?
 
   // Voice Call Reminders
-  callReminderSent Boolean        @default(false)
+  callReminderSent   Boolean   @default(false)
   callReminderSentAt DateTime?
 
   // No-show prediction
-  noShowRisk    Decimal?          @db.Decimal(5, 2)
+  noShowRisk Decimal? @db.Decimal(5, 2)
 
   // Deposit
-  depositPaid   Decimal?          @db.Decimal(10, 2)
+  depositPaid   Decimal?  @db.Decimal(10, 2)
   depositPaidAt DateTime?
 
   // Recurrence
-  isRecurring   Boolean           @default(false)
-  recurrenceRule String?
+  isRecurring         Boolean @default(false)
+  recurrenceRule      String?
   parentAppointmentId String?
 
   // Google Calendar integration (staff)
@@ -673,20 +699,29 @@ model Appointment {
   // Outlook Calendar integration (client)
   clientOutlookEventId String?
 
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  version        Int      @default(0)
+  idempotencyKey String?
 
   // Relations
-  client        Client?           @relation(fields: [clientId], references: [id])
-  clientId      String?
-  staff         Staff             @relation(fields: [staffId], references: [id])
-  staffId       String
-  location      Location          @relation(fields: [locationId], references: [id])
-  locationId    String
-  services      AppointmentService[]
-  photos        ClientPhoto[]
-  transaction   Transaction?
-  marketplaceLead MarketplaceLead?
+  client                Client?               @relation(fields: [clientId], references: [id])
+  clientId              String?
+  staff                 Staff                 @relation(fields: [staffId], references: [id])
+  staffId               String
+  location              Location              @relation(fields: [locationId], references: [id])
+  locationId            String
+  business              Business?             @relation(fields: [businessId], references: [id])
+  businessId            String?
+  services              AppointmentService[]
+  photos                ClientPhoto[]
+  transaction           Transaction?
+  marketplaceLead       MarketplaceLead?
+  integrationDeliveries IntegrationDelivery[]
+
+  @@unique([businessId, idempotencyKey])
+  @@index([businessId, scheduledStart])
+  @@index([businessId, status])
 }
 
 enum AppointmentStatus {
@@ -714,98 +749,98 @@ enum BookingSource {
 }
 
 model AppointmentService {
-  id            String    @id @default(cuid())
-  price         Decimal   @db.Decimal(10, 2)
-  duration      Int
-  notes         String?
+  id       String  @id @default(cuid())
+  price    Decimal @db.Decimal(10, 2)
+  duration Int
+  notes    String?
 
-  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  appointment   Appointment        @relation(fields: [appointmentId], references: [id])
   appointmentId String
-  service       Service   @relation(fields: [serviceId], references: [id])
+  service       Service            @relation(fields: [serviceId], references: [id])
   serviceId     String
   addOns        AppointmentAddOn[]
 }
 
 model AppointmentAddOn {
-  id            String    @id @default(cuid())
-  price         Decimal   @db.Decimal(10, 2)
-  duration      Int
+  id       String  @id @default(cuid())
+  price    Decimal @db.Decimal(10, 2)
+  duration Int
 
-  appointmentService AppointmentService @relation(fields: [appointmentServiceId], references: [id])
+  appointmentService   AppointmentService @relation(fields: [appointmentServiceId], references: [id])
   appointmentServiceId String
-  addOn         ServiceAddOn @relation(fields: [addOnId], references: [id])
-  addOnId       String
+  addOn                ServiceAddOn       @relation(fields: [addOnId], references: [id])
+  addOnId              String
 }
 
 model GroupAppointment {
-  id            String    @id @default(cuid())
-  name          String?
-  eventType     String    @default("group") // group, party, event, class
+  id        String  @id @default(cuid())
+  name      String?
+  eventType String  @default("group") // group, party, event, class
 
   scheduledStart DateTime
-  scheduledEnd  DateTime
+  scheduledEnd   DateTime
 
-  maxParticipants Int     @default(10)
-  minParticipants Int     @default(2)
+  maxParticipants Int @default(10)
+  minParticipants Int @default(2)
 
   // Pricing
-  pricePerPerson Decimal  @db.Decimal(10, 2)
+  pricePerPerson  Decimal  @db.Decimal(10, 2)
   depositRequired Decimal? @db.Decimal(10, 2)
 
-  status        String    @default("pending") // pending, confirmed, in_progress, completed, cancelled
+  status String @default("pending") // pending, confirmed, in_progress, completed, cancelled
 
-  notes         String?
-  hostName      String?
-  hostPhone     String?
-  hostEmail     String?
+  notes     String?
+  hostName  String?
+  hostPhone String?
+  hostEmail String?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  staffId       String
-  locationId    String
-  serviceId     String?
-  participants  GroupParticipant[]
+  staffId      String
+  locationId   String
+  serviceId    String?
+  participants GroupParticipant[]
 }
 
 model GroupParticipant {
-  id            String    @id @default(cuid())
-  name          String
-  phone         String?
-  email         String?
-  status        String    @default("confirmed") // confirmed, cancelled, no_show
-  checkedIn     Boolean   @default(false)
-  paidAmount    Decimal?  @db.Decimal(10, 2)
+  id         String   @id @default(cuid())
+  name       String
+  phone      String?
+  email      String?
+  status     String   @default("confirmed") // confirmed, cancelled, no_show
+  checkedIn  Boolean  @default(false)
+  paidAmount Decimal? @db.Decimal(10, 2)
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  groupAppointment GroupAppointment @relation(fields: [groupAppointmentId], references: [id])
+  groupAppointment   GroupAppointment @relation(fields: [groupAppointmentId], references: [id])
   groupAppointmentId String
-  clientId      String?
+  clientId           String?
 }
 
 model WaitlistEntry {
-  id            String    @id @default(cuid())
+  id            String         @id @default(cuid())
   position      Int
   estimatedWait Int?
   status        WaitlistStatus @default(WAITING)
 
   // Service requested
-  serviceNotes  String?
+  serviceNotes      String?
   estimatedDuration Int?
 
-  addedAt       DateTime  @default(now())
-  seatedAt      DateTime?
-  leftAt        DateTime?
+  addedAt  DateTime  @default(now())
+  seatedAt DateTime?
+  leftAt   DateTime?
 
   // Contact
-  phone         String?
+  phone            String?
   notificationSent Boolean @default(false)
 
-  client        Client?   @relation(fields: [clientId], references: [id])
-  clientId      String?
-  location      Location  @relation(fields: [locationId], references: [id])
-  locationId    String
+  client     Client?  @relation(fields: [clientId], references: [id])
+  clientId   String?
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId String
 }
 
 enum WaitlistStatus {
@@ -819,46 +854,46 @@ enum WaitlistStatus {
 // ============ POINT OF SALE ============
 
 model Transaction {
-  id            String          @id @default(cuid())
-  transactionNumber String      @unique
-  type          TransactionType @default(SALE)
-  status        TransactionStatus @default(COMPLETED)
+  id                String            @id @default(cuid())
+  transactionNumber String            @unique
+  type              TransactionType   @default(SALE)
+  status            TransactionStatus @default(COMPLETED)
 
   // Timing
-  date          DateTime        @default(now())
+  date DateTime @default(now())
 
   // Amounts
-  subtotal      Decimal         @db.Decimal(10, 2)
-  discountAmount Decimal        @db.Decimal(10, 2) @default(0)
+  subtotal       Decimal @db.Decimal(10, 2)
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
   discountReason String?
-  taxAmount     Decimal         @db.Decimal(10, 2) @default(0)
-  tipAmount     Decimal         @db.Decimal(10, 2) @default(0)
-  totalAmount   Decimal         @db.Decimal(10, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(10, 2)
+  tipAmount      Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount    Decimal @db.Decimal(10, 2)
 
   // Loyalty
-  pointsEarned  Int             @default(0)
-  pointsRedeemed Int            @default(0)
+  pointsEarned   Int @default(0)
+  pointsRedeemed Int @default(0)
 
-  notes         String?
+  notes String?
 
   // QuickBooks integration
   quickbooksCustomerId String?
-  quickbooksInvoiceId String?
-  quickbooksPaymentId String?
-  quickbooksSyncedAt DateTime?
+  quickbooksInvoiceId  String?
+  quickbooksPaymentId  String?
+  quickbooksSyncedAt   DateTime?
 
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  client        Client?         @relation(fields: [clientId], references: [id])
+  client        Client?               @relation(fields: [clientId], references: [id])
   clientId      String?
-  staff         Staff           @relation(fields: [staffId], references: [id])
+  staff         Staff                 @relation(fields: [staffId], references: [id])
   staffId       String
-  location      Location        @relation(fields: [locationId], references: [id])
+  location      Location              @relation(fields: [locationId], references: [id])
   locationId    String
-  appointment   Appointment?    @relation(fields: [appointmentId], references: [id])
-  appointmentId String?         @unique
+  appointment   Appointment?          @relation(fields: [appointmentId], references: [id])
+  appointmentId String?               @unique
   lineItems     TransactionLineItem[]
   payments      TransactionPayment[]
   tips          Tip[]
@@ -880,21 +915,21 @@ enum TransactionStatus {
 }
 
 model TransactionLineItem {
-  id            String    @id @default(cuid())
-  type          LineItemType
-  name          String
-  description   String?
-  quantity      Int       @default(1)
-  unitPrice     Decimal   @db.Decimal(10, 2)
-  totalPrice    Decimal   @db.Decimal(10, 2)
+  id          String       @id @default(cuid())
+  type        LineItemType
+  name        String
+  description String?
+  quantity    Int          @default(1)
+  unitPrice   Decimal      @db.Decimal(10, 2)
+  totalPrice  Decimal      @db.Decimal(10, 2)
 
   performedById String?
 
   transaction   Transaction @relation(fields: [transactionId], references: [id])
   transactionId String
-  service       Service?  @relation(fields: [serviceId], references: [id])
+  service       Service?    @relation(fields: [serviceId], references: [id])
   serviceId     String?
-  product       Product?  @relation(fields: [productId], references: [id])
+  product       Product?    @relation(fields: [productId], references: [id])
   productId     String?
 }
 
@@ -907,17 +942,17 @@ enum LineItemType {
 }
 
 model TransactionPayment {
-  id            String        @id @default(cuid())
-  method        PaymentMethod
-  amount        Decimal       @db.Decimal(10, 2)
-  reference     String?
+  id        String        @id @default(cuid())
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(10, 2)
+  reference String?
 
   stripePaymentId String?
-  giftCardId    String?
+  giftCardId      String?
 
-  createdAt     DateTime      @default(now())
+  createdAt DateTime @default(now())
 
-  transaction   Transaction   @relation(fields: [transactionId], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
   transactionId String
 }
 
@@ -934,445 +969,445 @@ enum PaymentMethod {
 }
 
 model Tip {
-  id            String    @id @default(cuid())
-  amount        Decimal   @db.Decimal(10, 2)
-  method        PaymentMethod
+  id     String        @id @default(cuid())
+  amount Decimal       @db.Decimal(10, 2)
+  method PaymentMethod
 
   transaction   Transaction @relation(fields: [transactionId], references: [id])
   transactionId String
-  staff         Staff     @relation(fields: [staffId], references: [id])
+  staff         Staff       @relation(fields: [staffId], references: [id])
   staffId       String
 }
 
 model Commission {
-  id            String    @id @default(cuid())
-  amount        Decimal   @db.Decimal(10, 2)
-  type          String
-  rate          Decimal   @db.Decimal(5, 2)
-  baseAmount    Decimal   @db.Decimal(10, 2)
+  id         String  @id @default(cuid())
+  amount     Decimal @db.Decimal(10, 2)
+  type       String
+  rate       Decimal @db.Decimal(5, 2)
+  baseAmount Decimal @db.Decimal(10, 2)
 
   transaction   Transaction @relation(fields: [transactionId], references: [id])
   transactionId String
-  staff         Staff     @relation(fields: [staffId], references: [id])
+  staff         Staff       @relation(fields: [staffId], references: [id])
   staffId       String
 }
 
 // ============ PRODUCTS ============
 
 model ProductCategory {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
-  sortOrder     Int       @default(0)
-  isActive      Boolean   @default(true)
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
 
-  business      Business  @relation(fields: [businessId], references: [id])
-  businessId    String
-  products      Product[]
+  business   Business  @relation(fields: [businessId], references: [id])
+  businessId String
+  products   Product[]
 
   @@unique([businessId, name])
 }
 
 model Product {
-  id            String    @id @default(cuid())
-  sku           String?
-  barcode       String?
-  name          String
-  description   String?
-  brand         String?
-  size          String?
+  id          String  @id @default(cuid())
+  sku         String?
+  barcode     String?
+  name        String
+  description String?
+  brand       String?
+  size        String?
 
   // Pricing
-  cost          Decimal?  @db.Decimal(10, 2)
-  price         Decimal   @db.Decimal(10, 2)
+  cost  Decimal? @db.Decimal(10, 2)
+  price Decimal  @db.Decimal(10, 2)
 
   // Inventory
-  trackInventory Boolean  @default(true)
-  quantityOnHand Int      @default(0)
-  reorderLevel  Int       @default(0)
+  trackInventory  Boolean @default(true)
+  quantityOnHand  Int     @default(0)
+  reorderLevel    Int     @default(0)
   reorderQuantity Int     @default(0)
 
   // Display
-  image         String?
-  sortOrder     Int       @default(0)
+  image     String?
+  sortOrder Int     @default(0)
 
-  isActive      Boolean   @default(true)
-  isTaxable     Boolean   @default(true)
+  isActive  Boolean @default(true)
+  isTaxable Boolean @default(true)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business      Business  @relation(fields: [businessId], references: [id])
-  businessId    String
-  category      ProductCategory? @relation(fields: [categoryId], references: [id])
-  categoryId    String?
-  lineItems     TransactionLineItem[]
+  business   Business              @relation(fields: [businessId], references: [id])
+  businessId String
+  category   ProductCategory?      @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  lineItems  TransactionLineItem[]
 }
 
 // ============ VENDORS & PURCHASE ORDERS ============
 
 model Vendor {
-  id            String    @id @default(cuid())
-  name          String
-  contactName   String?
-  email         String?
-  phone         String?
-  website       String?
+  id          String  @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  website     String?
 
   // Address
-  address       String?
-  city          String?
-  state         String?
-  zip           String?
-  country       String?
+  address String?
+  city    String?
+  state   String?
+  zip     String?
+  country String?
 
   // Terms
   paymentTerms  String?
   accountNumber String?
   notes         String?
 
-  isActive      Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  businessId    String
+  businessId     String
   purchaseOrders PurchaseOrder[]
 }
 
 model PurchaseOrder {
-  id            String    @id @default(cuid())
-  poNumber      String    @unique
-  status        String    @default("draft") // draft, submitted, partial, received, cancelled
+  id       String @id @default(cuid())
+  poNumber String @unique
+  status   String @default("draft") // draft, submitted, partial, received, cancelled
 
-  orderDate     DateTime  @default(now())
-  expectedDate  DateTime?
-  receivedDate  DateTime?
+  orderDate    DateTime  @default(now())
+  expectedDate DateTime?
+  receivedDate DateTime?
 
-  subtotal      Decimal   @db.Decimal(10, 2)
-  taxAmount     Decimal   @db.Decimal(10, 2) @default(0)
-  shippingAmount Decimal  @db.Decimal(10, 2) @default(0)
-  totalAmount   Decimal   @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(10, 2)
+  shippingAmount Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount    Decimal @db.Decimal(10, 2)
 
-  notes         String?
+  notes String?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  vendor        Vendor    @relation(fields: [vendorId], references: [id])
-  vendorId      String
-  createdById   String
-  items         PurchaseOrderItem[]
+  vendor      Vendor              @relation(fields: [vendorId], references: [id])
+  vendorId    String
+  createdById String
+  items       PurchaseOrderItem[]
 }
 
 model PurchaseOrderItem {
-  id            String    @id @default(cuid())
-  productId     String
-  productName   String
-  sku           String?
+  id          String  @id @default(cuid())
+  productId   String
+  productName String
+  sku         String?
 
-  quantityOrdered Int
-  quantityReceived Int     @default(0)
+  quantityOrdered  Int
+  quantityReceived Int @default(0)
 
-  unitCost      Decimal   @db.Decimal(10, 2)
-  totalCost     Decimal   @db.Decimal(10, 2)
+  unitCost  Decimal @db.Decimal(10, 2)
+  totalCost Decimal @db.Decimal(10, 2)
 
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId String
 }
 
 // ============ PACKAGES & MEMBERSHIPS ============
 
 model Package {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
+  id          String  @id @default(cuid())
+  name        String
+  description String?
 
   // Pricing
-  price         Decimal   @db.Decimal(10, 2)
-  originalValue Decimal   @db.Decimal(10, 2)
-  savingsAmount Decimal   @db.Decimal(10, 2)
-  savingsPercent Decimal  @db.Decimal(5, 2)
+  price          Decimal @db.Decimal(10, 2)
+  originalValue  Decimal @db.Decimal(10, 2)
+  savingsAmount  Decimal @db.Decimal(10, 2)
+  savingsPercent Decimal @db.Decimal(5, 2)
 
   // Validity
-  validityDays  Int       @default(365)
+  validityDays Int @default(365)
 
   // Display
-  image         String?
-  sortOrder     Int       @default(0)
-  isPopular     Boolean   @default(false)
+  image     String?
+  sortOrder Int     @default(0)
+  isPopular Boolean @default(false)
 
-  isActive      Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  businessId    String
-  services      PackageService[]
-  purchases     PackagePurchase[]
+  businessId String
+  services   PackageService[]
+  purchases  PackagePurchase[]
 }
 
 model PackageService {
-  id            String    @id @default(cuid())
-  quantity      Int       @default(1)
+  id       String @id @default(cuid())
+  quantity Int    @default(1)
 
-  package       Package   @relation(fields: [packageId], references: [id])
-  packageId     String
-  serviceId     String
+  package   Package @relation(fields: [packageId], references: [id])
+  packageId String
+  serviceId String
 
   @@unique([packageId, serviceId])
 }
 
 model PackagePurchase {
-  id            String    @id @default(cuid())
-  purchaseDate  DateTime  @default(now())
-  expiresAt     DateTime
+  id           String   @id @default(cuid())
+  purchaseDate DateTime @default(now())
+  expiresAt    DateTime
 
   // Usage tracking
-  totalServices Int
-  usedServices  Int       @default(0)
+  totalServices     Int
+  usedServices      Int @default(0)
   remainingServices Int
 
-  status        String    @default("active") // active, expired, completed
+  status String @default("active") // active, expired, completed
 
-  pricePaid     Decimal   @db.Decimal(10, 2)
+  pricePaid Decimal @db.Decimal(10, 2)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  package       Package   @relation(fields: [packageId], references: [id])
-  packageId     String
-  clientId      String
-  usages        PackageUsage[]
+  package   Package        @relation(fields: [packageId], references: [id])
+  packageId String
+  clientId  String
+  usages    PackageUsage[]
 }
 
 model PackageUsage {
-  id            String    @id @default(cuid())
-  usedAt        DateTime  @default(now())
+  id            String   @id @default(cuid())
+  usedAt        DateTime @default(now())
   serviceId     String
   appointmentId String?
 
-  purchase      PackagePurchase @relation(fields: [purchaseId], references: [id])
-  purchaseId    String
+  purchase   PackagePurchase @relation(fields: [purchaseId], references: [id])
+  purchaseId String
 }
 
 model Membership {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
+  id          String  @id @default(cuid())
+  name        String
+  description String?
 
   // Pricing
-  price         Decimal   @db.Decimal(10, 2)
-  billingCycle  String    @default("monthly") // monthly, quarterly, yearly
+  price        Decimal @db.Decimal(10, 2)
+  billingCycle String  @default("monthly") // monthly, quarterly, yearly
 
   // Benefits
-  discountPercent Decimal @db.Decimal(5, 2) @default(0)
-  freeServicesPerMonth Int @default(0)
-  priorityBooking Boolean @default(false)
-  guestPasses   Int       @default(0)
+  discountPercent      Decimal @default(0) @db.Decimal(5, 2)
+  freeServicesPerMonth Int     @default(0)
+  priorityBooking      Boolean @default(false)
+  guestPasses          Int     @default(0)
 
   // Included services (JSON for flexibility)
   includedServices Json?
 
   // Display
-  image         String?
-  color         String?
-  sortOrder     Int       @default(0)
-  isPopular     Boolean   @default(false)
+  image     String?
+  color     String?
+  sortOrder Int     @default(0)
+  isPopular Boolean @default(false)
 
-  isActive      Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   businessId    String
   subscriptions MembershipSubscription[]
 }
 
 model MembershipSubscription {
-  id            String    @id @default(cuid())
-  status        String    @default("active") // active, paused, cancelled, expired
+  id     String @id @default(cuid())
+  status String @default("active") // active, paused, cancelled, expired
 
-  startDate     DateTime  @default(now())
+  startDate       DateTime  @default(now())
   nextBillingDate DateTime
-  endDate       DateTime?
+  endDate         DateTime?
 
   // Payment
-  lastPaymentDate DateTime?
-  lastPaymentAmount Decimal? @db.Decimal(10, 2)
-  paymentMethod String?
+  lastPaymentDate      DateTime?
+  lastPaymentAmount    Decimal?  @db.Decimal(10, 2)
+  paymentMethod        String?
   stripeSubscriptionId String?
 
   // Usage this period
-  freeServicesUsed Int    @default(0)
-  guestPassesUsed Int     @default(0)
+  freeServicesUsed Int @default(0)
+  guestPassesUsed  Int @default(0)
 
   // Cancellation
-  cancelledAt   DateTime?
-  cancelReason  String?
+  cancelledAt  DateTime?
+  cancelReason String?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  membership    Membership @relation(fields: [membershipId], references: [id])
-  membershipId  String
-  clientId      String
+  membership   Membership @relation(fields: [membershipId], references: [id])
+  membershipId String
+  clientId     String
 }
 
 // ============ LOYALTY & GIFT CARDS ============
 
 model LoyaltyProgram {
-  id              String    @id @default(cuid())
-  name            String
-  isActive        Boolean   @default(true)
+  id       String  @id @default(cuid())
+  name     String
+  isActive Boolean @default(true)
 
   // Earning rules
-  pointsPerDollar Decimal   @db.Decimal(5, 2) @default(1)
-  bonusOnSignup   Int       @default(0)
-  bonusOnBirthday Int       @default(0)
-  bonusOnReferral Int       @default(0)
+  pointsPerDollar Decimal @default(1) @db.Decimal(5, 2)
+  bonusOnSignup   Int     @default(0)
+  bonusOnBirthday Int     @default(0)
+  bonusOnReferral Int     @default(0)
 
   // Tiers
-  tiers           Json?
+  tiers Json?
 
   // Expiration
   pointsExpireMonths Int?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business        Business  @relation(fields: [businessId], references: [id])
-  businessId      String    @unique
-  accounts        LoyaltyAccount[]
-  rewards         LoyaltyReward[]
+  business   Business         @relation(fields: [businessId], references: [id])
+  businessId String           @unique
+  accounts   LoyaltyAccount[]
+  rewards    LoyaltyReward[]
 }
 
 model LoyaltyAccount {
-  id            String    @id @default(cuid())
-  pointsBalance Int       @default(0)
-  lifetimePoints Int      @default(0)
-  tier          String    @default("Bronze")
-  tierExpiresAt DateTime?
+  id             String    @id @default(cuid())
+  pointsBalance  Int       @default(0)
+  lifetimePoints Int       @default(0)
+  tier           String    @default("Bronze")
+  tierExpiresAt  DateTime?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String    @unique
-  program       LoyaltyProgram @relation(fields: [programId], references: [id])
-  programId     String
-  transactions  LoyaltyTransaction[]
+  client       Client               @relation(fields: [clientId], references: [id])
+  clientId     String               @unique
+  program      LoyaltyProgram       @relation(fields: [programId], references: [id])
+  programId    String
+  transactions LoyaltyTransaction[]
 }
 
 model LoyaltyTransaction {
-  id            String    @id @default(cuid())
-  type          String
-  points        Int
-  description   String?
-  expiresAt     DateTime?
+  id          String    @id @default(cuid())
+  type        String
+  points      Int
+  description String?
+  expiresAt   DateTime?
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  account       LoyaltyAccount @relation(fields: [accountId], references: [id])
-  accountId     String
+  account   LoyaltyAccount @relation(fields: [accountId], references: [id])
+  accountId String
 }
 
 model LoyaltyReward {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
-  pointsCost    Int
-  type          String
-  value         Decimal   @db.Decimal(10, 2)
-  image         String?
-  isActive      Boolean   @default(true)
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  pointsCost  Int
+  type        String
+  value       Decimal @db.Decimal(10, 2)
+  image       String?
+  isActive    Boolean @default(true)
 
-  program       LoyaltyProgram @relation(fields: [programId], references: [id])
-  programId     String
+  program   LoyaltyProgram @relation(fields: [programId], references: [id])
+  programId String
 }
 
 model GiftCard {
-  id            String    @id @default(cuid())
-  code          String    @unique
-  initialBalance Decimal  @db.Decimal(10, 2)
-  currentBalance Decimal  @db.Decimal(10, 2)
-  expiresAt     DateTime?
-  status        String    @default("active")
+  id             String    @id @default(cuid())
+  code           String    @unique
+  initialBalance Decimal   @db.Decimal(10, 2)
+  currentBalance Decimal   @db.Decimal(10, 2)
+  expiresAt      DateTime?
+  status         String    @default("active")
 
-  purchasedAt   DateTime  @default(now())
+  purchasedAt DateTime @default(now())
 
-  isDigital     Boolean   @default(true)
+  isDigital      Boolean   @default(true)
   recipientEmail String?
-  recipientName String?
-  message       String?
-  sentAt        DateTime?
+  recipientName  String?
+  message        String?
+  sentAt         DateTime?
 
-  business      Business  @relation(fields: [businessId], references: [id])
+  business      Business        @relation(fields: [businessId], references: [id])
   businessId    String
-  purchasedBy   Client?   @relation("GiftCardPurchaser", fields: [purchasedById], references: [id])
+  purchasedBy   Client?         @relation("GiftCardPurchaser", fields: [purchasedById], references: [id])
   purchasedById String?
-  owner         Client?   @relation("GiftCardOwner", fields: [ownerId], references: [id])
+  owner         Client?         @relation("GiftCardOwner", fields: [ownerId], references: [id])
   ownerId       String?
   usageHistory  GiftCardUsage[]
 }
 
 model GiftCardUsage {
-  id            String    @id @default(cuid())
-  amount        Decimal   @db.Decimal(10, 2)
-  balanceAfter  Decimal   @db.Decimal(10, 2)
-  usedAt        DateTime  @default(now())
+  id           String   @id @default(cuid())
+  amount       Decimal  @db.Decimal(10, 2)
+  balanceAfter Decimal  @db.Decimal(10, 2)
+  usedAt       DateTime @default(now())
 
-  giftCard      GiftCard  @relation(fields: [giftCardId], references: [id])
-  giftCardId    String
+  giftCard   GiftCard @relation(fields: [giftCardId], references: [id])
+  giftCardId String
 }
 
 // ============ REFERRALS ============
 
 model Referral {
-  id            String    @id @default(cuid())
-  status        String    @default("pending")
+  id     String @id @default(cuid())
+  status String @default("pending")
 
-  referrerReward String?
-  referredReward String?
+  referrerReward   String?
+  referredReward   String?
   referrerRewarded Boolean @default(false)
   referredRewarded Boolean @default(false)
 
-  createdAt     DateTime  @default(now())
-  completedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
 
-  referrer      Client    @relation("Referrer", fields: [referrerId], references: [id])
-  referrerId    String
-  referred      Client    @relation("Referred", fields: [referredId], references: [id])
-  referredId    String    @unique
+  referrer   Client @relation("Referrer", fields: [referrerId], references: [id])
+  referrerId String
+  referred   Client @relation("Referred", fields: [referredId], references: [id])
+  referredId String @unique
 }
 
 // ============ MARKETING ============
 
 model Campaign {
-  id            String    @id @default(cuid())
-  name          String
-  type          CampaignType
-  status        String    @default("draft")
+  id     String       @id @default(cuid())
+  name   String
+  type   CampaignType
+  status String       @default("draft")
 
-  subject       String?
-  content       String
-  image         String?
+  subject String?
+  content String
+  image   String?
 
   targetTags    String[]
   targetSegment String?
 
-  scheduledAt   DateTime?
-  sentAt        DateTime?
+  scheduledAt DateTime?
+  sentAt      DateTime?
 
-  sentCount     Int       @default(0)
-  openCount     Int       @default(0)
-  clickCount    Int       @default(0)
+  sentCount  Int @default(0)
+  openCount  Int @default(0)
+  clickCount Int @default(0)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business      Business  @relation(fields: [businessId], references: [id])
-  businessId    String
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
 }
 
 enum CampaignType {
@@ -1382,123 +1417,162 @@ enum CampaignType {
 }
 
 model Review {
-  id            String    @id @default(cuid())
-  rating        Int
-  comment       String?
-  source        String
-  isPublic      Boolean   @default(true)
+  id       String  @id @default(cuid())
+  rating   Int
+  comment  String?
+  source   String
+  isPublic Boolean @default(true)
 
-  response      String?
-  respondedAt   DateTime?
+  response    String?
+  respondedAt DateTime?
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String
+  client   Client @relation(fields: [clientId], references: [id])
+  clientId String
 }
 
 model Communication {
-  id            String    @id @default(cuid())
-  type          String
-  direction     String
-  content       String?
-  status        String    @default("sent")
-  sentAt        DateTime  @default(now())
+  id        String   @id @default(cuid())
+  type      String
+  direction String
+  content   String?
+  status    String   @default("sent")
+  sentAt    DateTime @default(now())
 
-  openedAt      DateTime?
-  clickedAt     DateTime?
+  openedAt  DateTime?
+  clickedAt DateTime?
 
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String
+  client   Client @relation(fields: [clientId], references: [id])
+  clientId String
 }
 
 // ============ WORKFLOW AUTOMATION ============
 
 model Automation {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
-  isActive      Boolean   @default(true)
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean @default(true)
 
   triggerType   String
   triggerConfig Json?
 
-  actions       Json
+  actions Json
 
-  timesTriggered Int      @default(0)
-  lastTriggered DateTime?
+  timesTriggered Int       @default(0)
+  lastTriggered  DateTime?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business      Business  @relation(fields: [businessId], references: [id])
-  businessId    String
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
 }
 
 // ============ AUDIT & SEARCH ============
 
 model AuditLog {
-  id            String    @id @default(cuid())
-  action        String
-  entityType    String
-  entityId      String
-  changes       Json?
+  id         String @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  changes    Json?
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  user          User      @relation(fields: [userId], references: [id])
-  userId        String
+  user       User      @relation(fields: [userId], references: [id])
+  userId     String
+  business   Business? @relation("BusinessAuditLogs", fields: [businessId], references: [id])
+  businessId String?
+
+  @@index([businessId, createdAt])
+}
+
+enum IntegrationDeliveryStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  RETRY
+  DEAD_LETTER
+}
+
+/// Persistent outbox for email, SMS, and calendar delivery. Provider failures
+/// never roll back the authoritative appointment and are retried explicitly.
+model IntegrationDelivery {
+  id            String                    @id @default(cuid())
+  businessId    String
+  appointmentId String
+  kind          String
+  provider      String
+  dedupeKey     String                    @unique
+  payload       Json
+  status        IntegrationDeliveryStatus @default(PENDING)
+  attempts      Int                       @default(0)
+  nextAttemptAt DateTime                  @default(now())
+  lastErrorCode String?
+  lastErrorAt   DateTime?
+  deliveredAt   DateTime?
+  providerRef   String?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  business    Business    @relation(fields: [businessId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([businessId, appointmentId])
 }
 
 model SavedFilter {
-  id            String    @id @default(cuid())
-  name          String
-  entityType    String
-  filters       Json
-  isDefault     Boolean   @default(false)
+  id         String  @id @default(cuid())
+  name       String
+  entityType String
+  filters    Json
+  isDefault  Boolean @default(false)
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  user          User?     @relation(fields: [userId], references: [id])
-  userId        String?
-  business      Business? @relation(fields: [businessId], references: [id])
-  businessId    String?
+  user       User?     @relation(fields: [userId], references: [id])
+  userId     String?
+  business   Business? @relation(fields: [businessId], references: [id])
+  businessId String?
 }
 
 // ============ DAILY CLOSEOUT ============
 
 model DailyCloseout {
-  id            String    @id @default(cuid())
-  date          DateTime
-  staffId       String?
-  staff         Staff?    @relation(fields: [staffId], references: [id])
+  id      String   @id @default(cuid())
+  date    DateTime
+  staffId String?
+  staff   Staff?   @relation(fields: [staffId], references: [id])
 
   totalTransactions Int
-  grossSales    Decimal   @db.Decimal(10, 2)
-  discounts     Decimal   @db.Decimal(10, 2) @default(0)
-  netSales      Decimal   @db.Decimal(10, 2)
-  tax           Decimal   @db.Decimal(10, 2) @default(0)
-  tips          Decimal   @db.Decimal(10, 2) @default(0)
-  refunds       Decimal   @db.Decimal(10, 2) @default(0)
-  grandTotal    Decimal   @db.Decimal(10, 2)
+  grossSales        Decimal @db.Decimal(10, 2)
+  discounts         Decimal @default(0) @db.Decimal(10, 2)
+  netSales          Decimal @db.Decimal(10, 2)
+  tax               Decimal @default(0) @db.Decimal(10, 2)
+  tips              Decimal @default(0) @db.Decimal(10, 2)
+  refunds           Decimal @default(0) @db.Decimal(10, 2)
+  grandTotal        Decimal @db.Decimal(10, 2)
 
-  cashTotal     Decimal   @db.Decimal(10, 2) @default(0)
-  cardTotal     Decimal   @db.Decimal(10, 2) @default(0)
-  otherTotal    Decimal   @db.Decimal(10, 2) @default(0)
+  cashTotal  Decimal @default(0) @db.Decimal(10, 2)
+  cardTotal  Decimal @default(0) @db.Decimal(10, 2)
+  otherTotal Decimal @default(0) @db.Decimal(10, 2)
 
-  cashCounted   Decimal?  @db.Decimal(10, 2)
-  cashVariance  Decimal?  @db.Decimal(10, 2)
+  cashCounted  Decimal? @db.Decimal(10, 2)
+  cashVariance Decimal? @db.Decimal(10, 2)
 
-  appointmentsTotal Int   @default(0)
+  appointmentsTotal     Int @default(0)
   appointmentsCompleted Int @default(0)
-  appointmentsNoShow Int  @default(0)
-  newClients    Int       @default(0)
+  appointmentsNoShow    Int @default(0)
+  newClients            Int @default(0)
 
-  notes         String?
-  closedAt      DateTime  @default(now())
-  reportData    Json?
+  notes      String?
+  closedAt   DateTime @default(now())
+  reportData Json?
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([date, staffId])
 }
@@ -1506,27 +1580,27 @@ model DailyCloseout {
 // ============ FAMILY GROUPS ============
 
 model FamilyGroup {
-  id            String    @id @default(cuid())
-  name          String
+  id   String @id @default(cuid())
+  name String
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   primaryContactId String?
-  primaryContact Client?  @relation("PrimaryFamilyContact", fields: [primaryContactId], references: [id])
-  members       FamilyMember[]
+  primaryContact   Client?        @relation("PrimaryFamilyContact", fields: [primaryContactId], references: [id])
+  members          FamilyMember[]
 }
 
 model FamilyMember {
-  id            String    @id @default(cuid())
-  relationship  String
+  id           String @id @default(cuid())
+  relationship String
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  family        FamilyGroup @relation(fields: [familyId], references: [id])
-  familyId      String
-  client        Client    @relation(fields: [clientId], references: [id])
-  clientId      String
+  family   FamilyGroup @relation(fields: [familyId], references: [id])
+  familyId String
+  client   Client      @relation(fields: [clientId], references: [id])
+  clientId String
 
   @@unique([familyId, clientId])
 }
@@ -1534,25 +1608,25 @@ model FamilyMember {
 // ============ SALES CRM (Lead Tracking) ============
 
 model Lead {
-  id            String      @id @default(cuid())
+  id String @id @default(cuid())
 
   // Salon info
-  salonName     String
-  ownerName     String
-  email         String?
-  phone         String
-  website       String?
+  salonName String
+  ownerName String
+  email     String?
+  phone     String
+  website   String?
 
   // Address
-  address       String?
-  city          String?
-  state         String?
-  zip           String?
+  address String?
+  city    String?
+  state   String?
+  zip     String?
 
   // Lead info
-  source        LeadSource  @default(OTHER)
-  status        LeadStatus  @default(NEW)
-  priority      LeadPriority @default(MEDIUM)
+  source   LeadSource   @default(OTHER)
+  status   LeadStatus   @default(NEW)
+  priority LeadPriority @default(MEDIUM)
 
   // Tracking
   notes         String?
@@ -1560,11 +1634,11 @@ model Lead {
   nextFollowUp  DateTime?
 
   // Conversion
-  convertedAt   DateTime?
-  lostReason    String?
+  convertedAt DateTime?
+  lostReason  String?
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum LeadSource {
@@ -1600,40 +1674,40 @@ enum LeadPriority {
 // ============ SETTINGS ============
 
 model Settings {
-  id            String    @id @default("default")
-  businessName  String?
-  address       String?
-  phone         String?
-  email         String?
-  taxRate       Decimal?  @db.Decimal(5, 4)
-  openTime      String?
-  closeTime     String?
+  id           String   @id @default("default")
+  businessName String?
+  address      String?
+  phone        String?
+  email        String?
+  taxRate      Decimal? @db.Decimal(5, 4)
+  openTime     String?
+  closeTime    String?
 
   // Google Calendar
   googleCalendarEnabled Boolean @default(false)
 
   // QuickBooks
-  quickbooksAccessToken String?
+  quickbooksAccessToken  String?
   quickbooksRefreshToken String?
-  quickbooksRealmId String?
-  quickbooksTokenExpiry DateTime?
+  quickbooksRealmId      String?
+  quickbooksTokenExpiry  DateTime?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============ CONTACT MESSAGES ============
 
 model ContactMessage {
-  id            String    @id @default(cuid())
-  firstName     String
-  lastName      String
-  email         String
-  phone         String?
-  subject       String
-  message       String
-  isRead        Boolean   @default(false)
-  createdAt     DateTime  @default(now())
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 // ============ MARKETPLACE & LEAD GENERATION ============
@@ -1643,30 +1717,30 @@ model BusinessSubscription {
   plan                     SubscriptionPlan   @default(STARTER)
   status                   SubscriptionStatus @default(ACTIVE)
   billingCycle             String             @default("monthly")
-  monthlyPrice             Decimal            @db.Decimal(10, 2) @default(0)
-  marketplaceCommissionPct Decimal            @db.Decimal(5, 2) @default(20)
+  monthlyPrice             Decimal            @default(0) @db.Decimal(10, 2)
+  marketplaceCommissionPct Decimal            @default(20) @db.Decimal(5, 2)
 
   // Stripe
-  stripeCustomerId         String?
-  stripeSubscriptionId     String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
 
   // Trial
-  trialEndsAt              DateTime?
+  trialEndsAt DateTime?
 
   // Billing dates
-  currentPeriodStart       DateTime?
-  currentPeriodEnd         DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
 
   // Cancellation
-  cancelledAt              DateTime?
-  cancelReason             String?
+  cancelledAt  DateTime?
+  cancelReason String?
 
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business                 Business           @relation(fields: [businessId], references: [id])
-  businessId               String             @unique
-  invoices                 BusinessInvoice[]
+  business   Business          @relation(fields: [businessId], references: [id])
+  businessId String            @unique
+  invoices   BusinessInvoice[]
 }
 
 enum SubscriptionPlan {
@@ -1683,39 +1757,39 @@ enum SubscriptionStatus {
 }
 
 model MarketplaceLead {
-  id               String            @id @default(cuid())
-  source           MarketplaceSource @default(MARKETPLACE_SEARCH)
-  status           LeadStatusType    @default(NEW)
+  id     String            @id @default(cuid())
+  source MarketplaceSource @default(MARKETPLACE_SEARCH)
+  status LeadStatusType    @default(NEW)
 
   // Session & UTM tracking
-  sessionId        String?
-  utmSource        String?
-  utmMedium        String?
-  utmCampaign      String?
-  searchQuery      String?
+  sessionId   String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  searchQuery String?
 
   // Timestamps
-  viewedAt         DateTime          @default(now())
-  bookedAt         DateTime?
-  completedAt      DateTime?
+  viewedAt    DateTime  @default(now())
+  bookedAt    DateTime?
+  completedAt DateTime?
 
   // Commission
-  commissionRate   Decimal?          @db.Decimal(5, 2)
-  commissionAmount Decimal?          @db.Decimal(10, 2)
+  commissionRate   Decimal?  @db.Decimal(5, 2)
+  commissionAmount Decimal?  @db.Decimal(10, 2)
   commissionPaidAt DateTime?
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  business         Business          @relation(fields: [businessId], references: [id])
-  businessId       String
-  location         Location?         @relation(fields: [locationId], references: [id])
-  locationId       String?
-  appointment      Appointment?      @relation(fields: [appointmentId], references: [id])
-  appointmentId    String?           @unique
-  client           Client?           @relation(fields: [clientId], references: [id])
-  clientId         String?
+  business      Business     @relation(fields: [businessId], references: [id])
+  businessId    String
+  location      Location?    @relation(fields: [locationId], references: [id])
+  locationId    String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  appointmentId String?      @unique
+  client        Client?      @relation(fields: [clientId], references: [id])
+  clientId      String?
 }
 
 enum MarketplaceSource {
@@ -1740,31 +1814,31 @@ enum LeadStatusType {
 }
 
 model BusinessInvoice {
-  id                 String        @id @default(cuid())
-  invoiceNumber      String        @unique
-  periodStart        DateTime
-  periodEnd          DateTime
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  periodStart   DateTime
+  periodEnd     DateTime
 
   // Amounts
-  subscriptionAmount Decimal       @db.Decimal(10, 2) @default(0)
-  commissionAmount   Decimal       @db.Decimal(10, 2) @default(0)
-  totalAmount        Decimal       @db.Decimal(10, 2)
+  subscriptionAmount Decimal @default(0) @db.Decimal(10, 2)
+  commissionAmount   Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount        Decimal @db.Decimal(10, 2)
 
   // Status
-  status             InvoiceStatus @default(PENDING)
+  status InvoiceStatus @default(PENDING)
 
   // Payment
-  stripeInvoiceId    String?
-  paidAt             DateTime?
+  stripeInvoiceId String?
+  paidAt          DateTime?
 
   // Details (JSON array of lead commissions)
-  lineItems          Json?
+  lineItems Json?
 
-  dueDate            DateTime
-  createdAt          DateTime      @default(now())
+  dueDate   DateTime
+  createdAt DateTime @default(now())
 
-  subscription       BusinessSubscription @relation(fields: [subscriptionId], references: [id])
-  subscriptionId     String
+  subscription   BusinessSubscription @relation(fields: [subscriptionId], references: [id])
+  subscriptionId String
 }
 
 enum InvoiceStatus {
@@ -1776,158 +1850,158 @@ enum InvoiceStatus {
 }
 
 model PublicSalonProfile {
-  id                String   @id @default(cuid())
-  slug              String   @unique
+  id   String @id @default(cuid())
+  slug String @unique
 
   // Listing settings
-  isListed          Boolean  @default(true)
-  featuredUntil     DateTime?
+  isListed      Boolean   @default(true)
+  featuredUntil DateTime?
 
   // SEO
-  metaTitle         String?
-  metaDescription   String?
+  metaTitle       String?
+  metaDescription String?
 
   // Profile content
-  headline          String?
-  description       String?
-  specialties       String[]
-  amenities         String[]
+  headline    String?
+  description String?
+  specialties String[]
+  amenities   String[]
 
   // Gallery
-  coverImage        String?
-  galleryImages     String[]
+  coverImage    String?
+  galleryImages String[]
 
   // Stats (cached for performance)
-  avgRating         Decimal? @db.Decimal(3, 2)
-  reviewCount       Int      @default(0)
-  priceRange        String?
+  avgRating   Decimal? @db.Decimal(3, 2)
+  reviewCount Int      @default(0)
+  priceRange  String?
 
   // Verification
-  isVerified        Boolean  @default(false)
-  verifiedAt        DateTime?
+  isVerified Boolean   @default(false)
+  verifiedAt DateTime?
 
   // Analytics
-  viewCount         Int      @default(0)
-  bookingClickCount Int      @default(0)
+  viewCount         Int @default(0)
+  bookingClickCount Int @default(0)
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business          Business @relation(fields: [businessId], references: [id])
-  businessId        String   @unique
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String   @unique
 }
 
 // ============ HEALTHCARE AI FEATURES ============
 
 model SymptomCheck {
-  id            String    @id @default(cuid())
-  clientId      String?
-  sessionId     String
+  id        String  @id @default(cuid())
+  clientId  String?
+  sessionId String
 
   // Input
-  symptoms      String[]
-  duration      String?
-  severity      String?
+  symptoms       String[]
+  duration       String?
+  severity       String?
   additionalInfo String?
 
   // AI Analysis
   possibleConditions Json?
-  recommendations   Json?
-  urgencyLevel     String?   // low, medium, high, emergency
-  shouldSeekCare   Boolean   @default(false)
+  recommendations    Json?
+  urgencyLevel       String? // low, medium, high, emergency
+  shouldSeekCare     Boolean @default(false)
 
   // Metadata
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model MentalHealthSession {
-  id            String    @id @default(cuid())
-  clientId      String?
-  sessionId     String
+  id        String  @id @default(cuid())
+  clientId  String?
+  sessionId String
 
   // Session data
-  moodScore     Int?      // 1-10
-  stressLevel   Int?      // 1-10
-  anxietyLevel  Int?      // 1-10
-  sleepQuality  Int?      // 1-10
+  moodScore    Int? // 1-10
+  stressLevel  Int? // 1-10
+  anxietyLevel Int? // 1-10
+  sleepQuality Int? // 1-10
 
   // Conversation
-  messages      Json?     // Array of chat messages
+  messages Json? // Array of chat messages
 
   // AI Analysis
-  insights      Json?
-  copingStrategies Json?
+  insights             Json?
+  copingStrategies     Json?
   resourcesRecommended Json?
 
   // Flags
   needsProfessionalHelp Boolean @default(false)
-  crisisDetected  Boolean   @default(false)
+  crisisDetected        Boolean @default(false)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SkinAnalysis {
-  id            String    @id @default(cuid())
-  clientId      String?
+  id       String  @id @default(cuid())
+  clientId String?
 
   // Input
-  skinType      String?   // oily, dry, combination, normal, sensitive
-  concerns      String[]
-  age           Int?
-  lifestyle     String?
+  skinType       String? // oily, dry, combination, normal, sensitive
+  concerns       String[]
+  age            Int?
+  lifestyle      String?
   currentRoutine Json?
 
   // AI Analysis
-  skinCondition Json?
-  recommendations Json?
-  productSuggestions Json?
-  routineAdvice Json?
+  skinCondition        Json?
+  recommendations      Json?
+  productSuggestions   Json?
+  routineAdvice        Json?
   treatmentSuggestions Json?
 
   // Images (optional)
-  imageUrl      String?
+  imageUrl        String?
   analysisResults Json?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SleepRecord {
-  id            String    @id @default(cuid())
-  clientId      String?
-  date          DateTime  @default(now())
+  id       String   @id @default(cuid())
+  clientId String?
+  date     DateTime @default(now())
 
   // Sleep data
   bedtime       String?
   wakeTime      String?
-  sleepDuration Decimal?  @db.Decimal(4, 2)
-  sleepQuality  Int?      // 1-10
+  sleepDuration Decimal? @db.Decimal(4, 2)
+  sleepQuality  Int? // 1-10
 
   // Factors
-  caffeineIntake Boolean  @default(false)
-  screenTime    Int?      // minutes before bed
-  exercise      Boolean   @default(false)
-  stress        Int?      // 1-10
+  caffeineIntake Boolean @default(false)
+  screenTime     Int? // minutes before bed
+  exercise       Boolean @default(false)
+  stress         Int? // 1-10
 
   // Environment
-  roomTemp      String?
-  noiseLevel    String?
-  lightLevel    String?
+  roomTemp   String?
+  noiseLevel String?
+  lightLevel String?
 
   // AI Coaching
-  insights      Json?
+  insights        Json?
   recommendations Json?
-  sleepScore    Int?      // 0-100
+  sleepScore      Int? // 0-100
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PostureAssessment {
-  id            String    @id @default(cuid())
-  clientId      String?
+  id       String  @id @default(cuid())
+  clientId String?
 
   // Assessment input
   occupation    String?
@@ -1937,85 +2011,84 @@ model PostureAssessment {
   activityLevel String?
 
   // AI Analysis
-  postureScore  Int?      // 0-100
-  issues        Json?
-  exercises     Json?
-  ergonomicTips Json?
+  postureScore    Int? // 0-100
+  issues          Json?
+  exercises       Json?
+  ergonomicTips   Json?
   improvementPlan Json?
 
   // Progress tracking
   previousScore Int?
   improvement   Int?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AIProductRecommendation {
-  id            String    @id @default(cuid())
-  clientId      String?
+  id       String  @id @default(cuid())
+  clientId String?
 
   // Client profile
-  skinType      String?
-  hairType      String?
-  concerns      String[]
-  allergies     String[]
-  budget        String?
-  preferences   Json?
+  skinType    String?
+  hairType    String?
+  concerns    String[]
+  allergies   String[]
+  budget      String?
+  preferences Json?
 
   // Recommendations
-  products      Json?     // Array of recommended products
-  routines      Json?     // Daily/weekly routines
-  alternatives  Json?     // Budget-friendly alternatives
+  products     Json? // Array of recommended products
+  routines     Json? // Daily/weekly routines
+  alternatives Json? // Budget-friendly alternatives
 
   // Feedback
-  purchased     String[]  // Product IDs purchased
-  rating        Int?      // 1-5
-  feedback      String?
+  purchased String[] // Product IDs purchased
+  rating    Int? // 1-5
+  feedback  String?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AILoyaltyOptimization {
-  id            String    @id @default(cuid())
-  businessId    String
+  id         String @id @default(cuid())
+  businessId String
 
   // Analysis input
-  programData   Json?
-  memberData    Json?
+  programData     Json?
+  memberData      Json?
   transactionData Json?
 
   // AI Recommendations
-  programSuggestions Json?
-  rewardOptimizations Json?
+  programSuggestions   Json?
+  rewardOptimizations  Json?
   engagementStrategies Json?
-  retentionTactics Json?
+  retentionTactics     Json?
 
   // Metrics
-  projectedROI  Decimal?  @db.Decimal(10, 2)
+  projectedROI       Decimal? @db.Decimal(10, 2)
   projectedRetention Decimal? @db.Decimal(5, 2)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
-
 
 // ============================================
 // AI RESULTS POOL (JSONB observability)
 // ============================================
 
 model AiResult {
-  id          String   @id @default(cuid())
-  feature     String
-  businessId  String?
-  userId      String?
-  model       String
-  input       Json
-  output      Json
-  tokens      Int?
-  durationMs  Int?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  feature    String
+  businessId String?
+  userId     String?
+  model      String
+  input      Json
+  output     Json
+  tokens     Int?
+  durationMs Int?
+  createdAt  DateTime @default(now())
 
   @@index([businessId, feature])
   @@index([feature, createdAt])
@@ -2026,33 +2099,32 @@ model AiResult {
 // ============================================
 
 model AIConsent {
-  id          String   @id @default(cuid())
-  businessId  String
-  clientId    String?
-  userId      String?
-  feature     String   // skin_analyzer, mental_health, symptom_checker, posture, sleep
-  granted     Boolean  @default(true)
-  signature   String?  // base64 signature, optional
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  businessId String
+  clientId   String?
+  userId     String?
+  feature    String // skin_analyzer, mental_health, symptom_checker, posture, sleep
+  granted    Boolean  @default(true)
+  signature  String? // base64 signature, optional
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   @@index([clientId, feature])
   @@index([businessId, feature])
 }
 
 model WellnessAuditLog {
-  id          String   @id @default(cuid())
-  businessId  String
-  clientId    String?
-  userId      String?
-  feature     String
-  action      String   // viewed, created, exported, deleted
-  resourceId  String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  businessId String
+  clientId   String?
+  userId     String?
+  feature    String
+  action     String // viewed, created, exported, deleted
+  resourceId String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
   @@index([businessId, feature, createdAt])
   @@index([clientId, createdAt])
 }
-

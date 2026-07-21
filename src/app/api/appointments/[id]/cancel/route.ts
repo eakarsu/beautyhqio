@@ -1,46 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
+import { domainErrorResponse, transitionAppointment } from "@/lib/appointments/service";
 
-// POST /api/appointments/[id]/cancel - Cancel appointment
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { reason } = body;
-
-    const appointment = await prisma.appointment.update({
-      where: { id },
-      data: {
-        status: "CANCELLED",
-        internalNotes: reason ? `Cancelled: ${reason}` : "Cancelled",
-      },
-      include: {
-        client: true,
-      },
-    });
-
-    // Create activity for client
-    if (appointment.clientId) {
-      await prisma.activity.create({
-        data: {
-          clientId: appointment.clientId,
-          type: "APPOINTMENT_CANCELLED",
-          title: "Appointment Cancelled",
-          description: reason || "Appointment was cancelled",
-          metadata: { appointmentId: appointment.id },
-        },
-      });
-    }
-
-    return NextResponse.json(appointment);
+    const body = await request.json().catch(() => ({}));
+    return NextResponse.json(await transitionAppointment(prisma, user, id, "CANCELLED", String(body.reason || "")));
   } catch (error) {
-    console.error("Error cancelling appointment:", error);
-    return NextResponse.json(
-      { error: "Failed to cancel appointment" },
-      { status: 500 }
-    );
+    const known = domainErrorResponse(error);
+    return known ? NextResponse.json(known.body, { status: known.status }) : NextResponse.json({ error: "APPOINTMENT_CANCEL_FAILED" }, { status: 500 });
   }
 }

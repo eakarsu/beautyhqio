@@ -14,6 +14,13 @@ gcp-key*.json
 config.local.*
 token.txt
 *.local
+credentials.txt
+emails.txt
+ios_cleint_id.txt
+logins.txt
+stripe.txt
+users.txt
+letsencrypt-backup.tar.gz
 
 # Node
 node_modules/

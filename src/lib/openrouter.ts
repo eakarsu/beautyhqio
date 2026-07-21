@@ -1,5 +1,6 @@
 // OpenRouter AI Client for Beauty & Wellness AI
 // Supports multiple AI models through OpenRouter API
+import { z } from "zod";
 
 interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -30,6 +31,37 @@ interface AIGenerateOptions {
   stream?: boolean;
 }
 
+function parseAiJson<T>(text: string, schema: z.ZodType<T>): T {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("AI_OUTPUT_NOT_JSON");
+  let value: unknown;
+  try { value = JSON.parse(match[0]); } catch { throw new Error("AI_OUTPUT_NOT_JSON"); }
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new Error("AI_OUTPUT_SCHEMA_INVALID");
+  return parsed.data;
+}
+
+const noShowSchema = z.object({
+  riskLevel: z.enum(["low", "medium", "high"]), probability: z.number().min(0).max(100),
+  reasons: z.array(z.string().min(1).max(300)).max(10), recommendations: z.array(z.string().min(1).max(300)).max(10),
+});
+const messageSchema = z.object({ subject: z.string().max(200).optional(), message: z.string().min(1).max(5_000), smsVersion: z.string().min(1).max(320) });
+const reviewSchema = z.object({ response: z.string().min(1).max(3_000), tone: z.string().min(1).max(40), keyPoints: z.array(z.string().min(1).max(300)).max(10) });
+const translationSchema = z.object({ translation: z.string().min(1).max(10_000), detectedSourceLanguage: z.string().min(1).max(80) });
+const styleSchema = z.object({
+  recommendations: z.array(z.object({ service: z.string().min(1).max(200), description: z.string().max(2_000), reason: z.string().max(1_000), confidence: z.number().min(0).max(100) })).min(1).max(5),
+  personalizedTips: z.array(z.string().max(500)).max(20), productsToConsider: z.array(z.string().max(200)).max(20),
+});
+const photoStyleSchema = z.object({
+  faceShape: z.enum(["Oval", "Round", "Square", "Heart", "Oblong", "Diamond"]),
+  recommendations: z.array(z.object({ id: z.string().max(100), name: z.string().max(200), description: z.string().max(2_000), confidence: z.number().min(0).max(1), tags: z.array(z.string().max(100)).max(10), colorSuggestions: z.array(z.string().max(100)).max(10) })).min(1).max(5),
+});
+const insightSchema = z.object({
+  summary: z.string().min(1).max(2_000),
+  insights: z.array(z.object({ category: z.string().max(80), finding: z.string().max(1_000), impact: z.enum(["positive", "negative", "neutral"]), action: z.string().max(1_000) })).max(20),
+  recommendations: z.array(z.string().min(1).max(1_000)).max(20),
+});
+
 class OpenRouterClient {
   private apiKey: string;
   private model: string;
@@ -49,29 +81,23 @@ class OpenRouterClient {
       throw new Error("OpenRouter API key is not configured");
     }
 
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-        "HTTP-Referer": process.env.NEXTAUTH_URL || "http://localhost:3000",
-        "X-Title": "Beauty & Wellness AI",
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenRouter API error: ${error}`);
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.apiKey}`, "HTTP-Referer": process.env.NEXTAUTH_URL || "http://localhost:3000", "X-Title": "Beauty & Wellness AI" },
+        body: JSON.stringify({ model: this.model, messages, max_tokens: Math.min(maxTokens, 10_000), temperature }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (response.ok) {
+        const data: OpenRouterResponse = await response.json();
+        const content = data.choices[0]?.message?.content;
+        if (!content || content.length > 100_000) throw new Error("AI_OUTPUT_EMPTY_OR_TOO_LARGE");
+        return content;
+      }
+      if (attempt === 3 || (response.status < 500 && response.status !== 429)) throw new Error(`AI_PROVIDER_${response.status}`);
+      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
     }
-
-    const data: OpenRouterResponse = await response.json();
-    return data.choices[0]?.message?.content || "";
+    throw new Error("AI_PROVIDER_UNAVAILABLE");
   }
 
   // No-Show Prediction
@@ -129,20 +155,7 @@ Respond in JSON format with:
       temperature: 0.3,
     });
 
-    try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("Could not parse AI response");
-    } catch {
-      return {
-        riskLevel: "medium",
-        probability: 50,
-        reasons: ["Unable to analyze - insufficient data"],
-        recommendations: ["Send reminder 24 hours before appointment"],
-      };
-    }
+    return parseAiJson(response, noShowSchema);
   }
 
   // Style Recommendation
@@ -197,11 +210,7 @@ Provide 3-5 service recommendations with explanations. Respond in JSON format:
       temperature: 0.7,
     });
 
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Style recommendation failed: could not parse AI response");
-    }
-    return JSON.parse(jsonMatch[0]);
+    return parseAiJson(response, styleSchema);
   }
 
   // Analyze Face Photo for Style Recommendations
@@ -262,11 +271,7 @@ Provide 3 recommendations sorted by confidence (highest first). Make the descrip
       maxTokens: 10000,
     });
 
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Style analysis failed: could not parse AI response");
-    }
-    return JSON.parse(jsonMatch[0]);
+    return parseAiJson(response, photoStyleSchema);
   }
 
   // Message Generator
@@ -317,19 +322,7 @@ Respond in JSON format:
       temperature: 0.8,
     });
 
-    try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("Could not parse AI response");
-    } catch {
-      return {
-        subject: "Message from " + options.businessName,
-        message: `Dear ${options.clientName}, thank you for being a valued customer. We look forward to seeing you soon!`,
-        smsVersion: `Hi ${options.clientName}! Thanks for choosing ${options.businessName}. See you soon!`,
-      };
-    }
+    return parseAiJson(response, messageSchema);
   }
 
   // Review Response Generator
@@ -377,19 +370,7 @@ Respond in JSON format:
       temperature: 0.7,
     });
 
-    try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("Could not parse AI response");
-    } catch {
-      return {
-        response: `Thank you for your feedback, ${review.clientName}. We appreciate you taking the time to share your experience with us.`,
-        tone: "grateful",
-        keyPoints: ["Thanked customer"],
-      };
-    }
+    return parseAiJson(response, reviewSchema);
   }
 
   // Translation
@@ -420,18 +401,7 @@ Respond in JSON format:
       temperature: 0.3,
     });
 
-    try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("Could not parse AI response");
-    } catch {
-      return {
-        translation: text,
-        detectedSourceLanguage: "Unknown",
-      };
-    }
+    return parseAiJson(response, translationSchema);
   }
 
   // Smart Business Insights
@@ -481,19 +451,7 @@ Provide business insights in JSON format:
       temperature: 0.5,
     });
 
-    try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("Could not parse AI response");
-    } catch {
-      return {
-        summary: "Analysis in progress. Please ensure sufficient data is available.",
-        insights: [],
-        recommendations: ["Continue monitoring key metrics"],
-      };
-    }
+    return parseAiJson(response, insightSchema);
   }
 }
 

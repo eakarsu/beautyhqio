@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
+import { sendEmail } from "@/lib/email";
+import { enforceLoginRateLimit } from "@/lib/mobile-session";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +15,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const identityHash = await enforceLoginRateLimit(prisma, `reset:${request.headers.get("x-forwarded-for") || "unknown"}:${normalizedEmail}`).catch(() => null);
+    if (!identityHash) return NextResponse.json({ message: "If an account exists with that email, a reset link has been sent." });
+    await prisma.loginAttempt.create({ data: { identityHash, succeeded: false } });
 
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -28,8 +32,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate reset token
-    const resetToken = crypto.randomUUID();
-    const hashedToken = await bcrypt.hash(resetToken, 10);
+    const resetToken = crypto.randomBytes(32).toString("base64url");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
     const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
     await prisma.user.update({
@@ -41,42 +45,23 @@ export async function POST(request: NextRequest) {
     });
 
     // Build reset URL
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXTAUTH_URL;
+    if (!baseUrl) throw new Error("NEXTAUTH_URL is required");
     const resetUrl = `${baseUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(normalizedEmail)}`;
 
-    // Log reset URL in development
-    if (process.env.NODE_ENV === "development") {
-      console.log(`\n🔑 Password reset link for ${normalizedEmail}:\n${resetUrl}\n`);
-    }
-
-    // Try to send email if nodemailer/resend is configured
-    try {
-      const nodemailer = await import("nodemailer");
-      if (process.env.SMTP_HOST) {
-        const transporter = nodemailer.default.createTransport({
-          host: process.env.SMTP_HOST,
-          port: Number(process.env.SMTP_PORT) || 587,
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
-
-        await transporter.sendMail({
-          from: process.env.SMTP_FROM || "noreply@beautywellness.ai",
-          to: normalizedEmail,
-          subject: "Password Reset Request",
-          html: `
+    const delivery = await sendEmail({
+      to: normalizedEmail,
+      subject: "Password Reset Request",
+      html: `
             <h2>Password Reset</h2>
             <p>You requested a password reset for your account.</p>
             <p><a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#e11d48;color:white;text-decoration:none;border-radius:8px;">Reset Password</a></p>
             <p>This link expires in 1 hour.</p>
             <p>If you didn't request this, please ignore this email.</p>
           `,
-        });
-      }
-    } catch {
-      // Email sending is optional - the console log above serves as fallback
+    });
+    if (!delivery.success) {
+      await prisma.user.update({ where: { id: user.id }, data: { resetToken: null, resetTokenExpiry: null } });
     }
 
     return NextResponse.json({

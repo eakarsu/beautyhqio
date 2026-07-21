@@ -20,15 +20,20 @@ export default defineConfig({
       testMatch: /integration\/.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'governed',
+      testMatch: /governed\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
     // Existing tests (basic smoke tests)
     {
       name: 'chromium',
-      testMatch: /^(?!.*integration\/).*\.spec\.ts$/,
+      testMatch: /^(?!.*(?:integration|governed)\/).*\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: process.env.CI ? 'npm run start' : 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

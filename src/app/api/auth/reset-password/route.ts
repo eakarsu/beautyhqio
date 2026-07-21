@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
+import { passwordSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (newPassword.length < 8) {
+    if (!passwordSchema.safeParse(newPassword).success) {
       return NextResponse.json(
         { error: "Password must be at least 8 characters" },
         { status: 400 }
@@ -47,7 +49,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify token
-    const isValidToken = await bcrypt.compare(token, user.resetToken);
+    const suppliedHash = crypto.createHash("sha256").update(String(token)).digest();
+    const storedHash = Buffer.from(user.resetToken, "hex");
+    const isValidToken = storedHash.length === suppliedHash.length && crypto.timingSafeEqual(storedHash, suppliedHash);
     if (!isValidToken) {
       return NextResponse.json(
         { error: "Invalid or expired reset token" },
@@ -66,6 +70,8 @@ export async function POST(request: NextRequest) {
         resetTokenExpiry: null,
       },
     });
+    await prisma.mobileSession.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+    await prisma.auditLog.create({ data: { userId: user.id, businessId: user.businessId, action: "PASSWORD_RESET", entityType: "User", entityId: user.id } });
 
     return NextResponse.json({
       message: "Password has been reset successfully",

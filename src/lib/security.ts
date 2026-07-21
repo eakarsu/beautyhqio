@@ -3,7 +3,7 @@
 
 import { NextResponse } from "next/server";
 
-const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "*")
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || (process.env.NODE_ENV === "production" ? "" : "http://localhost:3000"))
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);

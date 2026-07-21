@@ -1,0 +1,14 @@
+title = "BeautyHQ secret detection"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Exclude generated and installed dependency trees only"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)\.next/''',
+  '''(^|/)coverage/''',
+  '''(^|/)playwright-report/''',
+  '''(^|/)test-results/''',
+]

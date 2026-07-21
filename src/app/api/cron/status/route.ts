@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initCronJobs, getCronStatus, processReminders } from "@/lib/cron";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 // Initialize cron jobs when this endpoint is first called
 let initialized = false;
@@ -12,7 +13,8 @@ function ensureCronInitialized() {
 }
 
 // GET /api/cron/status - Check cron job status
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   ensureCronInitialized();
 
   const status = getCronStatus();
@@ -26,15 +28,7 @@ export async function GET() {
 
 // POST /api/cron/status - Manually trigger reminder processing
 export async function POST(request: NextRequest) {
-  // Verify cron secret
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = request.headers.get("authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    if (token !== cronSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   ensureCronInitialized();
 

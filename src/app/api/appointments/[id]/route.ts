@@ -1,129 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { syncAppointmentToCalendars } from "@/lib/calendar-sync";
+import { getAuthenticatedUser } from "@/lib/api-auth";
+import { domainErrorResponse, transitionAppointment } from "@/lib/appointments/service";
 
-// GET /api/appointments/[id] - Get single appointment
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
-      include: {
-        client: true,
-        staff: {
-          include: {
-            user: true,
-          },
-        },
-        location: true,
-        services: {
-          include: {
-            service: true,
-            addOns: {
-              include: {
-                addOn: true,
-              },
-            },
-          },
-        },
-        photos: true,
-        transaction: true,
-      },
-    });
-
-    if (!appointment) {
-      return NextResponse.json(
-        { error: "Appointment not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(appointment);
-  } catch (error) {
-    console.error("Error fetching appointment:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch appointment" },
-      { status: 500 }
-    );
-  }
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const appointment = await prisma.appointment.findUnique({ where: { id }, include: { client: true, staff: { include: { user: true } }, location: true, services: { include: { service: true, addOns: { include: { addOn: true } } } }, photos: true, transaction: true } });
+  if (!appointment) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const allowed = user.isPlatformAdmin || (user.role === "CLIENT" ? user.clientId === appointment.clientId : user.businessId === (appointment.businessId || appointment.location.businessId) && (user.role !== "STAFF" || user.staffId === appointment.staffId));
+  if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  return NextResponse.json(appointment);
 }
 
-// PUT /api/appointments/[id] - Update appointment
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const body = await request.json();
-
-    const appointment = await prisma.appointment.update({
-      where: { id },
-      data: body,
-      include: {
-        client: true,
-        staff: {
-          include: {
-            user: true,
-          },
-        },
-        services: {
-          include: {
-            service: true,
-          },
-        },
-      },
-    });
-
-    // Auto-sync to connected calendars (non-blocking)
-    syncAppointmentToCalendars(appointment.id, "update").catch((err) => {
-      console.error("Calendar sync error:", err);
-    });
-
-    return NextResponse.json(appointment);
-  } catch (error) {
-    console.error("Error updating appointment:", error);
-    return NextResponse.json(
-      { error: "Failed to update appointment" },
-      { status: 500 }
-    );
-  }
+export async function PUT() {
+  return NextResponse.json({ error: "ARBITRARY_UPDATE_REMOVED", message: "Use explicit lifecycle endpoints." }, { status: 405, headers: { Allow: "GET,DELETE" } });
 }
 
-// DELETE /api/appointments/[id] - Delete appointment
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { id } = await params;
-
-    // Delete from calendars first (before removing from database)
-    try {
-      await syncAppointmentToCalendars(id, "delete");
-    } catch (err) {
-      console.error("Calendar sync error during delete:", err);
-    }
-
-    // First delete related records
-    await prisma.appointmentService.deleteMany({
-      where: { appointmentId: id },
-    });
-
-    await prisma.appointment.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ success: true });
+    const body = await request.json().catch(() => ({}));
+    const appointment = await transitionAppointment(prisma, user, id, "CANCELLED", String(body.reason || "Cancelled by authorized operator"));
+    return NextResponse.json(appointment);
   } catch (error) {
-    console.error("Error deleting appointment:", error);
-    return NextResponse.json(
-      { error: "Failed to delete appointment" },
-      { status: 500 }
-    );
+    const known = domainErrorResponse(error);
+    if (known) return NextResponse.json(known.body, { status: known.status });
+    return NextResponse.json({ error: "APPOINTMENT_CANCEL_FAILED" }, { status: 500 });
   }
 }

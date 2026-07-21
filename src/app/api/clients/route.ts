@@ -4,8 +4,7 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import jwt from "jsonwebtoken";
 import { requireAuth, getBusinessIdFilter, AuthenticatedUser } from "@/lib/api-auth";
-
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
+import { authSecret } from "@/lib/runtime-env";
 
 // Helper to get user from either web session or mobile JWT
 async function getAuthenticatedUserLegacy(request: NextRequest) {
@@ -30,7 +29,8 @@ async function getAuthenticatedUserLegacy(request: NextRequest) {
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; businessId: string };
+      const decoded = jwt.verify(token, authSecret(), { algorithms: ["HS256"], issuer: "beautyhq", audience: "beautyhq-mobile" }) as { userId: string; businessId: string; type: string };
+      if (decoded.type !== "access") return null;
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
         include: { business: true },

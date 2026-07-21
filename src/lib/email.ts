@@ -1,18 +1,5 @@
-// Email Service using Nodemailer (SMTP)
-import nodemailer from "nodemailer";
-
-// Create transporter using SMTP settings
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT || "587", 10),
-  secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
-
-const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_USER || "noreply@beautywellness.com";
+// Email delivery through the bounded Resend HTTPS API.
+import { Resend } from "resend";
 
 // Multi-language email templates for appointment reminders
 export const emailReminderTemplates = {
@@ -147,23 +134,23 @@ export interface SendEmailParams {
 
 // Send generic email
 export async function sendEmail(params: SendEmailParams) {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-    console.warn("SMTP not configured, skipping email");
+  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
     return { success: false, error: "Email service not configured" };
   }
 
   try {
-    const result = await transporter.sendMail({
-      from: emailFrom,
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM,
       to: params.to,
       subject: params.subject,
       html: params.html,
-      ...(params.text && { text: params.text }),
+      text: params.text,
     });
-
+    if (error) return { success: false, error: "Email provider rejected request" };
     return {
       success: true,
-      messageId: result.messageId,
+      messageId: data?.id,
     };
   } catch (error) {
     console.error("Error sending email:", error);
@@ -200,7 +187,7 @@ export async function sendAppointmentReminderEmail(
 
 // Check if email service is configured
 export function isEmailConfigured(): boolean {
-  return !!(process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+  return !!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 }
 
 // Multi-language email templates for appointment confirmations

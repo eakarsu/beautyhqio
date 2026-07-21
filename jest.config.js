@@ -10,7 +10,7 @@ const config = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
-  setupFilesAfterEnv: [],
+  setupFiles: ['<rootDir>/src/test/setup-env.ts'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
@@ -20,6 +20,7 @@ const config = {
     '/e2e/',
     '/.next/',
   ],
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
 };
 
 module.exports = config;

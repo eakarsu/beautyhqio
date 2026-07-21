@@ -1,29 +1,25 @@
 /**
- * Integration test - sends REAL SMS
- * Run with: npx jest src/lib/__tests__/twilio-integration.test.ts
+ * Explicit provider certification test. It is skipped unless the operator
+ * supplies a dedicated sandbox account and recipient and opts in.
  */
-import * as dotenv from 'dotenv';
-dotenv.config();
+import twilio from "twilio";
 
-import twilio from 'twilio';
+const enabled = process.env.RUN_TWILIO_INTEGRATION === "true";
+const describeProvider = enabled ? describe : describe.skip;
 
-describe('Twilio Integration Test (REAL SMS)', () => {
-  it('should send a real SMS to 8043601129', async () => {
-    const client = twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
-
+describeProvider("Twilio sandbox certification", () => {
+  it("sends to the operator-designated sandbox recipient", async () => {
+    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, TWILIO_TEST_RECIPIENT } = process.env;
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER || !TWILIO_TEST_RECIPIENT) {
+      throw new Error("Twilio sandbox credentials and TWILIO_TEST_RECIPIENT are required");
+    }
+    const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
     const message = await client.messages.create({
-      body: 'Test message from Twilio integration test - ' + new Date().toISOString(),
-      to: '+18043601129',
-      from: process.env.TWILIO_PHONE_NUMBER,
+      body: `BeautyHQ provider certification ${new Date().toISOString()}`,
+      to: TWILIO_TEST_RECIPIENT,
+      from: TWILIO_PHONE_NUMBER,
     });
-
-    console.log('Message SID:', message.sid);
-    console.log('Status:', message.status);
-    
-    expect(message.sid).toBeDefined();
+    expect(message.sid).toMatch(/^SM/);
     expect(message.status).toBeDefined();
   });
 });

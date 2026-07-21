@@ -1,96 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { enforceLoginRateLimit, issueMobileSession } from "@/lib/mobile-session";
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
+const requestSchema = z.object({ email: z.string().email().transform((v) => v.toLowerCase().trim()), password: z.string().min(1).max(256) });
 
-// POST /api/auth/login - Email/password login for mobile app
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { email, password } = body;
+  const parsed = requestSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "INVALID_REQUEST" }, { status: 422 });
+  const identityHash = await enforceLoginRateLimit(prisma, `${request.headers.get("x-forwarded-for") || "unknown"}:${parsed.data.email}`).catch(() => null);
+  if (!identityHash) return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429, headers: { "Retry-After": "900" } });
 
-    // Validate required fields
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
-    }
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email }, include: { business: true, staff: true } });
+  const valid = Boolean(user?.isActive && user.password && await bcrypt.compare(parsed.data.password, user.password));
+  await prisma.loginAttempt.create({ data: { identityHash, succeeded: valid } });
+  if (!valid || !user) return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
 
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: {
-        business: true,
-        staff: true,
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
-    }
-
-    // Check password
-    if (!user.password) {
-      return NextResponse.json(
-        { error: "Please use social login for this account" },
-        { status: 401 }
-      );
-    }
-
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        businessId: user.businessId,
-        role: user.role,
-      },
-      JWT_SECRET,
-      { expiresIn: "30d" }
-    );
-
-    const refreshToken = jwt.sign(
-      { userId: user.id },
-      JWT_SECRET,
-      { expiresIn: "90d" }
-    );
-
-    return NextResponse.json({
-      token,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: `${user.firstName} ${user.lastName}`.trim(),
-        phone: user.phone || null,
-        image: user.avatar || null,
-        role: user.role,
-        businessId: user.businessId,
-        staffId: user.staff?.id || null,
-        isClient: user.role === "CLIENT",
-        createdAt: user.createdAt.toISOString(),
-        updatedAt: user.updatedAt.toISOString(),
-      },
-    });
-  } catch (error: any) {
-    console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Authentication failed" },
-      { status: 500 }
-    );
-  }
+  const credentials = await issueMobileSession(prisma, user);
+  await prisma.auditLog.create({ data: { userId: user.id, businessId: user.businessId, action: "MOBILE_LOGIN", entityType: "User", entityId: user.id } });
+  return NextResponse.json({
+    ...credentials,
+    user: {
+      id: user.id, email: user.email, name: `${user.firstName} ${user.lastName}`.trim(), phone: user.phone,
+      image: user.avatar, role: user.role, businessId: user.businessId, staffId: user.staff?.id || null,
+      isClient: user.role === "CLIENT", createdAt: user.createdAt.toISOString(), updatedAt: user.updatedAt.toISOString(),
+    },
+  });
 }

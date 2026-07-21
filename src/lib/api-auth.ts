@@ -1,11 +1,11 @@
 import { getServerSession } from "next-auth";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "./prisma";
 import { authOptions } from "./auth";
+import { authSecret } from "./runtime-env";
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
 
 export type UserRole = "PLATFORM_ADMIN" | "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF" | "CLIENT";
 
@@ -16,6 +16,7 @@ export interface AuthenticatedUser {
   businessId: string | null;
   businessName: string | null;
   staffId: string | null;
+  clientId: string | null;
   firstName: string;
   lastName: string;
   isPlatformAdmin: boolean;
@@ -37,6 +38,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
       businessId: session.user.businessId,
       businessName: session.user.businessName,
       staffId: session.user.staffId,
+      clientId: session.user.clientId,
       firstName: session.user.firstName,
       lastName: session.user.lastName,
       isPlatformAdmin: session.user.isPlatformAdmin,
@@ -50,23 +52,24 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
 
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
-      const decoded = jwt.verify(token, JWT_SECRET) as {
+      const decoded = jwt.verify(token, authSecret(), {
+        algorithms: ["HS256"], issuer: "beautyhq", audience: "beautyhq-mobile",
+      }) as {
         userId: string;
         email: string;
         businessId: string;
         role: string;
+        type: string;
       };
+      if (decoded.type !== "access") return null;
 
       // Fetch full user data from database
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        include: {
-          business: true,
-          staff: true,
-        },
+        include: { business: true, staff: true, client: true },
       });
 
-      if (user) {
+      if (user?.isActive) {
         return {
           id: user.id,
           email: user.email,
@@ -74,6 +77,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
           businessId: user.businessId,
           businessName: user.business?.name || null,
           staffId: user.staff?.id || null,
+          clientId: user.client?.id || null,
           firstName: user.firstName,
           lastName: user.lastName,
           isPlatformAdmin: user.role === "PLATFORM_ADMIN",

@@ -1,36 +1,38 @@
-   This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BeautyHQ
 
-## Getting Started
+BeautyHQ is a multi-tenant beauty and wellness operations application. Its
+supported production workflow is authenticated appointment booking and
+lifecycle management backed by PostgreSQL.
 
-First, run the development server:
+An owner, manager, receptionist, or linked client can create an idempotent
+appointment only with active staff, location, client, and service records in
+the correct tenant. Overlaps are rejected. Confirmation, check-in, service
+start, completion, cancellation, and no-show are explicit versioned
+transitions. Every accepted state change is audited; provider work is written
+to a durable retry/dead-letter outbox.
+
+## Local verification
+
+1. Install Node.js 22 and PostgreSQL 17.
+2. Copy `.env.example` to `.env.local`, replace all required values, and create
+   an empty database. Never use the example values in production.
+3. Run `npm ci`, `npx prisma migrate deploy`, then `npm run dev`.
+
+The release gates are:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run typecheck
+npm run lint
+npm run test:unit
+npm run build
+npm run audit:prod
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The real HTTP journey additionally uses `ALLOW_E2E_SEED=true npm run
+seed:governed` against an explicitly local/test database followed by `npm run
+test:governed`. The seed command refuses non-test targets.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `OPERATIONS.md` for migration, deployment, backup, provider-worker, AI, and
+legacy-route controls. See `SECURITY_INCIDENT.md` before any release: tracked
+credential inventories and certificate private keys were found and removed,
+so owner-side rotation and Git-history cleanup remain mandatory.

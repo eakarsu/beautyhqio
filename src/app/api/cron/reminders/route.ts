@@ -2,18 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentReminder, sendAppointmentReminderCall } from "@/lib/twilio";
 import { sendAppointmentReminderEmail } from "@/lib/email";
-
-// Verify cron secret for security
-function verifyCronSecret(request: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return true; // Allow if not configured (development)
-
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader) return false;
-
-  const token = authHeader.replace("Bearer ", "");
-  return token === cronSecret;
-}
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 // Format date for display
 function formatDate(date: Date, language: string = "en"): string {
@@ -51,7 +40,7 @@ function formatTime(date: Date, language: string = "en"): string {
 
 export async function GET(request: NextRequest) {
   // Verify authentication
-  if (!verifyCronSecret(request)) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -268,7 +257,7 @@ export async function GET(request: NextRequest) {
 // POST endpoint for manual trigger (useful for testing)
 export async function POST(request: NextRequest) {
   // Verify authentication
-  if (!verifyCronSecret(request)) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

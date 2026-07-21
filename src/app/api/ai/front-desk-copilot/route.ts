@@ -54,11 +54,11 @@ export async function GET(req: NextRequest) {
       take: 30,
     }),
     prisma.waitlistEntry.findMany({
-      where: { businessId: auth.businessId, status: "WAITING" },
+      where: { location: { businessId: auth.businessId }, status: "WAITING" },
       take: 20,
     }).catch(() => [] as any[]),
     prisma.staff.findMany({
-      where: { businessId: auth.businessId, isActive: true },
+      where: { location: { businessId: auth.businessId }, isActive: true },
       select: { id: true, displayName: true },
       take: 20,
     }),

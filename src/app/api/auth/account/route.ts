@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key";
+import { authSecret } from "@/lib/runtime-env";
 
 interface JwtPayload {
   userId: string;
+  type: string;
 }
 
 // DELETE /api/auth/account - Delete user account and all associated data
@@ -23,7 +23,8 @@ export async function DELETE(request: NextRequest) {
 
     let decoded: JwtPayload;
     try {
-      decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+      decoded = jwt.verify(token, authSecret(), { algorithms: ["HS256"], issuer: "beautyhq", audience: "beautyhq-mobile" }) as JwtPayload;
+      if (decoded.type !== "access") throw new Error("invalid token type");
     } catch {
       return NextResponse.json(
         { error: "Invalid or expired token" },

@@ -1,48 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/api-auth";
+import { domainErrorResponse, transitionAppointment } from "@/lib/appointments/service";
 
-// POST /api/appointments/[id]/no-show - Mark appointment as no-show
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-
-    const appointment = await prisma.appointment.update({
-      where: { id },
-      data: {
-        status: "NO_SHOW",
-      },
-      include: {
-        client: true,
-        staff: {
-          include: {
-            user: true,
-          },
-        },
-      },
-    });
-
-    // Create activity for client
-    if (appointment.clientId) {
-      await prisma.activity.create({
-        data: {
-          clientId: appointment.clientId,
-          type: "APPOINTMENT_NO_SHOW",
-          title: "No Show",
-          description: "Client did not show up for appointment",
-          metadata: { appointmentId: appointment.id },
-        },
-      });
-    }
-
-    return NextResponse.json(appointment);
-  } catch (error) {
-    console.error("Error marking no-show:", error);
-    return NextResponse.json(
-      { error: "Failed to mark as no-show" },
-      { status: 500 }
-    );
-  }
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try { return NextResponse.json(await transitionAppointment(prisma, user, (await params).id, "NO_SHOW")); }
+  catch (error) { const known = domainErrorResponse(error); return known ? NextResponse.json(known.body, { status: known.status }) : NextResponse.json({ error: "NO_SHOW_FAILED" }, { status: 500 }); }
 }
