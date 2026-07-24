@@ -1,30 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${DATABASE_URL:?DATABASE_URL is required}"
-: "${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}"
-: "${NEXTAUTH_URL:?NEXTAUTH_URL is required}"
-
-if [[ ${#NEXTAUTH_SECRET} -lt 32 ]] || [[ "$NEXTAUTH_SECRET" =~ (change|demo|example|your-secret) ]]; then
-  echo "NEXTAUTH_SECRET must be a non-placeholder value of at least 32 characters" >&2
-  exit 1
+project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$project_dir/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$project_dir/.env"
+  set +a
 fi
+export API_PORT="${API_PORT:-${BACKEND_PORT:-}}"
+export UI_PORT="${UI_PORT:-${FRONTEND_PORT:-}}"
 
-if [[ "${NODE_ENV:-development}" == "production" ]] && [[ "${CORS_ORIGINS:-}" == *"*"* ]]; then
-  echo "Production CORS_ORIGINS must be an explicit allowlist" >&2
-  exit 1
-fi
+required() { [[ -n "${!1:-}" ]] || { echo "$1 is required" >&2; exit 1; }; }
+configuration() {
+  for key in DATABASE_URL NEXTAUTH_SECRET NEXTAUTH_URL API_PORT UI_PORT OPENROUTER_API_KEY OPENROUTER_MODEL OPENROUTER_BASE_URL ADMIN_EMAIL ADMIN_PASSWORD; do required "$key"; done
+  [[ ${#NEXTAUTH_SECRET} -ge 32 ]] || { echo 'NEXTAUTH_SECRET must contain at least 32 characters' >&2; exit 1; }
+  [[ "$API_PORT" != "$UI_PORT" ]] || { echo 'API_PORT and UI_PORT must differ' >&2; exit 1; }
+  [[ "${ALLOW_SCHEMA_MIGRATION:-}" == 1 || "${ALLOW_SCHEMA_MIGRATION:-}" == true ]] || { echo 'ALLOW_SCHEMA_MIGRATION=true is required' >&2; exit 1; }
+}
+migrate() { (cd "$project_dir" && npx --no-install prisma migrate deploy); }
+start_services() {
+  migrate
+  npm --prefix "$project_dir" run create-admin
+  cleanup() {
+    trap - INT TERM EXIT
+    [[ -z "${proxy_pid:-}" ]] || kill "$proxy_pid" 2>/dev/null || true
+    [[ -z "${app_pid:-}" ]] || kill "$app_pid" 2>/dev/null || true
+    [[ -z "${proxy_pid:-}" ]] || wait "$proxy_pid" 2>/dev/null || true
+    [[ -z "${app_pid:-}" ]] || wait "$app_pid" 2>/dev/null || true
+  }
+  trap cleanup INT TERM EXIT
+  PORT="$API_PORT" HOSTNAME=127.0.0.1 NEXTAUTH_URL="http://127.0.0.1:$UI_PORT" AUTH_COOKIE_SECURE=false node "$project_dir/.next/standalone/server.js" &
+  app_pid=$!
+  API_PORT="$API_PORT" UI_PORT="$UI_PORT" node "$project_dir/scripts/runtime-proxy.mjs" &
+  proxy_pid=$!
+  wait "$app_pid" "$proxy_pid"
+}
 
-if [[ "${NODE_ENV:-development}" == "test" && -z "${CRON_SECRET:-}" && -n "${JWT_SECRET:-}" ]]; then
-  export CRON_SECRET="$JWT_SECRET"
-fi
-
-if [[ "${RUN_MIGRATIONS:-false}" == "true" ]]; then
-  npx --no-install prisma migrate deploy
-fi
-
-if [[ "${NODE_ENV:-development}" != "development" && -f .next/standalone/server.js ]]; then
-  export HOSTNAME="${HOST:-127.0.0.1}"
-  exec npm run start
-fi
-exec npm run dev -- --webpack --hostname "${HOST:-127.0.0.1}" --port "${PORT:-3000}"
+case "${1:-start}" in
+  check) NODE_ENV=production npm --prefix "$project_dir" run build && npm --prefix "$project_dir" run typecheck && (cd "$project_dir" && npx --no-install eslint src/app/api/runtime-auth/me/route.ts src/app/api/runtime-ai/beauty-advice/route.ts src/lib/auth.ts) ;;
+  migrate) configuration; migrate ;;
+  start) configuration; start_services ;;
+  *) echo 'usage: ./start.sh [check|migrate|start]' >&2; exit 2 ;;
+esac

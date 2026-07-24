@@ -8,6 +8,7 @@ import prisma from "./prisma";
 
 // Roles that require email/password login (no OAuth)
 const STAFF_ROLES = ["PLATFORM_ADMIN", "OWNER", "MANAGER", "RECEPTIONIST", "STAFF"];
+const secureCookie = process.env.AUTH_COOKIE_SECURE === "true";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -205,48 +206,48 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.AUTH_DEBUG === "true" && process.env.NODE_ENV !== "production",
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === "production" ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
+      name: secureCookie ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: "lax" as const,
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: secureCookie,
       },
     },
     callbackUrl: {
-      name: process.env.NODE_ENV === "production" ? `__Secure-next-auth.callback-url` : `next-auth.callback-url`,
+      name: secureCookie ? `__Secure-next-auth.callback-url` : `next-auth.callback-url`,
       options: {
         httpOnly: true,
         sameSite: "lax" as const,
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: secureCookie,
       },
     },
     csrfToken: {
-      name: process.env.NODE_ENV === "production" ? `__Secure-next-auth.csrf-token` : `next-auth.csrf-token`,
+      name: secureCookie ? `__Secure-next-auth.csrf-token` : `next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: "lax" as const,
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: secureCookie,
       },
     },
     pkceCodeVerifier: {
-      name: process.env.NODE_ENV === "production" ? `__Secure-next-auth.pkce.code_verifier` : `next-auth.pkce.code_verifier`,
+      name: secureCookie ? `__Secure-next-auth.pkce.code_verifier` : `next-auth.pkce.code_verifier`,
       options: {
         httpOnly: true,
         sameSite: "lax" as const,
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: secureCookie,
       },
     },
     state: {
-      name: process.env.NODE_ENV === "production" ? `__Secure-next-auth.state` : `next-auth.state`,
+      name: secureCookie ? `__Secure-next-auth.state` : `next-auth.state`,
       options: {
         httpOnly: true,
         sameSite: "lax" as const,
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: secureCookie,
       },
     },
   },
