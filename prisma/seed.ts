@@ -3,6 +3,12 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+function requireDemoPassword() {
+  const password = process.env.DEMO_PASSWORD || process.env.SEED_DEMO_PASSWORD || process.env.DEMO_SEED_PASSWORD || '';
+  if (password.length < 12 || password.length > 1024) throw new Error('DEMO_PASSWORD must contain 12-1024 characters');
+  return password;
+}
+
 async function main() {
   console.log("Starting seed...");
 
@@ -74,8 +80,8 @@ async function main() {
   console.log("Created locations:", locations.length);
 
   // Create Users and Staff
-  const hashedPassword = await bcrypt.hash("password123", 12);
-  const adminPassword = await bcrypt.hash("admin123", 12);
+  const hashedPassword = await bcrypt.hash(requireDemoPassword(), 12);
+  const adminPassword = await bcrypt.hash(requireDemoPassword(), 12);
 
   // Create admin user first
   const adminUser = await prisma.user.create({
@@ -1787,8 +1793,8 @@ async function main() {
   console.log("\n📊 Sales CRM Data:");
   console.log(`   - Sales Leads: ${salesLeads.length}`);
   console.log("\n🔑 Login credentials:");
-  console.log("   Admin: admin@luxebeauty.com / admin123");
-  console.log("   Staff: any staff email / password123");
+  console.log('Demo login users provisioned from the local environment.');
+  console.log('Demo login users provisioned from the local environment.');
   console.log("\n🌐 Marketplace URLs:");
   console.log("   /explore - Browse all salons");
   console.log("   /salon/luxe-beauty-studio - Example salon profile");

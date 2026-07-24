@@ -7,8 +7,14 @@ if (process.env.ALLOW_E2E_SEED !== "true" || !/(_test|localhost|127\.0\.0\.1)/.t
 
 const prisma = new PrismaClient();
 
+function requireDemoPassword() {
+  const password = process.env.DEMO_PASSWORD || process.env.SEED_DEMO_PASSWORD || process.env.DEMO_SEED_PASSWORD || '';
+  if (password.length < 12 || password.length > 1024) throw new Error('DEMO_PASSWORD must contain 12-1024 characters');
+  return password;
+}
+
 async function main() {
-  const password = await bcrypt.hash("E2E-Only-Passphrase-2026!", 12);
+  const password = await bcrypt.hash(requireDemoPassword(), 12);
   try {
   const business = await prisma.business.upsert({
     where: { id: "e2e-business-primary" },
