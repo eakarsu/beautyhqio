@@ -24,6 +24,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "create-admin": "tsx scripts/create-admin.ts",
+    "provision-demo-users": "tsx scripts/provision-demo-users.ts",
     "typecheck": "tsc --noEmit",
     "audit:prod": "npm audit --audit-level=low",
     "seed:governed": "tsx scripts/seed-governed-e2e.ts",

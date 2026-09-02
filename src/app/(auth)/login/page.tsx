@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -9,6 +9,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+
+type DemoAccount = {
+  key: "owner" | "manager" | "receptionist" | "staff";
+  email: string;
+  password: string;
+  role: "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF";
+};
+
+const demoRoleDetails: Record<DemoAccount["key"], { label: string; description: string; classes: string }> = {
+  owner: {
+    label: "Owner",
+    description: "Full dashboard with all features",
+    classes: "bg-blue-50 hover:bg-blue-100 text-blue-700",
+  },
+  manager: {
+    label: "Manager",
+    description: "Same as Owner (minus Billing/Subscription)",
+    classes: "bg-purple-50 hover:bg-purple-100 text-purple-700",
+  },
+  receptionist: {
+    label: "Receptionist",
+    description: "Limited dashboard (no Services, Staff, Products)",
+    classes: "bg-amber-50 hover:bg-amber-100 text-amber-700",
+  },
+  staff: {
+    label: "Staff",
+    description: "Staff portal (My Schedule, Clients, Earnings)",
+    classes: "bg-green-50 hover:bg-green-100 text-green-700",
+  },
+};
 
 // Social login icons as SVG components
 function GoogleIcon() {
@@ -60,6 +90,22 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([]);
+
+  const loadDemoAccounts = async () => {
+    const response = await fetch("/api/auth/demo-credentials", { cache: "no-store" });
+    const credentials = await response.json();
+    if (!response.ok) throw new Error(credentials.error || "Demo credentials are unavailable");
+    const accounts = Array.isArray(credentials.accounts) ? credentials.accounts as DemoAccount[] : [];
+    setDemoAccounts(accounts);
+    return { accounts, email: credentials.email || "", password: credentials.password || "" };
+  };
+
+  useEffect(() => {
+    void loadDemoAccounts().catch(() => {
+      // Demo sign-in is optional outside the local start.sh runtime.
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +140,20 @@ export default function LoginPage() {
     } catch {
       setError("An error occurred. Please try again.");
       setSocialLoading(null);
+    }
+  };
+
+  const fillDemoCredentials = async (accountKey: DemoAccount["key"] = "owner") => {
+    setError("");
+    try {
+      const loaded = demoAccounts.length > 0
+        ? { accounts: demoAccounts, email: "", password: "" }
+        : await loadDemoAccounts();
+      const account = loaded.accounts.find(({ key }) => key === accountKey);
+      setEmail(account?.email || loaded.email);
+      setPassword(account?.password || loaded.password);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Demo credentials are unavailable");
     }
   };
 
@@ -220,8 +280,12 @@ export default function LoginPage() {
               />
             </div>
 
+            <Button type="button" variant="outline" className="w-full" onClick={() => fillDemoCredentials()}>
+              Auto Fill Demo Credentials
+            </Button>
+
             <Button type="submit" className="w-full bg-rose-600 hover:bg-rose-700" disabled={loading || socialLoading !== null}>
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
@@ -240,56 +304,35 @@ export default function LoginPage() {
           </p>
 
           {/* Demo Credentials with Role Summary */}
-          <div className="w-full bg-slate-50 rounded-lg p-4 space-y-3">
-            <p className="text-xs font-semibold text-slate-700 text-center uppercase tracking-wide">
-              Demo Accounts & Role Access
-            </p>
-            <div className="space-y-2 text-xs">
-              <div
-                className="p-2 bg-blue-50 rounded cursor-pointer hover:bg-blue-100 transition-colors"
-                onClick={() => { setEmail("admin@luxebeauty.com"); setPassword("admin123"); }}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-blue-700">Owner</span>
-                  <span className="text-blue-600">admin@luxebeauty.com</span>
-                </div>
-                <p className="text-[10px] text-blue-600 mt-1">Full dashboard with all features</p>
+          {demoAccounts.length > 0 && (
+            <div className="w-full bg-slate-50 rounded-lg p-4 space-y-3">
+              <p className="text-xs font-semibold text-slate-700 text-center uppercase tracking-wide">
+                Demo Accounts & Role Access
+              </p>
+              <div className="space-y-2 text-xs">
+                {demoAccounts.map((account) => {
+                  const details = demoRoleDetails[account.key];
+                  return (
+                    <button
+                      key={account.key}
+                      type="button"
+                      className={`block w-full p-2 rounded cursor-pointer transition-colors text-left ${details.classes}`}
+                      onClick={() => fillDemoCredentials(account.key)}
+                    >
+                      <span className="flex justify-between items-center gap-2">
+                        <span className="font-medium">{details.label}</span>
+                        <span className="truncate">{account.email}</span>
+                      </span>
+                      <span className="block text-[10px] mt-1">{details.description}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <div
-                className="p-2 bg-purple-50 rounded cursor-pointer hover:bg-purple-100 transition-colors"
-                onClick={() => { setEmail("jennifer@luxebeauty.com"); setPassword("password123"); }}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-purple-700">Manager</span>
-                  <span className="text-purple-600">jennifer@luxebeauty.com</span>
-                </div>
-                <p className="text-[10px] text-purple-600 mt-1">Same as Owner (minus Billing/Subscription)</p>
-              </div>
-              <div
-                className="p-2 bg-amber-50 rounded cursor-pointer hover:bg-amber-100 transition-colors"
-                onClick={() => { setEmail("lisa@luxebeauty.com"); setPassword("password123"); }}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-amber-700">Receptionist</span>
-                  <span className="text-amber-600">lisa@luxebeauty.com</span>
-                </div>
-                <p className="text-[10px] text-amber-600 mt-1">Limited dashboard (no Services, Staff, Products)</p>
-              </div>
-              <div
-                className="p-2 bg-green-50 rounded cursor-pointer hover:bg-green-100 transition-colors"
-                onClick={() => { setEmail("sarah@luxebeauty.com"); setPassword("password123"); }}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-green-700">Staff</span>
-                  <span className="text-green-600">sarah@luxebeauty.com</span>
-                </div>
-                <p className="text-[10px] text-green-600 mt-1">Staff portal (My Schedule, Clients, Earnings)</p>
-              </div>
+              <p className="text-[10px] text-slate-500 text-center">
+                Click any row to auto-fill credentials
+              </p>
             </div>
-            <p className="text-[10px] text-slate-500 text-center">
-              Click any row to auto-fill credentials
-            </p>
-          </div>
+          )}
         </CardFooter>
       </Card>
     </div>

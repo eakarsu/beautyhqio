@@ -1,20 +1,47 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+const rootPrisma = new PrismaClient();
 
 function requireDemoPassword() {
-  const password = process.env.DEMO_PASSWORD || process.env.SEED_DEMO_PASSWORD || process.env.DEMO_SEED_PASSWORD || '';
-  if (password.length < 12 || password.length > 1024) throw new Error('DEMO_PASSWORD must contain 12-1024 characters');
+  const password = process.env.DEMO_PASSWORD || process.env.SEED_DEMO_PASSWORD || process.env.DEMO_SEED_PASSWORD || process.env.ADMIN_PASSWORD || '';
+  if (password.length < 12 || password.length > 72) throw new Error('DEMO_PASSWORD or ADMIN_PASSWORD must contain 12-72 characters');
   return password;
 }
 
-async function main() {
+async function main(prisma: Prisma.TransactionClient) {
   console.log("Starting seed...");
 
+  const tenantId = String(process.env.TENANT_ID || "runtime-tenant").trim();
+  const existingTenant = await prisma.business.findUnique({
+    where: { id: tenantId },
+    select: {
+      _count: { select: { clients: true, services: true, products: true, appointments: true } },
+    },
+  });
+  if (existingTenant && Object.values(existingTenant._count).some((count) => count > 0)) {
+    console.log(`Demo data already exists for tenant ${tenantId}; seed skipped.`);
+    return;
+  }
+
   // Create Business
-  const business = await prisma.business.create({
-    data: {
+  const business = await prisma.business.upsert({
+    where: { id: tenantId },
+    update: {
+      name: "Luxe Beauty Studio",
+      type: "MULTI_SERVICE",
+      phone: "5551234567",
+      email: "hello@luxebeauty.com",
+      website: "https://luxebeauty.com",
+      timezone: "America/New_York",
+      defaultLanguage: "en",
+      supportedLanguages: ["en", "es", "vi", "ko", "zh"],
+      instagram: "@luxebeautystudio",
+      facebook: "luxebeautystudio",
+      taxRate: 0.0875,
+    },
+    create: {
+      id: tenantId,
       name: "Luxe Beauty Studio",
       type: "MULTI_SERVICE",
       phone: "5551234567",
@@ -84,8 +111,18 @@ async function main() {
   const adminPassword = await bcrypt.hash(requireDemoPassword(), 12);
 
   // Create admin user first
-  const adminUser = await prisma.user.create({
-    data: {
+  const adminUser = await prisma.user.upsert({
+    where: { email: "admin@luxebeauty.com" },
+    update: {
+      businessId: business.id,
+      password: adminPassword,
+      firstName: "Admin",
+      lastName: "User",
+      role: "OWNER",
+      phone: "5550000000",
+      isActive: true,
+    },
+    create: {
       businessId: business.id,
       email: "admin@luxebeauty.com",
       password: adminPassword,
@@ -210,8 +247,18 @@ async function main() {
 
   const users = [];
   for (const userData of usersData) {
-    const user = await prisma.user.create({
-      data: {
+    const user = await prisma.user.upsert({
+      where: { email: userData.email },
+      update: {
+        password: hashedPassword,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role,
+        phone: userData.phone,
+        businessId: business.id,
+        isActive: true,
+      },
+      create: {
         email: userData.email,
         password: hashedPassword,
         firstName: userData.firstName,
@@ -225,8 +272,7 @@ async function main() {
 
     // Create staff record if staffData exists
     if (userData.staffData) {
-      await prisma.staff.create({
-        data: {
+      const staffData = {
           userId: user.id,
           locationId: locations[0].id,
           displayName: userData.staffData.displayName,
@@ -240,7 +286,11 @@ async function main() {
           commissionPct: userData.staffData.commissionPct,
           boothRent: userData.staffData.boothRent,
           rentFrequency: userData.staffData.rentFrequency,
-        },
+      };
+      await prisma.staff.upsert({
+        where: { userId: user.id },
+        update: staffData,
+        create: staffData,
       });
     }
   }
@@ -596,6 +646,7 @@ async function main() {
 
   // Get staff members for appointments
   const staffMembers = await prisma.staff.findMany({
+    where: { user: { businessId: business.id } },
     take: 5,
   });
 
@@ -620,6 +671,7 @@ async function main() {
 
       const apt = await prisma.appointment.create({
         data: {
+          businessId: business.id,
           clientId: client.id,
           staffId: staff.id,
           locationId: locations[0].id,
@@ -659,6 +711,7 @@ async function main() {
     if (staffMembers.length > 0) {
       const apt = await prisma.appointment.create({
         data: {
+          businessId: business.id,
           clientId: clients[Math.floor(Math.random() * clients.length)].id,
           staffId: staffMembers[Math.floor(Math.random() * staffMembers.length)].id,
           locationId: locations[0].id,
@@ -1794,17 +1847,16 @@ async function main() {
   console.log(`   - Sales Leads: ${salesLeads.length}`);
   console.log("\n🔑 Login credentials:");
   console.log('Demo login users provisioned from the local environment.');
-  console.log('Demo login users provisioned from the local environment.');
   console.log("\n🌐 Marketplace URLs:");
   console.log("   /explore - Browse all salons");
   console.log("   /salon/luxe-beauty-studio - Example salon profile");
 }
 
-main()
+rootPrisma.$transaction((prisma) => main(prisma), { maxWait: 30_000, timeout: 300_000 })
   .catch((e) => {
     console.error(e);
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await rootPrisma.$disconnect();
   });

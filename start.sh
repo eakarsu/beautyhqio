@@ -21,7 +21,8 @@ configuration() {
 migrate() { (cd "$project_dir" && npx --no-install prisma migrate deploy); }
 start_services() {
   migrate
-  npm --prefix "$project_dir" run create-admin
+  npm --prefix "$project_dir" run db:seed
+  npm --prefix "$project_dir" run provision-demo-users
   cleanup() {
     trap - INT TERM EXIT
     [[ -z "${proxy_pid:-}" ]] || kill "$proxy_pid" 2>/dev/null || true
@@ -30,7 +31,7 @@ start_services() {
     [[ -z "${app_pid:-}" ]] || wait "$app_pid" 2>/dev/null || true
   }
   trap cleanup INT TERM EXIT
-  PORT="$API_PORT" HOSTNAME=127.0.0.1 NEXTAUTH_URL="http://127.0.0.1:$UI_PORT" AUTH_COOKIE_SECURE=false node "$project_dir/.next/standalone/server.js" &
+  (cd "$project_dir" && NODE_ENV=production ENABLE_DEMO_CREDENTIAL_AUTOFILL=true NEXTAUTH_URL="http://127.0.0.1:$UI_PORT" AUTH_COOKIE_SECURE=false ./node_modules/.bin/next start -H 127.0.0.1 -p "$API_PORT") &
   app_pid=$!
   API_PORT="$API_PORT" UI_PORT="$UI_PORT" node "$project_dir/scripts/runtime-proxy.mjs" &
   proxy_pid=$!
