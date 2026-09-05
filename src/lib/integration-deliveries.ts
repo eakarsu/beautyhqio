@@ -37,30 +37,45 @@ async function dispatch(delivery: { kind: string; appointmentId: string }) {
   throw new Error("UNSUPPORTED_DELIVERY_KIND");
 }
 
+export const DELIVERY_LEASE_MS = 5 * 60_000;
+
 export async function processIntegrationDeliveries(limit = 20) {
   const processed: { id: string; status: string }[] = [];
+  // A crashed fifth attempt must terminate rather than remain PROCESSING forever.
+  await prisma.integrationDelivery.updateMany({
+    where: { status: "PROCESSING", attempts: { gte: 5 }, updatedAt: { lt: new Date(Date.now() - DELIVERY_LEASE_MS) } },
+    data: { status: "DEAD_LETTER", lastErrorCode: "WORKER_LEASE_EXPIRED", lastErrorAt: new Date() },
+  });
   for (let index = 0; index < Math.min(Math.max(limit, 1), 100); index += 1) {
     const delivery = await prisma.$transaction(async (tx) => {
       const candidate = await tx.integrationDelivery.findFirst({
-        where: { status: { in: ["PENDING", "RETRY"] }, nextAttemptAt: { lte: new Date() } },
+        where: { attempts: { lt: 5 }, OR: [
+          { status: { in: ["PENDING", "RETRY"] }, nextAttemptAt: { lte: new Date() } },
+          { status: "PROCESSING", updatedAt: { lt: new Date(Date.now() - DELIVERY_LEASE_MS) } },
+        ] },
         orderBy: { createdAt: "asc" },
       });
       if (!candidate) return null;
       const claimed = await tx.integrationDelivery.updateMany({
-        where: { id: candidate.id, status: candidate.status, attempts: candidate.attempts },
+        where: { id: candidate.id, status: candidate.status, attempts: candidate.attempts, updatedAt: candidate.updatedAt },
         data: { status: "PROCESSING", attempts: { increment: 1 } },
       });
       return claimed.count === 1 ? { ...candidate, attempts: candidate.attempts + 1 } : null;
     });
     if (!delivery) break;
+    const owned = { id: delivery.id, status: "PROCESSING" as const, attempts: delivery.attempts };
+    // Renew long-running attempts; fencing prevents an old worker completing a reclaimed job.
+    const heartbeat = setInterval(() => {
+      void prisma.integrationDelivery.updateMany({ where: owned, data: { updatedAt: new Date() } }).catch(() => {});
+    }, DELIVERY_LEASE_MS / 3);
     try {
       const providerRef = await dispatch(delivery);
-      await prisma.integrationDelivery.update({ where: { id: delivery.id }, data: { status: "DELIVERED", deliveredAt: new Date(), providerRef, lastErrorCode: null } });
-      processed.push({ id: delivery.id, status: "DELIVERED" });
+      const completed = await prisma.integrationDelivery.updateMany({ where: owned, data: { status: "DELIVERED", deliveredAt: new Date(), providerRef, lastErrorCode: null } });
+      if (completed.count) processed.push({ id: delivery.id, status: "DELIVERED" });
     } catch (error) {
       const terminal = delivery.attempts >= 5;
-      await prisma.integrationDelivery.update({
-        where: { id: delivery.id },
+      const failed = await prisma.integrationDelivery.updateMany({
+        where: owned,
         data: {
           status: terminal ? "DEAD_LETTER" : "RETRY",
           nextAttemptAt: new Date(Date.now() + retryDelayMs(delivery.attempts)),
@@ -68,7 +83,9 @@ export async function processIntegrationDeliveries(limit = 20) {
           lastErrorCode: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN_PROVIDER_ERROR",
         },
       });
-      processed.push({ id: delivery.id, status: terminal ? "DEAD_LETTER" : "RETRY" });
+      if (failed.count) processed.push({ id: delivery.id, status: terminal ? "DEAD_LETTER" : "RETRY" });
+    } finally {
+      clearInterval(heartbeat);
     }
   }
   return processed;

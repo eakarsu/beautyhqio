@@ -17,7 +17,7 @@ export function corsHeaders(origin?: string | null): Record<string, string> {
       allow && origin ? origin : ALLOWED_ORIGINS.includes("*") ? "*" : "",
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
     "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, X-Api-Key, X-User-Id, X-Twilio-Signature, Stripe-Signature",
+      "Content-Type, Authorization, Idempotency-Key, X-Api-Key, X-User-Id, X-Twilio-Signature, Stripe-Signature",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };

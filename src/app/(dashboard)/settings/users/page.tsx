@@ -130,6 +130,7 @@ export default function UsersSettingsPage() {
   };
 
   const handleOpenAdd = () => {
+    setEditingUser(null);
     setFormData({
       firstName: "",
       lastName: "",
@@ -155,6 +156,7 @@ export default function UsersSettingsPage() {
       });
 
       if (response.ok) {
+        if (!editingUser) toast({ title: "User created", description: "They can set their password using Forgot password on the login page." });
         setShowAddUser(false);
         setShowEditUser(false);
         setEditingUser(null);

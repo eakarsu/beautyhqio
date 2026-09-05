@@ -30,20 +30,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
   // First try NextAuth session (web)
   const session = await getServerSession(authOptions);
 
-  if (session?.user) {
-    return {
-      id: session.user.id,
-      email: session.user.email || "",
-      role: session.user.role as UserRole,
-      businessId: session.user.businessId,
-      businessName: session.user.businessName,
-      staffId: session.user.staffId,
-      clientId: session.user.clientId,
-      firstName: session.user.firstName,
-      lastName: session.user.lastName,
-      isPlatformAdmin: session.user.isPlatformAdmin,
-    };
-  }
+  if (session?.user?.id) return loadActiveUser(session.user.id);
 
   // Try JWT token from Authorization header (mobile)
   try {
@@ -63,26 +50,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
       };
       if (decoded.type !== "access") return null;
 
-      // Fetch full user data from database
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        include: { business: true, staff: true, client: true },
-      });
-
-      if (user?.isActive) {
-        return {
-          id: user.id,
-          email: user.email,
-          role: user.role as UserRole,
-          businessId: user.businessId,
-          businessName: user.business?.name || null,
-          staffId: user.staff?.id || null,
-          clientId: user.client?.id || null,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          isPlatformAdmin: user.role === "PLATFORM_ADMIN",
-        };
-      }
+      return loadActiveUser(decoded.userId);
     }
   } catch (error) {
     // JWT verification failed, continue to return null
@@ -90,6 +58,15 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
   }
 
   return null;
+}
+
+async function loadActiveUser(id: string): Promise<AuthenticatedUser | null> {
+  const user = await prisma.user.findUnique({ where: { id }, include: { business: true, staff: true, client: true } });
+  if (!user?.isActive) return null;
+  return { id: user.id, email: user.email, role: user.role, businessId: user.businessId,
+    businessName: user.business?.name || null, staffId: user.staff?.id || null,
+    clientId: user.client?.id || null, firstName: user.firstName, lastName: user.lastName,
+    isPlatformAdmin: user.role === "PLATFORM_ADMIN" };
 }
 
 /**

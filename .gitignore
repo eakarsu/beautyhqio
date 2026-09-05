@@ -99,3 +99,6 @@ token.txt
 id_rsa*
 **/credentials*.json
 **/serviceAccount*.json
+
+# Generated TypeScript incremental build cache
+*.tsbuildinfo

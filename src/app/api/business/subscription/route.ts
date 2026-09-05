@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { COMMISSION_RATES, SUBSCRIPTION_PRICING, getRecommendedPlan } from "@/lib/commission";
+import { beginBusinessBilling, BillingError } from "@/lib/business-billing";
 import { SubscriptionPlan } from "@prisma/client";
 
 // GET /api/business/subscription - Get current subscription
@@ -35,8 +36,9 @@ export async function GET(request: NextRequest) {
 
     // If no subscription exists, create a default STARTER subscription
     if (!subscription) {
-      subscription = await prisma.businessSubscription.create({
-        data: {
+      subscription = await prisma.businessSubscription.upsert({
+        where: { businessId: user.business.id }, update: {},
+        create: {
           businessId: user.business.id,
           plan: "STARTER",
           status: "ACTIVE",
@@ -65,9 +67,8 @@ export async function GET(request: NextRequest) {
     });
 
     // Calculate recommended plan
-    const monthlyLeadRevenue = Number(leadStats._sum.commissionAmount || 0) *
-      (100 / COMMISSION_RATES[subscription.plan as SubscriptionPlan]);
-    const recommendedPlan = getRecommendedPlan(monthlyLeadRevenue);
+    const monthlyLeadRevenue = COMMISSION_RATES[subscription.plan] > 0 ? Number(leadStats._sum.commissionAmount || 0) * 100 / COMMISSION_RATES[subscription.plan] : null;
+    const recommendedPlan = monthlyLeadRevenue === null ? null : getRecommendedPlan(monthlyLeadRevenue);
 
     return NextResponse.json({
       subscription: {
@@ -97,171 +98,22 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/business/subscription - Create or start subscription
+// Plan selection opens provider checkout or the billing portal. It never grants a paid plan.
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      include: { business: true },
-    });
-
-    if (!user?.business) {
-      return NextResponse.json({ error: "Business not found" }, { status: 404 });
-    }
-
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await prisma.user.findUnique({ where: { id: session.user.id }, include: { business: true } });
+    if (!user?.isActive || !user.business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+    if (user.role !== "OWNER") return NextResponse.json({ error: "Only the business owner can manage billing" }, { status: 403 });
     const body = await request.json();
-    const { plan } = body as { plan: SubscriptionPlan };
-
-    if (!plan || !Object.keys(SUBSCRIPTION_PRICING).includes(plan)) {
-      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
-    }
-
-    const price = SUBSCRIPTION_PRICING[plan];
-    const commissionRate = COMMISSION_RATES[plan];
-
-    // Check if subscription already exists
-    const existingSubscription = await prisma.businessSubscription.findUnique({
-      where: { businessId: user.business.id },
-    });
-
-    if (existingSubscription) {
-      // Update existing subscription
-      const subscription = await prisma.businessSubscription.update({
-        where: { businessId: user.business.id },
-        data: {
-          plan,
-          status: "ACTIVE",
-          monthlyPrice: price,
-          marketplaceCommissionPct: commissionRate,
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        },
-      });
-
-      return NextResponse.json({ subscription });
-    }
-
-    // Create new subscription
-    const subscription = await prisma.businessSubscription.create({
-      data: {
-        businessId: user.business.id,
-        plan,
-        status: "ACTIVE",
-        monthlyPrice: price,
-        marketplaceCommissionPct: commissionRate,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      },
-    });
-
-    return NextResponse.json({ subscription });
+    if (!body || typeof body.plan !== "string" || !Object.hasOwn(SUBSCRIPTION_PRICING, body.plan)) return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+    return NextResponse.json(await beginBusinessBilling(user.business.id, user.email, body.plan as SubscriptionPlan));
   } catch (error) {
-    console.error("Error creating subscription:", error);
-    return NextResponse.json(
-      { error: "Failed to create subscription" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error instanceof BillingError ? error.message : "Billing could not complete. Your plan has not been changed; retry later." }, { status: error instanceof BillingError ? error.status : 503 });
   }
 }
-
-// PUT /api/business/subscription - Upgrade/downgrade subscription
-export async function PUT(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      include: { business: true },
-    });
-
-    if (!user?.business) {
-      return NextResponse.json({ error: "Business not found" }, { status: 404 });
-    }
-
-    const body = await request.json();
-    const { plan } = body as { plan: SubscriptionPlan };
-
-    if (!plan || !Object.keys(SUBSCRIPTION_PRICING).includes(plan)) {
-      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
-    }
-
-    const price = SUBSCRIPTION_PRICING[plan];
-    const commissionRate = COMMISSION_RATES[plan];
-
-    const subscription = await prisma.businessSubscription.update({
-      where: { businessId: user.business.id },
-      data: {
-        plan,
-        monthlyPrice: price,
-        marketplaceCommissionPct: commissionRate,
-      },
-    });
-
-    return NextResponse.json({
-      subscription: {
-        ...subscription,
-        monthlyPrice: Number(subscription.monthlyPrice),
-        marketplaceCommissionPct: Number(subscription.marketplaceCommissionPct),
-      },
-    });
-  } catch (error) {
-    console.error("Error updating subscription:", error);
-    return NextResponse.json(
-      { error: "Failed to update subscription" },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE /api/business/subscription - Cancel subscription
+export const PUT = POST;
 export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      include: { business: true },
-    });
-
-    if (!user?.business) {
-      return NextResponse.json({ error: "Business not found" }, { status: 404 });
-    }
-
-    const body = await request.json();
-    const { reason } = body as { reason?: string };
-
-    // Downgrade to STARTER (free) instead of fully cancelling
-    const subscription = await prisma.businessSubscription.update({
-      where: { businessId: user.business.id },
-      data: {
-        plan: "STARTER",
-        monthlyPrice: 0,
-        marketplaceCommissionPct: COMMISSION_RATES.STARTER,
-        cancelledAt: new Date(),
-        cancelReason: reason,
-      },
-    });
-
-    return NextResponse.json({
-      subscription,
-      message: "Subscription cancelled. You have been downgraded to the free tier.",
-    });
-  } catch (error) {
-    console.error("Error cancelling subscription:", error);
-    return NextResponse.json(
-      { error: "Failed to cancel subscription" },
-      { status: 500 }
-    );
-  }
+  return POST(new NextRequest(request.url, { method: "POST", headers: request.headers, body: JSON.stringify({ plan: "STARTER" }) }));
 }

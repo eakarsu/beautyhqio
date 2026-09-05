@@ -21,3 +21,31 @@ AI routes default to disabled. Enable them only with `ENABLE_AI_FEATURES=true`, 
 Legacy booking, marketplace, recurring, voice, and kiosk appointment-write routes are disabled in production by default because they do not yet meet the governed workflow contract. Keep `ENABLE_LEGACY_APPOINTMENT_WRITES=false` until each route uses the central permission, idempotency, conflict, audit, and outbox service and receives equivalent test coverage.
 
 Back up PostgreSQL and the configured upload store together, encrypt them, enforce retention, and run restore drills. Do not put certificate archives, account exports, or live credentials in the repository.
+
+## September 2026 security and booking update
+
+Run `npm ci`, `npx prisma generate`, and `npx prisma migrate deploy` before starting
+the updated application. Migration `20260905000000_booking_integrity` requires
+PostgreSQL's `btree_gist` extension and adds an exclusion constraint against staff
+overlaps. It runs atomically and refuses existing overlapping active appointments
+or invalid intervals; resolve those records deliberately before retrying a failed
+migration. No production records are automatically rescheduled or deleted.
+
+Old appointment idempotency keys without a request hash return 409. Retrieve the
+existing appointment instead of submitting a new booking to resolve an old retry.
+New retries preserve their keys and reject changes to the original request.
+
+New accounts created without an explicit password use Forgot password to set one.
+Accounts previously saved with plaintext passwords also need password reset; do
+not distribute or reuse those old values. Existing web sessions re-read the user
+record so deactivation and role changes take effect on the next request.
+
+The provider worker reclaims PROCESSING deliveries after a five-minute expired
+lease, renews active leases, and fences stale workers using attempt numbers.
+Delivery remains at least once: a crash after a provider accepts a message but
+before its result is saved can cause a duplicate on retry.
+
+For isolated HTTP/browser tests, start the server with a local test database and
+set `PLAYWRIGHT_BASE_URL` and `PLAYWRIGHT_EXTERNAL_SERVER=true`. The governed suite
+now tests both booking forms, the lifecycle, API access denial, password creation,
+and session permission revocation. Database tests mock notification providers.

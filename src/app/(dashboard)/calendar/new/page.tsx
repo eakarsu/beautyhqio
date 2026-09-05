@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { bookingBody, bookingRequest } from "@/lib/appointments/booking-request";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,7 @@ interface Service {
 
 interface Staff {
   id: string;
+  locationId: string;
   displayName?: string;
   user?: {
     firstName: string;
@@ -41,6 +43,7 @@ interface Staff {
 
 export default function NewAppointmentPage() {
   const router = useRouter();
+  const attempt = useRef<{ body: string; key: string } | null>(null);
   const searchParams = useSearchParams();
   const clientId = searchParams.get("clientId");
 
@@ -94,19 +97,14 @@ export default function NewAppointmentPage() {
     setIsSaving(true);
 
     try {
-      const response = await fetch("/api/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId: formData.clientId,
-          serviceId: formData.serviceId,
-          staffId: formData.staffId,
-          startTime: new Date(`${formData.date}T${formData.time}`).toISOString(),
-          notes: formData.notes,
-        }),
-      });
+      const selectedStaff = staff.find((member) => member.id === formData.staffId);
+      const body = bookingBody(formData, selectedStaff?.locationId || "");
+      const request = bookingRequest(body, attempt.current);
+      attempt.current = request.attempt;
+      const response = await fetch("/api/appointments", request.init);
 
       if (response.ok) {
+        attempt.current = null;
         router.push("/calendar");
       } else {
         toast({ title: "Error", description: "Failed to create appointment", variant: "destructive" });

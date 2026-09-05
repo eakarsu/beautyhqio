@@ -22,7 +22,7 @@ function applyCors(res: NextResponse, origin: string | null) {
   );
   res.headers.set(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Api-Key, X-User-Id, X-Twilio-Signature, Stripe-Signature"
+    "Content-Type, Authorization, Idempotency-Key, X-Api-Key, X-User-Id, X-Twilio-Signature, Stripe-Signature"
   );
   res.headers.set("Access-Control-Max-Age", "86400");
   res.headers.set("Vary", "Origin");

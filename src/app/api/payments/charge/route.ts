@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedUser } from "@/lib/api-auth";
+import { requireRoles } from "@/lib/api-auth";
 import Stripe from "stripe";
 
 function getStripe() {
@@ -12,15 +12,14 @@ function getStripe() {
 // POST /api/payments/charge - Charge a saved payment method
 export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireRoles(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    if (user instanceof NextResponse) return user;
+    if (!user.isPlatformAdmin && !user.businessId) return NextResponse.json({ error: "Tenant required" }, { status: 403 });
 
     const body = await request.json();
     const { amount, clientId, paymentMethodId, staffId, metadata } = body;
 
-    if (!amount || amount <= 0) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
       return NextResponse.json({ error: "Valid amount is required" }, { status: 400 });
     }
 
@@ -34,8 +33,8 @@ export async function POST(request: NextRequest) {
 
     // Get client's Stripe customer ID
     const client = await prisma.client.findUnique({
-      where: { id: clientId },
-      select: { stripeCustomerId: true, email: true, firstName: true, lastName: true },
+      where: { id: clientId, ...(user.isPlatformAdmin ? {} : { businessId: user.businessId! }) },
+      select: { businessId: true, stripeCustomerId: true, email: true, firstName: true, lastName: true },
     });
 
     if (!client) {
@@ -56,10 +55,10 @@ export async function POST(request: NextRequest) {
       confirm: true,
       description: `POS Payment for ${client.firstName} ${client.lastName}`,
       metadata: {
+        ...metadata,
         clientId,
         staffId: staffId || "",
-        businessId: user.businessId || "",
-        ...metadata,
+        businessId: client.businessId,
       },
     });
 

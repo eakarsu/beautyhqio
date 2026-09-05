@@ -1,3 +1,6 @@
+import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
+import { publicUserSelect } from "@/lib/public-user";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, getBusinessIdFilter, AuthenticatedUser } from "@/lib/api-auth";
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
     const staff = await prisma.staff.findMany({
       where,
       include: {
-        user: true,
+        user: { select: publicUserSelect },
         location: true,
         schedules: true,
       },
@@ -106,7 +109,7 @@ export async function POST(request: NextRequest) {
         finalUserId = existingUser.id;
       } else {
         // Generate a temporary password (should be changed on first login)
-        const tempPassword = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const tempPassword = await bcrypt.hash(randomBytes(32).toString("base64url"), 12);
 
         const newUser = await prisma.user.create({
           data: {
@@ -114,7 +117,7 @@ export async function POST(request: NextRequest) {
             firstName,
             lastName,
             phone: phone || null,
-            password: tempPassword, // Temporary password - user should reset on first login
+            password: tempPassword, // User sets their password through password reset
             role: "STAFF",
             businessId: targetBusinessId,
           },
@@ -150,7 +153,7 @@ export async function POST(request: NextRequest) {
     // Check if staff already exists for this user
     const existingStaff = await prisma.staff.findUnique({
       where: { userId: finalUserId },
-      include: { user: true, location: true },
+      include: { user: { select: publicUserSelect }, location: true },
     });
 
     if (existingStaff) {
@@ -174,7 +177,7 @@ export async function POST(request: NextRequest) {
         commissionPct,
       },
       include: {
-        user: true,
+        user: { select: publicUserSelect },
         location: true,
       },
     });

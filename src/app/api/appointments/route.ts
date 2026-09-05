@@ -1,3 +1,4 @@
+import { publicUserSelect } from "@/lib/public-user";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/api-auth";
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
   if (requestedStaff && user.role !== "STAFF") where.staffId = requestedStaff;
   const appointments = await prisma.appointment.findMany({
     where,
-    include: { client: true, staff: { include: { user: true } }, location: true, services: { include: { service: true, addOns: { include: { addOn: true } } } } },
+    include: { client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true, services: { include: { service: true, addOns: { include: { addOn: true } } } } },
     orderBy: { scheduledStart: "asc" },
     take: 100,
   });

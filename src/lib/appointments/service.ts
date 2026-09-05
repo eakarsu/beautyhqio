@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { publicUserSelect } from "@/lib/public-user";
 import { Prisma, PrismaClient } from "@prisma/client";
 import type { AuthenticatedUser } from "@/lib/api-auth";
 import {
@@ -40,48 +42,59 @@ export async function createAppointment(
     throw new AppointmentDomainError("ROLE_FORBIDDEN", 403, "role cannot create appointments");
   }
 
-  const existing = await db.appointment.findUnique({
-    where: { businessId_idempotencyKey: { businessId: location.businessId, idempotencyKey } },
-    include: { services: { include: { service: true } }, client: true, staff: { include: { user: true } }, location: true },
-  });
-  if (existing) return { appointment: existing, replayed: true };
+  const requestHash = createHash("sha256").update(JSON.stringify({ ...input, clientId: input.clientId || user.clientId || null })).digest("hex");
+  return db.$transaction(async (tx) => {
+    // Serialize governed creates in a tenant, including retries with the same key.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${location.businessId}, 0))::text`;
+    const existing = await tx.appointment.findUnique({
+      where: { businessId_idempotencyKey: { businessId: location.businessId, idempotencyKey } },
+      include: { services: { include: { service: true } }, client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true },
+    });
+    if (existing) {
+      if (user.role === "CLIENT" && existing.clientId !== user.clientId) {
+        throw new AppointmentDomainError("CLIENT_MISMATCH", 403, "clients may access only their own appointments");
+      }
+      if (existing.requestHash !== requestHash) throw new AppointmentDomainError("IDEMPOTENCY_CONFLICT", 409, "idempotency key was used for a different request");
+      return { appointment: existing, replayed: true };
+    }
 
-  const requestedServiceIds = input.services?.map((line) => line.serviceId) || input.serviceIds || [];
-  const [staff, services, client] = await Promise.all([
-    db.staff.findUnique({ where: { id: input.staffId }, include: { user: true, location: true } }),
-    db.service.findMany({ where: { id: { in: requestedServiceIds }, businessId: location.businessId, isActive: true } }),
-    (input.clientId || user.clientId) ? db.client.findUnique({ where: { id: (input.clientId || user.clientId)! } }) : Promise.resolve(null),
-  ]);
-  if (!staff || staff.location.businessId !== location.businessId || !staff.isActive) {
-    throw new AppointmentDomainError("STAFF_NOT_FOUND", 404, "active staff member not found in this business");
-  }
-  if (services.length !== new Set(requestedServiceIds).size) {
-    throw new AppointmentDomainError("SERVICE_MISMATCH", 422, "one or more services are unavailable for this business");
-  }
-  if (client && client.businessId !== location.businessId) {
-    throw new AppointmentDomainError("CLIENT_MISMATCH", 403, "client belongs to another business");
-  }
-  const totalDuration = services.reduce((sum, service) => sum + service.duration, 0);
-  const scheduledEnd = input.scheduledEnd || new Date(input.scheduledStart.getTime() + totalDuration * 60_000);
-  if (scheduledEnd <= input.scheduledStart) throw new AppointmentDomainError("INVALID_TIME", 422, "appointment end must follow its start");
+    const requestedServiceIds = input.services?.map((line) => line.serviceId) || input.serviceIds || [];
+    const [staff, services, client] = await Promise.all([
+      tx.staff.findUnique({ where: { id: input.staffId }, include: { user: { select: publicUserSelect }, location: true } }),
+      tx.service.findMany({ where: { id: { in: requestedServiceIds }, businessId: location.businessId, isActive: true } }),
+      (input.clientId || user.clientId) ? tx.client.findUnique({ where: { id: (input.clientId || user.clientId)! } }) : Promise.resolve(null),
+    ]);
+    if (!staff || staff.location.businessId !== location.businessId || !staff.isActive) {
+      throw new AppointmentDomainError("STAFF_NOT_FOUND", 404, "active staff member not found in this business");
+    }
+    if (services.length !== new Set(requestedServiceIds).size) {
+      throw new AppointmentDomainError("SERVICE_MISMATCH", 422, "one or more services are unavailable for this business");
+    }
+    if ((input.clientId || user.clientId) && !client) throw new AppointmentDomainError("CLIENT_NOT_FOUND", 404, "client not found");
+    if (client && client.businessId !== location.businessId) {
+      throw new AppointmentDomainError("CLIENT_MISMATCH", 403, "client belongs to another business");
+    }
+    const totalDuration = services.reduce((sum, service) => sum + service.duration, 0);
+    const scheduledEnd = input.scheduledEnd || new Date(input.scheduledStart.getTime() + totalDuration * 60_000);
+    if (scheduledEnd <= input.scheduledStart) throw new AppointmentDomainError("INVALID_TIME", 422, "appointment end must follow its start");
 
-  const conflict = await db.appointment.findFirst({
-    where: {
-      staffId: input.staffId,
-      status: { notIn: ["CANCELLED", "NO_SHOW", "RESCHEDULED"] },
-      scheduledStart: { lt: scheduledEnd },
-      scheduledEnd: { gt: input.scheduledStart },
-    },
-    select: { id: true },
-  });
-  if (conflict) throw new AppointmentDomainError("STAFF_CONFLICT", 409, "staff member already has an overlapping appointment");
+    const conflict = await tx.appointment.findFirst({
+      where: {
+        staffId: input.staffId,
+        status: { notIn: ["CANCELLED", "NO_SHOW", "RESCHEDULED"] },
+        scheduledStart: { lt: scheduledEnd },
+        scheduledEnd: { gt: input.scheduledStart },
+      },
+      select: { id: true },
+    });
+    if (conflict) throw new AppointmentDomainError("STAFF_CONFLICT", 409, "staff member already has an overlapping appointment");
 
-  const lineByService = new Map((input.services || []).map((line) => [line.serviceId, line]));
-  const result = await db.$transaction(async (tx) => {
+    const lineByService = new Map((input.services || []).map((line) => [line.serviceId, line]));
     const appointment = await tx.appointment.create({
       data: {
         businessId: location.businessId,
         idempotencyKey,
+        requestHash,
         clientId: client?.id,
         staffId: staff.id,
         locationId: location.id,
@@ -97,7 +110,7 @@ export async function createAppointment(
           })),
         },
       },
-      include: { services: { include: { service: true } }, client: true, staff: { include: { user: true } }, location: true },
+      include: { services: { include: { service: true } }, client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true },
     });
     if (client) {
       await tx.activity.create({ data: { clientId: client.id, userId: user.id, type: "APPOINTMENT_BOOKED", title: "Appointment Booked", metadata: { appointmentId: appointment.id } } });
@@ -111,9 +124,8 @@ export async function createAppointment(
     await tx.integrationDelivery.createMany({
       data: deliveries.map(([kind, provider]) => ({ businessId: location.businessId, appointmentId: appointment.id, kind, provider, dedupeKey: `${appointment.id}:${kind}`, payload: { appointmentId: appointment.id } })),
     });
-    return appointment;
+    return { appointment, replayed: false };
   });
-  return { appointment: result, replayed: false };
 }
 
 export async function transitionAppointment(
@@ -159,12 +171,18 @@ export async function transitionAppointment(
       await tx.activity.create({ data: { clientId: current.clientId, userId: user.id, type: activityType, title: target.replace("_", " "), metadata: { appointmentId: id, reason: reason?.trim() } } });
     }
     await tx.integrationDelivery.create({ data: { businessId, appointmentId: id, kind: "CALENDAR_UPDATE", provider: "calendar", dedupeKey: `${id}:CALENDAR_UPDATE:${current.version + 1}`, payload: { appointmentId: id, target } } });
-    return tx.appointment.findUniqueOrThrow({ where: { id }, include: { client: true, staff: { include: { user: true } }, location: true, services: { include: { service: true } } } });
+    return tx.appointment.findUniqueOrThrow({ where: { id }, include: { client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true, services: { include: { service: true } } } });
   });
 }
 
 export function domainErrorResponse(error: unknown) {
   if (error instanceof AppointmentDomainError) return { status: error.status, body: { error: error.code, message: error.message } };
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return { status: 409, body: { error: "CONFLICT", message: "request conflicts with an existing record" } };
+  const overlapViolation = error instanceof Prisma.PrismaClientUnknownRequestError
+    ? error.message.includes("Appointment_staff_no_overlap") && error.message.includes("23P01")
+    : error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2004" || error.code === "P2010") && /Appointment_staff_no_overlap/.test(JSON.stringify(error.meta));
+  if (overlapViolation) {
+    return { status: 409, body: { error: "STAFF_CONFLICT", message: "staff member already has an overlapping appointment" } };
+  }
   return null;
 }

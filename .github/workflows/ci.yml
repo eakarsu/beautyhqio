@@ -42,8 +42,10 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
       - run: npm run seed:governed
         env:
           ALLOW_E2E_SEED: "true"
+          DEMO_PASSWORD: "E2E-Only-Passphrase-2026!"
       - run: npm run test:governed
       - run: npm run audit:prod

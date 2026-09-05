@@ -1,11 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireRoles } from "@/lib/api-auth";
+import { z } from "zod";
 import { Decimal } from "@prisma/client/runtime/library";
+
+const money = z.number().finite().nonnegative().max(1_000_000);
+const checkoutSchema = z.object({
+  locationId: z.string().min(1).optional(), clientId: z.string().min(1).nullish(), staffId: z.string().min(1),
+  items: z.array(z.object({ name: z.string().min(1), description: z.string().optional(), quantity: z.number().int().positive().max(1000).default(1), unitPrice: money, total: money,
+    serviceId: z.string().min(1).optional(), productId: z.string().min(1).optional(), staffId: z.string().min(1).optional() })).min(1).max(100),
+  paymentMethod: z.enum(["CASH", "CREDIT_CARD", "DEBIT_CARD", "GIFT_CARD", "PREPAID_PACKAGE", "POINTS", "APPLE_PAY", "GOOGLE_PAY", "OTHER"]).optional(),
+  subtotal: money, tax: money.optional(), discount: money.optional(), tip: money.optional(), total: money,
+  giftCardCode: z.string().min(1).optional(), loyaltyPointsUsed: z.number().int().nonnegative().optional(), notes: z.string().max(2000).optional(),
+});
 
 // POST /api/checkout - Process checkout/sale
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const actor = await requireRoles(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    if (actor instanceof NextResponse) return actor;
+    if (!actor.isPlatformAdmin && !actor.businessId) return NextResponse.json({ error: "Tenant required" }, { status: 403 });
+    const body = checkoutSchema.parse(await request.json().catch(() => null));
     const {
       locationId,
       clientId,
@@ -26,6 +41,7 @@ export async function POST(request: NextRequest) {
     let finalLocationId = locationId;
     if (!finalLocationId) {
       const defaultLocation = await prisma.location.findFirst({
+        where: { isActive: true, businessId: actor.businessId || "__none__" },
         orderBy: { createdAt: "asc" },
       });
       if (defaultLocation) {
@@ -37,6 +53,23 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    const location = await prisma.location.findFirst({ where: { id: finalLocationId, isActive: true, ...(actor.isPlatformAdmin ? {} : { businessId: actor.businessId! }) } });
+    if (!location) return NextResponse.json({ error: "Location not found" }, { status: 404 });
+    const businessId = location.businessId;
+    const staffIds = [...new Set([staffId, ...items.flatMap(item => item.staffId ? [item.staffId] : [])])];
+    const productIds = [...new Set(items.flatMap(item => item.productId ? [item.productId] : []))];
+    const serviceIds = [...new Set(items.flatMap(item => item.serviceId ? [item.serviceId] : []))];
+    const [staffCount, productCount, serviceCount, clientCount, giftCardCount] = await Promise.all([
+      prisma.staff.count({ where: { id: { in: staffIds }, location: { businessId }, isActive: true } }),
+      prisma.product.count({ where: { id: { in: productIds }, businessId } }),
+      prisma.service.count({ where: { id: { in: serviceIds }, businessId } }),
+      clientId ? prisma.client.count({ where: { id: clientId, businessId } }) : Promise.resolve(1),
+      giftCardCode ? prisma.giftCard.count({ where: { code: giftCardCode, businessId } }) : Promise.resolve(1),
+    ]);
+    if (staffCount !== staffIds.length || productCount !== productIds.length || serviceCount !== serviceIds.length || !clientCount || !giftCardCount) return NextResponse.json({ error: "Checkout resources must belong to this business" }, { status: 403 });
+    const cents = (value: number) => Math.round(value * 100);
+    if (items.some(item => cents(item.total) !== cents(item.unitPrice) * item.quantity) || cents(subtotal) !== items.reduce((sum, item) => sum + cents(item.total), 0) || cents(total) !== cents(subtotal) + cents(tax || 0) + cents(tip || 0) - cents(discount || 0)) return NextResponse.json({ error: "Checkout totals do not match line items" }, { status: 422 });
 
     // Generate transaction number
     const transactionNumber = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
@@ -153,7 +186,7 @@ export async function POST(request: NextRequest) {
       // Earn loyalty points for the purchase
       if (clientId) {
         const loyaltyProgram = await tx.loyaltyProgram.findFirst({
-          where: { isActive: true },
+          where: { isActive: true, businessId },
         });
 
         if (loyaltyProgram) {
@@ -224,6 +257,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(completeTransaction, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return NextResponse.json({ error: "INVALID_REQUEST" }, { status: 422 });
     console.error("Error processing checkout:", error);
     return NextResponse.json(
       { error: "Failed to process checkout" },
@@ -235,13 +269,16 @@ export async function POST(request: NextRequest) {
 // GET /api/checkout - Get recent transactions
 export async function GET(request: NextRequest) {
   try {
+    const actor = await requireRoles(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    if (actor instanceof NextResponse) return actor;
+    if (!actor.isPlatformAdmin && !actor.businessId) return NextResponse.json({ error: "Tenant required" }, { status: 403 });
     const { searchParams } = new URL(request.url);
     const locationId = searchParams.get("locationId");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const limit = parseInt(searchParams.get("limit") || "50");
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = actor.isPlatformAdmin ? {} : { location: { businessId: actor.businessId! } };
     if (locationId) where.locationId = locationId;
     if (startDate || endDate) {
       where.date = {};

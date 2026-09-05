@@ -101,8 +101,7 @@ export const authOptions: NextAuthOptions = {
           if (STAFF_ROLES.includes(existingUser.role)) {
             throw new Error("Staff members must use email and password to login");
           }
-          // Allow OAuth for existing CLIENT users
-          return true;
+          return existingUser.isActive;
         }
 
         // New user via OAuth - create as CLIENT
@@ -176,6 +175,18 @@ export const authOptions: NextAuthOptions = {
         token.isPlatformAdmin = user.isPlatformAdmin;
         token.isClient = user.isClient;
       }
+      const current = await prisma.user.findUnique({ where: { id: token.id }, include: { business: true, staff: true, client: true } });
+      if (!current?.isActive) throw new Error("Identity inactive");
+      token.role = current.role;
+      token.businessId = current.businessId;
+      token.businessName = current.business?.name || null;
+      token.staffId = current.staff?.id || null;
+      token.clientId = current.client?.id || null;
+      token.firstName = current.firstName;
+      token.lastName = current.lastName;
+      token.email = current.email;
+      token.isPlatformAdmin = current.role === "PLATFORM_ADMIN";
+      token.isClient = current.role === "CLIENT";
       return token;
     },
     async session({ session, token }) {

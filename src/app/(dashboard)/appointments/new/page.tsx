@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { bookingBody, bookingRequest } from "@/lib/appointments/booking-request";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ interface Client {
 
 interface Staff {
   id: string;
+  locationId: string;
   displayName: string | null;
   user: {
     firstName: string;
@@ -42,6 +44,7 @@ interface Service {
 
 export default function NewAppointmentPage() {
   const router = useRouter();
+  const attempt = useRef<{ body: string; key: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -92,32 +95,14 @@ export default function NewAppointmentPage() {
     setIsLoading(true);
 
     try {
-      const selectedService = services.find((s) => s.id === formData.serviceId);
-      const duration = selectedService?.duration || 60;
-
-      const scheduledStart = new Date(`${formData.date}T${formData.time}`);
-      const scheduledEnd = new Date(scheduledStart.getTime() + duration * 60000);
-
-      const response = await fetch("/api/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId: formData.clientId || null,
-          staffId: formData.staffId,
-          scheduledStart: scheduledStart.toISOString(),
-          scheduledEnd: scheduledEnd.toISOString(),
-          notes: formData.notes,
-          services: [
-            {
-              serviceId: formData.serviceId,
-              price: selectedService?.price || 0,
-              duration: duration,
-            },
-          ],
-        }),
-      });
+      const selectedStaff = staff.find((member) => member.id === formData.staffId);
+      const body = bookingBody(formData, selectedStaff?.locationId || "");
+      const request = bookingRequest(body, attempt.current);
+      attempt.current = request.attempt;
+      const response = await fetch("/api/appointments", request.init);
 
       if (response.ok) {
+        attempt.current = null;
         const appointment = await response.json();
         router.push(`/appointments/${appointment.id}`);
       } else {

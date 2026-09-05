@@ -1,49 +1,36 @@
-// QuickBooks Integration Library
-import OAuthClient from "intuit-oauth";
+// QuickBooks OAuth uses the standard token endpoint directly so URL parsing does
+// not depend on the deprecated query-string/decode-uri-component dependency chain.
+import { z } from "zod";
 
-// Initialize OAuth client
-const oauthClient = new OAuthClient({
-  clientId: process.env.QUICKBOOKS_CLIENT_ID || "",
-  clientSecret: process.env.QUICKBOOKS_CLIENT_SECRET || "",
-  environment: process.env.QUICKBOOKS_ENVIRONMENT === "production" ? "production" : "sandbox",
-  redirectUri: process.env.QUICKBOOKS_REDIRECT_URI || "",
-});
-
-// Get authorization URL
 export function getAuthUrl(): string {
-  return oauthClient.authorizeUri({
-    scope: [OAuthClient.scopes.Accounting, OAuthClient.scopes.Payment],
-    state: "beauty-wellness-state",
-  });
+  const url = new URL("https://appcenter.intuit.com/connect/oauth2");
+  url.search = new URLSearchParams({ client_id: process.env.QUICKBOOKS_CLIENT_ID || "",
+    redirect_uri: process.env.QUICKBOOKS_REDIRECT_URI || "", response_type: "code",
+    scope: "com.intuit.quickbooks.accounting com.intuit.quickbooks.payment",
+    state: "beauty-wellness-state" }).toString();
+  return url.toString();
 }
 
-// Exchange authorization code for tokens
+const tokenSchema = z.object({ access_token: z.string().min(1), refresh_token: z.string().min(1), expires_in: z.number().positive() });
+async function exchangeToken(parameters: Record<string, string>) {
+  const clientId = process.env.QUICKBOOKS_CLIENT_ID;
+  const clientSecret = process.env.QUICKBOOKS_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("QuickBooks OAuth is not configured");
+  const response = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
+    method: "POST", headers: { Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body: new URLSearchParams(parameters).toString(), signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`QuickBooks token exchange failed (${response.status})`);
+  const token = tokenSchema.parse(await response.json());
+  return { accessToken: token.access_token, refreshToken: token.refresh_token, expiresAt: new Date(Date.now() + token.expires_in * 1000) };
+}
 export async function getTokensFromCode(code: string, realmId: string) {
-  const authResponse = await oauthClient.createToken(
-    `${process.env.QUICKBOOKS_REDIRECT_URI}?code=${code}&realmId=${realmId}`
-  );
-
-  return {
-    accessToken: authResponse.token.access_token,
-    refreshToken: authResponse.token.refresh_token,
-    realmId,
-    expiresAt: new Date(Date.now() + authResponse.token.expires_in * 1000),
-  };
+  const tokens = await exchangeToken({ grant_type: "authorization_code", code, redirect_uri: process.env.QUICKBOOKS_REDIRECT_URI || "" });
+  return { ...tokens, realmId };
 }
-
-// Refresh access token
-export async function refreshToken(refreshToken: string) {
-  oauthClient.setToken({
-    refresh_token: refreshToken,
-  });
-
-  const authResponse = await oauthClient.refresh();
-
-  return {
-    accessToken: authResponse.token.access_token,
-    refreshToken: authResponse.token.refresh_token,
-    expiresAt: new Date(Date.now() + authResponse.token.expires_in * 1000),
-  };
+export async function refreshToken(refresh: string) {
+  return exchangeToken({ grant_type: "refresh_token", refresh_token: refresh });
 }
 
 // Make authenticated API call

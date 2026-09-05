@@ -703,6 +703,7 @@ model Appointment {
   updatedAt      DateTime @updatedAt
   version        Int      @default(0)
   idempotencyKey String?
+  requestHash    String?
 
   // Relations
   client                Client?               @relation(fields: [clientId], references: [id])

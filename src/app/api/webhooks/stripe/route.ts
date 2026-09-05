@@ -1,3 +1,4 @@
+import { syncBusinessSubscription } from "@/lib/business-billing";
 import { NextRequest, NextResponse } from "next/server";
 import { constructWebhookEvent } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
@@ -27,6 +28,20 @@ export async function POST(request: NextRequest) {
         { error: "Invalid signature" },
         { status: 400 }
       );
+    }
+
+    if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(event.type)) {
+      const subscription = event.data.object as Stripe.Subscription;
+      if (subscription.metadata?.type === "business_subscription") {
+        await syncBusinessSubscription(subscription.id);
+        return NextResponse.json({ received: true });
+      }
+    }
+    if (["invoice.paid", "invoice.payment_failed"].includes(event.type)) {
+      const invoice = event.data.object as Stripe.Invoice;
+      const ref = invoice.parent?.subscription_details?.subscription;
+      const id = typeof ref === "string" ? ref : ref?.id;
+      if (id && await syncBusinessSubscription(id)) return NextResponse.json({ received: true });
     }
 
     // Handle different event types

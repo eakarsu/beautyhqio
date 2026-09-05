@@ -107,8 +107,13 @@ export default function MySubscriptionPage() {
   };
 
   const handleUpgrade = async (plan: string) => {
-    // In real app, this would redirect to Stripe checkout
-    toast({ title: "Success", description: `Upgrade to ${plan} - Stripe checkout would open here` });
+    try {
+      const response = await fetch("/api/business/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Billing could not start");
+      if (result.url) window.location.assign(result.url);
+      else await fetchMySubscription();
+    } catch (error) { toast({ title: "Billing unavailable", description: error instanceof Error ? error.message : "Retry later", variant: "destructive" }); }
   };
 
   if (status === "loading" || loading) {
