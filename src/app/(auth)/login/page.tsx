@@ -91,18 +91,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([]);
+  const [demoEnabled, setDemoEnabled] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
-  const loadDemoAccounts = async () => {
-    const response = await fetch("/api/auth/demo-credentials", { cache: "no-store" });
+  const loadDemoAccounts = async (statusOnly = false) => {
+    const response = await fetch("/api/auth/demo-credentials" + (statusOnly ? '?status=1' : ''), { cache: "no-store" });
     const credentials = await response.json();
     if (!response.ok) throw new Error(credentials.error || "Demo credentials are unavailable");
     const accounts = Array.isArray(credentials.accounts) ? credentials.accounts as DemoAccount[] : [];
+    setDemoEnabled(credentials.enabled === true);
     setDemoAccounts(accounts);
     return { accounts, email: credentials.email || "", password: credentials.password || "" };
   };
 
   useEffect(() => {
-    void loadDemoAccounts().catch(() => {
+    void loadDemoAccounts(true).catch(() => {
       // Demo sign-in is optional outside the local start.sh runtime.
     });
   }, []);
@@ -145,15 +148,17 @@ export default function LoginPage() {
 
   const fillDemoCredentials = async (accountKey: DemoAccount["key"] = "owner") => {
     setError("");
+    setDemoLoading(true);
     try {
-      const loaded = demoAccounts.length > 0
-        ? { accounts: demoAccounts, email: "", password: "" }
-        : await loadDemoAccounts();
+      const loaded = await loadDemoAccounts();
       const account = loaded.accounts.find(({ key }) => key === accountKey);
+      if (!account?.password && !loaded.password) throw new Error('Local autofill is unavailable.');
       setEmail(account?.email || loaded.email);
       setPassword(account?.password || loaded.password);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Demo credentials are unavailable");
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -280,9 +285,9 @@ export default function LoginPage() {
               />
             </div>
 
-            <Button type="button" variant="outline" className="w-full" onClick={() => fillDemoCredentials()}>
-              Auto Fill Demo Credentials
-            </Button>
+            {demoEnabled && <Button type="button" variant="outline" className="w-full" onClick={() => fillDemoCredentials()} disabled={demoLoading || loading} aria-label="Auto Fill Demo Credentials">
+              {demoLoading ? 'Filling credentials…' : 'Auto Fill Demo Credentials'}
+            </Button>}
 
             <Button type="submit" className="w-full bg-rose-600 hover:bg-rose-700" disabled={loading || socialLoading !== null}>
               {loading ? "Signing in..." : "Sign In"}
@@ -316,6 +321,7 @@ export default function LoginPage() {
                     <button
                       key={account.key}
                       type="button"
+                      disabled={demoLoading || loading}
                       className={`block w-full p-2 rounded cursor-pointer transition-colors text-left ${details.classes}`}
                       onClick={() => fillDemoCredentials(account.key)}
                     >

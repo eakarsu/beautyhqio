@@ -20,6 +20,7 @@ configuration() {
 }
 migrate() { (cd "$project_dir" && npx --no-install prisma migrate deploy); }
 start_services() {
+  node "$project_dir/scripts/clear-project-ports.cjs" "$API_PORT" "$UI_PORT"
   if [[ "${ALLOW_SCHEMA_MIGRATION:-}" == 1 || "${ALLOW_SCHEMA_MIGRATION:-}" == true ]]; then migrate; else (cd "$project_dir" && npx --no-install prisma migrate status); fi
   npm --prefix "$project_dir" run db:generate
   npm --prefix "$project_dir" run create-admin

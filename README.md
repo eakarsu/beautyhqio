@@ -89,3 +89,7 @@ Open **Cash drawer** with an owner, manager or receptionist business account. Es
 Later sessions carry forward the last approved physical count. New verified cash activity after submission is allocated to the next session, including activity between sessions. Each cash payment/refund is counted once. Closed history is immutable; approved closeouts can be exported as CSV. The workflow supports one shared USD drawer per location and does not command physical drawer hardware or initiate bank movements. More than 10,000 unallocated payments or refunds requires historical reconciliation before opening/counting; close out regularly.
 
 `node scripts/test-operations.cjs` runs all isolated PostgreSQL suites, including cash closeout. The browser acceptance checkpoint used disposable fixture data and no provider actions.
+
+Local restart behavior: `./start.sh` clears this project’s configured ports before migrations or builds. It stops the prior project server tree, waits for release and verifies the ports are free. If another application owns a configured port, startup stops with an explanation instead of terminating that application. Run `npm run test:startup` to verify both cases.
+
+Local autofill is enabled by `ENABLE_DEMO_CREDENTIAL_AUTOFILL=true` in the ignored `.env`, with the existing administrator credentials configured there. The login button checks availability without retrieving passwords, then fills the configured account when clicked. Availability and credential responses are never cached.

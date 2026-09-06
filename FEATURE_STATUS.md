@@ -115,3 +115,7 @@ Applied additive migration `20260906050000_cash_closeout` after private backup `
 After the closeout migration and restart, fresh owner login, nine authenticated API reads and six business pages passed the local browser smoke, including Cash drawer, POS and subscription. Anonymous drawer/sales/billing/connection requests remained protected; no real business writes or provider calls were performed.
 
 A fresh full restore rehearsal after the latest schema changes passed: 98 public tables, 227 constraints, zero invalid indexes, and successful reads of every restored table. Temporary restore databases were removed; private verified archives remain under this project's backup directory.
+
+### September 6 — local startup and autofill follow-up
+
+`start.sh` releases existing listeners owned by this project before migrations or builds, including the prior server process tree. It validates all port owners first and preserves unrelated applications. `npm run test:startup` passed for this project; a real repeated HomeServices startup also released both occupied ports and restarted successfully. Local autofill and authenticated browser login were verified across all five apps without changing account passwords. Local `.env` opt-ins and credentials remain untracked.
