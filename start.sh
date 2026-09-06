@@ -28,7 +28,7 @@ start_services() {
     npm --prefix "$project_dir" run provision-demo-users
     npm --prefix "$project_dir" run demo-data:load
   fi
-  if [[ "${BUILD_ON_START:-true}" == true ]]; then npm --prefix "$project_dir" run build; fi
+  if [[ "${BUILD_ON_START:-true}" == true ]]; then NODE_ENV=production npm --prefix "$project_dir" run build; fi
   cleanup() {
     trap - INT TERM EXIT
     [[ -z "${proxy_pid:-}" ]] || kill "$proxy_pid" 2>/dev/null || true

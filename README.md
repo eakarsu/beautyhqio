@@ -72,7 +72,7 @@ Owners select plans in **My Subscription**. Paid selections open actual Stripe C
 
 The platform billing account uses `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`; this is separate from a salon's POS provider connection. Configure `/api/webhooks/stripe` for subscription, invoice and checkout events. Run provider test-account acceptance before enabling real customers. See `FEATURE_STATUS.md` for current scope and unfinished POS/payment work.
 
-Startup preserves existing administrators and demo role accounts. AI is optional. Demo seeding runs only when `LOAD_DEMO_DATA=true`; login autofill defaults off. Startup builds current code unless `BUILD_ON_START=false` is explicitly set for an already-built checkout.
+Startup preserves existing administrators and demo role accounts. AI is optional. Demo seeding runs only when `LOAD_DEMO_DATA=true`; login autofill defaults off. Startup builds current code unless `BUILD_ON_START=false` is explicitly set for an already-built checkout. The startup build explicitly uses `NODE_ENV=production`, including when the local `.env` selects development mode.
 
 POS workflow: open `/pos`, have an owner/manager review the actual sales-tax settings, save a sale, review its saved prices and tax, then record received cash/gift-card tenders or use salon Stripe checkout. Partial cash/gift payments are supported. Refunds require manager authority and original verified receipts; cash refunds require confirmation of the actual return. Void an unpaid draft to release its tracked stock. A completed appointment's checkout link imports services at current catalog prices for review; automatic add-on import is unavailable.
 
