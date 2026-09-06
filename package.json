@@ -28,7 +28,11 @@
     "typecheck": "tsc --noEmit",
     "audit:prod": "npm audit --audit-level=low",
     "seed:governed": "tsx scripts/seed-governed-e2e.ts",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "demo-data:load": "node scripts/load-demo-data.cjs",
+    "demo-data:verify": "node scripts/load-demo-data.cjs --verify",
+    "test:booking-migration": "node scripts/check-booking-migration.cjs",
+    "test:restore": "node scripts/verify-restore.cjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

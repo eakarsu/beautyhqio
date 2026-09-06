@@ -1,5 +1,6 @@
 "use client";
 
+import { AppointmentActions } from "@/components/operations/appointment-actions";
 import { useState, useEffect } from "react";
 import { DetailSheet, DetailField } from "@/components/ui/detail-sheet";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -28,6 +29,8 @@ import {
 import { format, startOfDay, endOfDay, addDays, subDays } from "date-fns";
 
 interface Appointment {
+  version: number;
+  isRecurring?: boolean;
   id: string;
   status: string;
   scheduledStart: string;
@@ -103,13 +106,13 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     fetchAppointments();
-  }, [selectedDate, statusFilter]);
+  }, [selectedDate, statusFilter, activeTab]);
 
   const fetchAppointments = async () => {
     setIsLoading(true);
     try {
       const start = startOfDay(selectedDate).toISOString();
-      const end = endOfDay(selectedDate).toISOString();
+      const end = endOfDay(activeTab === "week" ? addDays(selectedDate, 6) : selectedDate).toISOString();
       const params = new URLSearchParams({
         startDate: start,
         endDate: end,
@@ -117,12 +120,12 @@ export default function AppointmentsPage() {
       });
 
       const response = await fetch(`/api/appointments?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAppointments(data);
-      }
+      if (!response.ok) throw new Error(`Failed to load appointments (HTTP ${response.status})`);
+      const data = await response.json();
+      setAppointments(data);
     } catch (error) {
       console.error("Error fetching appointments:", error);
+      toast({ title: "Appointments unavailable", description: "Could not load appointments. Please retry.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -361,6 +364,7 @@ export default function AppointmentsPage() {
       >
         {selectedAppointment && (
           <div className="space-y-1">
+            <AppointmentActions appointment={selectedAppointment} role={session?.user?.role || ""} onChanged={() => { setSelectedAppointment(null); void fetchAppointments(); }} />
             <DetailField label="Client" value={getClientName(selectedAppointment)} />
             <DetailField
               label="Service(s)"
@@ -406,9 +410,9 @@ export default function AppointmentsPage() {
       {deleteId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-2">Delete Appointment</h3>
+            <h3 className="text-lg font-semibold mb-2">Cancel Appointment</h3>
             <p className="text-slate-600 mb-4">
-              Are you sure you want to delete this appointment? This action cannot be undone.
+              Cancel this appointment? Its history and payment records will be retained.
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setDeleteId(null)} disabled={isDeleting}>
@@ -419,7 +423,7 @@ export default function AppointmentsPage() {
                 onClick={() => handleDelete(deleteId)}
                 disabled={isDeleting}
               >
-                {isDeleting ? "Deleting..." : "Delete"}
+                {isDeleting ? "Cancelling..." : "Cancel appointment"}
               </Button>
             </div>
           </div>

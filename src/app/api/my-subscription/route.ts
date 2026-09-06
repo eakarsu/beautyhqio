@@ -1,3 +1,4 @@
+import {effectiveSubscription} from "@/lib/business-billing";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -23,12 +24,12 @@ export async function GET() {
       include: { business: true },
     });
 
-    if (!user?.businessId || !user.business) {
+    if (!user?.isActive || !user.businessId || !user.business || !["OWNER","MANAGER"].includes(user.role)) {
       return NextResponse.json({ error: "No business found" }, { status: 404 });
     }
 
     // Get subscription for this specific business
-    const subscription = await prisma.businessSubscription.findUnique({
+    let subscription = await prisma.businessSubscription.findUnique({
       where: { businessId: user.businessId },
     });
 
@@ -48,6 +49,7 @@ export async function GET() {
       });
     }
 
+    subscription=effectiveSubscription(subscription);
     return NextResponse.json({
       subscription: {
         id: subscription.id,

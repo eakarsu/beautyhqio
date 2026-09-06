@@ -1,61 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-
-// GET /api/loyalty/rewards - List rewards
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const programId = searchParams.get("programId");
-
-    const where: any = { isActive: true };
-    if (programId) where.programId = programId;
-
-    const rewards = await prisma.loyaltyReward.findMany({
-      where,
-      orderBy: { pointsCost: "asc" },
-    });
-
-    return NextResponse.json(rewards);
-  } catch (error) {
-    console.error("Error fetching rewards:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch rewards" },
-      { status: 500 }
-    );
-  }
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { context, endpoint, fail, idSchema } from '@/lib/operations/core';
+export async function GET() {
+  return endpoint(async () => {
+    const ctx = await context(['OWNER', 'MANAGER', 'RECEPTIONIST', 'CLIENT']);
+    return prisma.loyaltyReward.findMany({ where: { isActive: true, program: { businessId: ctx.businessId, isActive: true } }, orderBy: { pointsCost: 'asc' }, take: 200 });
+  });
 }
-
-// POST /api/loyalty/rewards - Create reward
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { programId, name, description, pointsCost, type, value } = body;
-
-    if (!programId || !name || !pointsCost) {
-      return NextResponse.json(
-        { error: "Program ID, name, and points cost are required" },
-        { status: 400 }
-      );
-    }
-
-    const reward = await prisma.loyaltyReward.create({
-      data: {
-        programId,
-        name,
-        description: description || null,
-        pointsCost: parseInt(String(pointsCost)),
-        type: type || "CUSTOM",
-        value: value !== null && value !== undefined ? value : 0,
-        isActive: true,
-      },
-    });
-
-    return NextResponse.json(reward, { status: 201 });
-  } catch (error) {
-    console.error("Error creating reward:", error);
-    return NextResponse.json(
-      { error: "Failed to create reward" },
-      { status: 500 }
-    );
-  }
+export async function POST(req: Request) {
+  return endpoint(async () => {
+    const ctx = await context(['OWNER', 'MANAGER']);
+    const input = z.object({ programId: idSchema, name: z.string().trim().min(1).max(150), description: z.string().max(1000).optional().nullable(), pointsCost: z.coerce.number().int().positive().max(1000000), type: z.string().max(40).default('CUSTOM'), value: z.coerce.number().nonnegative().max(100000).default(0) }).parse(await req.json());
+    if (!await prisma.loyaltyProgram.findFirst({ where: { id: input.programId, businessId: ctx.businessId } })) return fail(404, 'Program not found');
+    return prisma.loyaltyReward.create({ data: input });
+  });
 }

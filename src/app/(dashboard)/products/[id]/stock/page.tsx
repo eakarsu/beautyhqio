@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,7 @@ export default function AdjustStockPage() {
     }
   };
 
+  const stockAttempt = useRef<{ body: string; key: string } | null>(null);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return;
@@ -66,12 +67,12 @@ export default function AdjustStockPage() {
       : Math.max(0, product.quantityOnHand - formData.quantity);
 
     try {
-      const response = await fetch(`/api/products/${params.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quantityOnHand: newQuantity,
-        }),
+      const body = JSON.stringify({ adjustment: formData.adjustmentType === 'add' ? formData.quantity : -formData.quantity, reason: formData.reason });
+      if (stockAttempt.current?.body !== body) stockAttempt.current = { body, key: crypto.randomUUID() };
+      const response = await fetch(`/api/products/${params.id}/adjust-stock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": stockAttempt.current.key },
+        body,
       });
 
       if (response.ok) {

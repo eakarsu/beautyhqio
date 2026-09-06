@@ -11,6 +11,8 @@ import {
   type AppointmentStatus,
 } from "./domain";
 
+import { assertAvailable } from "./availability";
+
 const MANAGER_ROLES = new Set(["OWNER", "MANAGER", "RECEPTIONIST"]);
 
 async function assertBusinessAccess(user: AuthenticatedUser, businessId: string) {
@@ -24,6 +26,7 @@ export async function createAppointment(
   user: AuthenticatedUser,
   raw: unknown,
   rawIdempotencyKey: string | null,
+  transaction?: Prisma.TransactionClient,
 ) {
   const parsed = createAppointmentSchema.safeParse(raw);
   if (!parsed.success) {
@@ -31,7 +34,7 @@ export async function createAppointment(
   }
   const input = parsed.data;
   const idempotencyKey = parseIdempotencyKey(rawIdempotencyKey);
-  const location = await db.location.findUnique({ where: { id: input.locationId } });
+  const location = await (transaction || db).location.findUnique({ where: { id: input.locationId } });
   if (!location || !location.isActive) throw new AppointmentDomainError("LOCATION_NOT_FOUND", 404, "active location not found");
   await assertBusinessAccess(user, location.businessId);
 
@@ -43,7 +46,7 @@ export async function createAppointment(
   }
 
   const requestHash = createHash("sha256").update(JSON.stringify({ ...input, clientId: input.clientId || user.clientId || null })).digest("hex");
-  return db.$transaction(async (tx) => {
+  const work = async (tx: Prisma.TransactionClient) => {
     // Serialize governed creates in a tenant, including retries with the same key.
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${location.businessId}, 0))::text`;
     const existing = await tx.appointment.findUnique({
@@ -64,7 +67,7 @@ export async function createAppointment(
       tx.service.findMany({ where: { id: { in: requestedServiceIds }, businessId: location.businessId, isActive: true } }),
       (input.clientId || user.clientId) ? tx.client.findUnique({ where: { id: (input.clientId || user.clientId)! } }) : Promise.resolve(null),
     ]);
-    if (!staff || staff.location.businessId !== location.businessId || !staff.isActive) {
+    if (!staff || staff.location.businessId !== location.businessId || staff.locationId !== location.id || !staff.isActive) {
       throw new AppointmentDomainError("STAFF_NOT_FOUND", 404, "active staff member not found in this business");
     }
     if (services.length !== new Set(requestedServiceIds).size) {
@@ -74,22 +77,18 @@ export async function createAppointment(
     if (client && client.businessId !== location.businessId) {
       throw new AppointmentDomainError("CLIENT_MISMATCH", 403, "client belongs to another business");
     }
-    const totalDuration = services.reduce((sum, service) => sum + service.duration, 0);
-    const scheduledEnd = input.scheduledEnd || new Date(input.scheduledStart.getTime() + totalDuration * 60_000);
-    if (scheduledEnd <= input.scheduledStart) throw new AppointmentDomainError("INVALID_TIME", 422, "appointment end must follow its start");
-
-    const conflict = await tx.appointment.findFirst({
-      where: {
-        staffId: input.staffId,
-        status: { notIn: ["CANCELLED", "NO_SHOW", "RESCHEDULED"] },
-        scheduledStart: { lt: scheduledEnd },
-        scheduledEnd: { gt: input.scheduledStart },
-      },
-      select: { id: true },
-    });
-    if (conflict) throw new AppointmentDomainError("STAFF_CONFLICT", 409, "staff member already has an overlapping appointment");
-
+    if (user.role === "CLIENT" && (input.scheduledEnd || input.services?.some(line => line.price !== undefined || line.duration !== undefined))) {
+      throw new AppointmentDomainError("PRICE_OVERRIDE_FORBIDDEN", 403, "Clients cannot override service prices or durations");
+    }
+    if (user.role === "CLIENT" && (!location.allowOnlineBooking || services.some(service => !service.allowOnline))) throw new AppointmentDomainError("ONLINE_BOOKING_DISABLED", 409, "One or more services cannot be booked online");
+    if (user.role === "CLIENT" && (input.scheduledStart <= new Date() || input.scheduledStart.getTime() > Date.now() + location.advanceBookingDays * 86400000)) throw new AppointmentDomainError("BOOKING_WINDOW", 422, "Choose a future time within the booking window");
+    if (staff.serviceIds.length && requestedServiceIds.some(id => !staff.serviceIds.includes(id))) throw new AppointmentDomainError("STAFF_SERVICE_MISMATCH", 422, "Staff member does not provide all selected services");
     const lineByService = new Map((input.services || []).map((line) => [line.serviceId, line]));
+    const totalDuration = services.reduce((sum, service) => sum + (lineByService.get(service.id)?.duration ?? service.duration), 0);
+    const scheduledEnd = input.scheduledEnd || new Date(input.scheduledStart.getTime() + totalDuration * 60_000);
+    if (scheduledEnd.getTime() - input.scheduledStart.getTime() < totalDuration * 60000) throw new AppointmentDomainError("INVALID_TIME", 422, "Appointment must include the full duration of its services");
+    await assertAvailable(tx, { businessId: location.businessId, locationId: location.id, staffId: staff.id, start: input.scheduledStart, end: scheduledEnd, buffer: Math.max(0, ...services.map(s => (s.bufferTime || 0))) });
+
     const appointment = await tx.appointment.create({
       data: {
         businessId: location.businessId,
@@ -118,14 +117,15 @@ export async function createAppointment(
     await tx.auditLog.create({ data: { userId: user.id, businessId: location.businessId, action: "APPOINTMENT_CREATED", entityType: "Appointment", entityId: appointment.id, changes: { status: "BOOKED", scheduledStart: appointment.scheduledStart.toISOString(), scheduledEnd: appointment.scheduledEnd.toISOString() } } });
     const deliveries = [
       ["CALENDAR_CREATE", "calendar"],
-      ...(client?.email ? [["CONFIRMATION_EMAIL", "email"]] : []),
+      ...(client?.email && client.allowEmail !== false ? [["CONFIRMATION_EMAIL", "email"]] : []),
       ...(client?.phone && client.allowSms !== false ? [["CONFIRMATION_SMS", "twilio"]] : []),
     ];
     await tx.integrationDelivery.createMany({
       data: deliveries.map(([kind, provider]) => ({ businessId: location.businessId, appointmentId: appointment.id, kind, provider, dedupeKey: `${appointment.id}:${kind}`, payload: { appointmentId: appointment.id } })),
     });
     return { appointment, replayed: false };
-  });
+  };
+  return transaction ? work(transaction) : db.$transaction(work);
 }
 
 export async function transitionAppointment(
@@ -141,7 +141,8 @@ export async function transitionAppointment(
   const businessId = current.businessId || current.location.businessId;
   await assertBusinessAccess(user, businessId);
   if (user.role === "CLIENT") {
-    if (!user.clientId || current.clientId !== user.clientId || target !== "CANCELLED") throw new AppointmentDomainError("ROLE_FORBIDDEN", 403, "client cannot perform this transition");
+    if (target === "CHECKED_IN" && Math.abs(current.scheduledStart.getTime() - Date.now()) > 2 * 3600000) throw new AppointmentDomainError("CHECK_IN_WINDOW", 409, "Self check-in is available within two hours of the appointment");
+    if (!user.clientId || current.clientId !== user.clientId || !["CANCELLED", "CHECKED_IN"].includes(target)) throw new AppointmentDomainError("ROLE_FORBIDDEN", 403, "client cannot perform this transition");
   } else if (user.role === "STAFF" && (current.staffId !== user.staffId || !["CHECKED_IN", "IN_SERVICE", "COMPLETED"].includes(target))) {
     throw new AppointmentDomainError("ROLE_FORBIDDEN", 403, "staff member cannot perform this transition");
   } else if (!user.isPlatformAdmin && !MANAGER_ROLES.has(user.role) && user.role !== "STAFF") {
@@ -158,6 +159,8 @@ export async function transitionAppointment(
         status: target,
         version: { increment: 1 },
         checkedInAt: target === "CHECKED_IN" ? now : undefined,
+        isConfirmed: target === "CONFIRMED" ? true : undefined,
+        confirmedAt: target === "CONFIRMED" ? now : undefined,
         actualStart: target === "IN_SERVICE" ? now : undefined,
         actualEnd: target === "COMPLETED" ? now : undefined,
         checkedOutAt: target === "COMPLETED" ? now : undefined,
@@ -165,6 +168,7 @@ export async function transitionAppointment(
       },
     });
     if (updated.count !== 1) throw new AppointmentDomainError("STALE_WRITE", 409, "appointment changed; refresh and retry");
+    if (["CANCELLED", "NO_SHOW", "RESCHEDULED"].includes(target)) await tx.roomReservation.deleteMany({ where: { appointmentId: id } });
     await tx.auditLog.create({ data: { userId: user.id, businessId, action: `APPOINTMENT_${target}`, entityType: "Appointment", entityId: id, changes: { from, to: target, reason: reason?.trim() } } });
     if (["CANCELLED", "COMPLETED", "NO_SHOW"].includes(target) && current.clientId) {
       const activityType = target === "CANCELLED" ? "APPOINTMENT_CANCELLED" : target === "COMPLETED" ? "APPOINTMENT_COMPLETED" : "APPOINTMENT_NO_SHOW";

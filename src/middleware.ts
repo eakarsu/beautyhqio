@@ -54,13 +54,9 @@ export async function middleware(request: NextRequest) {
   const origin = request.headers.get("origin");
 
   const legacyAppointmentWrites = [
-    "/api/booking",
-    "/api/marketplace/book",
-    "/api/appointments/recurring",
     "/api/voice/confirm-booking",
     "/api/voice/reschedule",
     "/api/voice/appointment-action",
-    "/api/kiosk/check-in",
   ];
   if (
     process.env.NODE_ENV === "production" &&
@@ -85,7 +81,7 @@ export async function middleware(request: NextRequest) {
     return res;
   }
 
-  const isAiRoute = pathname.startsWith("/api/ai/") || pathname === "/api/recovery-coach";
+  const isAiRoute = (pathname.startsWith("/api/ai/") && !["/api/ai/consent", "/api/ai/audit-log"].includes(pathname)) || pathname === "/api/recovery-coach";
   if (isAiRoute) {
     if (process.env.ENABLE_AI_FEATURES !== "true" || !process.env.OPENROUTER_API_KEY) {
       const unavailable = NextResponse.json({ error: "AI_FEATURES_DISABLED", message: "AI routes require an explicitly enabled, evaluated provider configuration." }, { status: 503 });
@@ -93,7 +89,7 @@ export async function middleware(request: NextRequest) {
       applySecurityHeaders(unavailable);
       return unavailable;
     }
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET,cookieName:process.env.AUTH_COOKIE_SECURE==="true"?"__Secure-beautyhqio.session-token":"beautyhqio.session-token" });
     if (!token) {
       const unauthorized = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       applyCors(unauthorized, origin);

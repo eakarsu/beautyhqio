@@ -23,10 +23,14 @@
         "NSCameraUsageDescription": "BeautyHQ needs camera access to take photos of clients and hairstyles.",
         "NSPhotoLibraryUsageDescription": "BeautyHQ needs photo library access to save and upload images.",
         "NSFaceIDUsageDescription": "BeautyHQ uses Face ID for secure authentication.",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "NSHealthShareUsageDescription": "BeautyHQ can import your step samples for your optional personal wellness history after you choose to share them."
       },
       "entitlements": {
-        "aps-environment": "production"
+        "aps-environment": "production",
+        "com.apple.developer.healthkit": true
       },
       "config": {
         "usesNonExemptEncryption": false

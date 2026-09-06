@@ -68,6 +68,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     // Redirect based on user role
@@ -90,13 +91,17 @@ export default function DashboardPage() {
   }, [session, status, router]);
 
   const fetchDashboardData = async () => {
+    setIsLoading(true);
+    setLoadError(false);
     try {
       const response = await fetch("/api/dashboard");
+      if (!response.ok) throw new Error("Dashboard unavailable");
       if (response.ok) {
         const data = await response.json();
         setDashboardData(data);
       }
     } catch (error) {
+      setLoadError(true);
       console.error("Error fetching dashboard data:", error);
     } finally {
       setIsLoading(false);
@@ -172,6 +177,14 @@ export default function DashboardPage() {
         </div>
       </div>
     );
+  }
+
+  if (loadError || !dashboardData) {
+    return <div role="alert" className="space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">Dashboard data could not be loaded</h1>
+      <p>Your totals are unavailable. Retry to load the latest figures.</p>
+      <button className="rounded bg-pink-600 px-4 py-2 text-white" onClick={() => void fetchDashboardData()}>Retry dashboard</button>
+    </div>;
   }
 
   const stats = dashboardData?.stats || {

@@ -13,16 +13,22 @@ export UI_PORT="${UI_PORT:-${FRONTEND_PORT:-}}"
 
 required() { [[ -n "${!1:-}" ]] || { echo "$1 is required" >&2; exit 1; }; }
 configuration() {
-  for key in DATABASE_URL NEXTAUTH_SECRET NEXTAUTH_URL API_PORT UI_PORT OPENROUTER_API_KEY OPENROUTER_MODEL OPENROUTER_BASE_URL ADMIN_EMAIL ADMIN_PASSWORD; do required "$key"; done
+  for key in DATABASE_URL NEXTAUTH_SECRET NEXTAUTH_URL API_PORT UI_PORT ADMIN_EMAIL ADMIN_PASSWORD; do required "$key"; done
   [[ ${#NEXTAUTH_SECRET} -ge 32 ]] || { echo 'NEXTAUTH_SECRET must contain at least 32 characters' >&2; exit 1; }
   [[ "$API_PORT" != "$UI_PORT" ]] || { echo 'API_PORT and UI_PORT must differ' >&2; exit 1; }
-  [[ "${ALLOW_SCHEMA_MIGRATION:-}" == 1 || "${ALLOW_SCHEMA_MIGRATION:-}" == true ]] || { echo 'ALLOW_SCHEMA_MIGRATION=true is required' >&2; exit 1; }
+
 }
 migrate() { (cd "$project_dir" && npx --no-install prisma migrate deploy); }
 start_services() {
-  migrate
-  npm --prefix "$project_dir" run db:seed
-  npm --prefix "$project_dir" run provision-demo-users
+  if [[ "${ALLOW_SCHEMA_MIGRATION:-}" == 1 || "${ALLOW_SCHEMA_MIGRATION:-}" == true ]]; then migrate; else (cd "$project_dir" && npx --no-install prisma migrate status); fi
+  npm --prefix "$project_dir" run db:generate
+  npm --prefix "$project_dir" run create-admin
+  if [[ "${LOAD_DEMO_DATA:-false}" == true ]]; then
+    npm --prefix "$project_dir" run db:seed
+    npm --prefix "$project_dir" run provision-demo-users
+    npm --prefix "$project_dir" run demo-data:load
+  fi
+  if [[ "${BUILD_ON_START:-true}" == true ]]; then npm --prefix "$project_dir" run build; fi
   cleanup() {
     trap - INT TERM EXIT
     [[ -z "${proxy_pid:-}" ]] || kill "$proxy_pid" 2>/dev/null || true
@@ -31,7 +37,7 @@ start_services() {
     [[ -z "${app_pid:-}" ]] || wait "$app_pid" 2>/dev/null || true
   }
   trap cleanup INT TERM EXIT
-  (cd "$project_dir" && NODE_ENV=production ENABLE_DEMO_CREDENTIAL_AUTOFILL=true NEXTAUTH_URL="http://127.0.0.1:$UI_PORT" AUTH_COOKIE_SECURE=false ./node_modules/.bin/next start -H 127.0.0.1 -p "$API_PORT") &
+  (cd "$project_dir" && NODE_ENV=production ENABLE_DEMO_CREDENTIAL_AUTOFILL="${ENABLE_DEMO_CREDENTIAL_AUTOFILL:-false}" NEXTAUTH_URL="http://127.0.0.1:$UI_PORT" AUTH_COOKIE_SECURE=false ./node_modules/.bin/next start -H 127.0.0.1 -p "$API_PORT") &
   app_pid=$!
   API_PORT="$API_PORT" UI_PORT="$UI_PORT" node "$project_dir/scripts/runtime-proxy.mjs" &
   proxy_pid=$!

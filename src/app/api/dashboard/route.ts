@@ -17,6 +17,10 @@ export async function GET() {
       return NextResponse.json({ error: "Use /api/client/dashboard for client dashboard" }, { status: 400 });
     }
 
+    if (!user.isPlatformAdmin && (!user.businessId || !["OWNER", "MANAGER", "RECEPTIONIST"].includes(user.role))) {
+      return NextResponse.json({ error: "Business dashboard access required" }, { status: 403 });
+    }
+
     // Get locations for the user's business (for filtering)
     let locationIds: string[] = [];
     if (!user.isPlatformAdmin && user.businessId) {
@@ -28,7 +32,7 @@ export async function GET() {
     }
 
     // Build filter based on user role
-    const locationFilter = !user.isPlatformAdmin && locationIds.length > 0
+    const locationFilter = !user.isPlatformAdmin
       ? { locationId: { in: locationIds } }
       : {};
 
@@ -164,7 +168,7 @@ export async function GET() {
         },
       },
     };
-    if (!user.isPlatformAdmin && locationIds.length > 0) {
+    if (!user.isPlatformAdmin) {
       staffOnDutyWhere.locationId = { in: locationIds };
     }
     const staffOnDuty = await prisma.staff.findMany({

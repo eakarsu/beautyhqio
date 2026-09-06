@@ -1,0 +1,4 @@
+CREATE TABLE "BusinessBillingAttempt" (id TEXT PRIMARY KEY, "businessId" TEXT NOT NULL REFERENCES "Business"(id), "requestKey" TEXT NOT NULL, plan "SubscriptionPlan" NOT NULL, "createdById" TEXT NOT NULL REFERENCES "User"(id), status TEXT NOT NULL DEFAULT 'PENDING', "providerSessionId" TEXT, "providerSubscriptionId" TEXT, "lastError" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE UNIQUE INDEX "BusinessBillingAttempt_businessId_requestKey_key" ON "BusinessBillingAttempt"("businessId","requestKey");
+CREATE UNIQUE INDEX "BusinessBillingAttempt_providerSessionId_key" ON "BusinessBillingAttempt"("providerSessionId");
+CREATE INDEX "BusinessBillingAttempt_businessId_status_createdAt_idx" ON "BusinessBillingAttempt"("businessId",status,"createdAt");

@@ -1,1137 +1,911 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import { toast } from "@/hooks/use-toast";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Search,
-  Plus,
-  Minus,
-  Trash2,
-  CreditCard,
-  Banknote,
-  Gift,
-  Percent,
-  User,
-  X,
-  Check,
-  Loader2,
-} from "lucide-react";
-import { formatCurrency, getInitials } from "@/lib/utils";
-
-interface Service {
-  id: string;
-  name: string;
-  price: number;
-  category: { name: string } | string;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  price: string | number;
-  retailPrice?: number;
-  category?: { name: string } | string;
-}
-
-interface Staff {
-  id: string;
-  displayName?: string;
-  color?: string;
-  user?: { firstName: string; lastName: string };
-}
-
-interface Client {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email?: string;
-  phone?: string;
-}
-
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  type: "service" | "product";
-  staffId?: string;
-}
-
-const STAFF_COLORS = ["#F43F5E", "#8B5CF6", "#EC4899", "#3B82F6", "#10B981", "#F59E0B", "#6366F1"];
-
-export default function POSPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [selectedStaff, setSelectedStaff] = useState<string>("");
-  const [tipAmount, setTipAmount] = useState<number>(0);
-  const [tipPercent, setTipPercent] = useState<string>("");
-  const [discount, setDiscount] = useState<number>(0);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"services" | "products">("services");
-
-  const [services, setServices] = useState<Service[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Modal states
-  const [showClientSelect, setShowClientSelect] = useState(false);
-  const [showDiscountModal, setShowDiscountModal] = useState(false);
-  const [showGiftCardModal, setShowGiftCardModal] = useState(false);
-  const [showCashModal, setShowCashModal] = useState(false);
-  const [showCardModal, setShowCardModal] = useState(false);
-  const [clientSearchQuery, setClientSearchQuery] = useState("");
-
-  // Discount state
-  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
-  const [discountValue, setDiscountValue] = useState("");
-
-  // Gift card state
-  const [giftCardCode, setGiftCardCode] = useState("");
-  const [giftCardBalance, setGiftCardBalance] = useState<number | null>(null);
-  const [giftCardAmount, setGiftCardAmount] = useState("");
-  const [giftCardError, setGiftCardError] = useState("");
-  const [giftCardApplied, setGiftCardApplied] = useState<number>(0);
-
-  // Cash payment state
-  const [cashReceived, setCashReceived] = useState("");
-
-  // Processing states
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-
-  // Client payment methods
-  const [clientPaymentMethods, setClientPaymentMethods] = useState<any[]>([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
-  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
-
-  // Appointment checkout
-  const [appointmentId, setAppointmentId] = useState<string | null>(null);
-  const [appointmentLoaded, setAppointmentLoaded] = useState(false);
-
-  // Load appointment from URL params
-  useEffect(() => {
-    const apptId = searchParams.get("appointmentId");
-    if (apptId && !appointmentLoaded) {
-      setAppointmentId(apptId);
-      loadAppointment(apptId);
-    }
-  }, [searchParams, appointmentLoaded]);
-
-  const loadAppointment = async (apptId: string) => {
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+type Row = { id: string; [key: string]: any };
+type Data = {
+  role: string;
+  business: Row;
+  locations: Row[];
+  staff: Row[];
+  clients: Row[];
+  products: Row[];
+  services: Row[];
+  sales: Row[];
+  checkouts: Row[];
+  refunds: Row[];
+};
+const usd = (v: unknown) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+    Number(v),
+  );
+const inputClass = "block w-full border rounded-md bg-white p-2";
+export default function Page() {
+  const [data, setData] = useState<Data | null>(null),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [busy, setBusy] = useState(false),
+    [location, setLocation] = useState(""),
+    [staff, setStaff] = useState(""),
+    [client, setClient] = useState(""),
+    [appointmentId, setAppointmentId] = useState(""),
+    [cart, setCart] = useState<
+      {
+        id: string;
+        type: "SERVICE" | "PRODUCT";
+        quantity: number;
+        unitPrice?: number;
+      }[]
+    >([]),
+    [pick, setPick] = useState(""),
+    [discount, setDiscount] = useState(0),
+    [reason, setReason] = useState(""),
+    [tip, setTip] = useState(0),
+    [tax, setTax] = useState(0),
+    [servicesTaxable, setServicesTaxable] = useState(false),
+    [taxReviewed, setTaxReviewed] = useState(false),
+    [selected, setSelected] = useState("");
+  const appointmentLoaded = useRef(false);
+  const retry = useRef<{ body: string; key: string } | null>(null);
+  async function load() {
     try {
-      const response = await fetch(`/api/appointments/${apptId}`);
-      if (response.ok) {
-        const appointment = await response.json();
-
-        // Set client
-        if (appointment.client) {
-          setSelectedClient({
-            id: appointment.client.id,
-            firstName: appointment.client.firstName,
-            lastName: appointment.client.lastName,
-            email: appointment.client.email,
-            phone: appointment.client.phone,
-          });
+      const r = await fetch("/api/operations/sales"),
+        j = await r.json();
+      if (!r.ok) throw Error(j.error);
+      setData(j);
+      setTax(Number(j.business.taxRate) * 100);
+      setServicesTaxable(j.business.servicesTaxable);
+      setLocation((v) => v || j.locations[0]?.id || "");
+      setStaff((v) => v || j.staff[0]?.id || "");
+      const linked = new URLSearchParams(window.location.search).get("appointmentId");
+      if (linked && !appointmentLoaded.current) {
+        const response = await fetch(`/api/appointments/${encodeURIComponent(linked)}`), appointment = await response.json();
+        if (!response.ok) throw Error(appointment.error || "Appointment unavailable");
+        if (appointment.transaction) { setSelected(appointment.transaction.id); appointmentLoaded.current = true; }
+        else {
+          if (appointment.status !== "COMPLETED") throw Error("Complete the appointment before creating its sale.");
+          if (appointment.services.some((line:Row) => line.addOns?.length)) throw Error("This appointment includes add-ons. A manager must price and review them in a separate sale; automatic import is unavailable.");
+          setAppointmentId(appointment.id); setClient(appointment.clientId); setStaff(appointment.staffId); setLocation(appointment.locationId);
+          setCart(appointment.services.map((line:Row)=>({id:line.serviceId,type:"SERVICE",quantity:1})));
+          setNotice("Appointment services loaded at current catalog prices. Review any agreed price changes before payment.");
+          appointmentLoaded.current = true;
         }
-
-        // Set staff
-        if (appointment.staff?.id) {
-          setSelectedStaff(appointment.staff.id);
-        }
-
-        // Add services to cart
-        const cartItems: CartItem[] = appointment.services.map((svc: { id: string; service: { name: string }; price: number; }) => ({
-          id: svc.id,
-          name: svc.service.name,
-          price: Number(svc.price),
-          quantity: 1,
-          type: "service" as const,
-          staffId: appointment.staff?.id,
-        }));
-        setCart(cartItems);
-        setAppointmentLoaded(true);
       }
-    } catch (error) {
-      console.error("Error loading appointment:", error);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to load POS");
     }
-  };
-
+  }
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [servicesRes, productsRes, staffRes, clientsRes] = await Promise.all([
-          fetch("/api/services"),
-          fetch("/api/products"),
-          fetch("/api/staff"),
-          fetch("/api/clients"),
-        ]);
-
-        if (servicesRes.ok) {
-          const servicesData = await servicesRes.json();
-          setServices(servicesData);
-        }
-        if (productsRes.ok) {
-          const productsData = await productsRes.json();
-          setProducts(productsData);
-        }
-        if (staffRes.ok) {
-          const staffData = await staffRes.json();
-          setStaff(staffData);
-          if (staffData.length > 0) {
-            setSelectedStaff(staffData[0].id);
-          }
-        }
-        if (clientsRes.ok) {
-          const clientsData = await clientsRes.json();
-          setClients(clientsData.clients || clientsData);
-        }
-      } catch (error) {
-        console.error("Error fetching POS data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchData();
+    void load();
   }, []);
-
-  const addToCart = (
-    item: { id: string; name: string; price: number },
-    type: "service" | "product"
-  ) => {
-    const existingItem = cart.find((c) => c.id === item.id && c.type === type);
-    if (existingItem) {
-      setCart(
-        cart.map((c) =>
-          c.id === item.id && c.type === type
-            ? { ...c, quantity: c.quantity + 1 }
-            : c
-        )
-      );
-    } else {
-      setCart([
-        ...cart,
-        {
-          ...item,
-          quantity: 1,
-          type,
-          staffId: type === "service" ? selectedStaff : undefined,
-        },
-      ]);
-    }
-  };
-
-  const removeFromCart = (id: string, type: "service" | "product") => {
-    setCart(cart.filter((c) => !(c.id === id && c.type === type)));
-  };
-
-  const updateQuantity = (
-    id: string,
-    type: "service" | "product",
-    delta: number
-  ) => {
-    setCart(
-      cart
-        .map((c) =>
-          c.id === id && c.type === type
-            ? { ...c, quantity: Math.max(0, c.quantity + delta) }
-            : c
-        )
-        .filter((c) => c.quantity > 0)
-    );
-  };
-
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.0875;
-  const total = subtotal - discount + tax + tipAmount;
-
-  const handleTipPercent = (percent: string) => {
-    setTipPercent(percent);
-    if (percent) {
-      setTipAmount(subtotal * (parseInt(percent) / 100));
-    }
-  };
-
-  const getServiceCategory = (service: Service): string => {
-    if (typeof service.category === "string") return service.category;
-    return service.category?.name || "Uncategorized";
-  };
-
-  const getProductCategory = (product: Product): string => {
-    if (!product.category) return "Uncategorized";
-    if (typeof product.category === "string") return product.category;
-    return product.category?.name || "Uncategorized";
-  };
-
-  const getStaffName = (s: Staff): string => {
-    if (s.displayName) return s.displayName;
-    if (s.user) return `${s.user.firstName} ${s.user.lastName.charAt(0)}.`;
-    return "Unknown";
-  };
-
-  const getStaffColor = (index: number): string => {
-    return STAFF_COLORS[index % STAFF_COLORS.length];
-  };
-
-  const filteredServices = services.filter((s) =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredClients = clients.filter((c) =>
-    `${c.firstName} ${c.lastName}`.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-    c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-    c.phone?.includes(clientSearchQuery)
-  );
-
-  // Fetch client payment methods when client is selected
-  useEffect(() => {
-    if (selectedClient) {
-      fetchClientPaymentMethods(selectedClient.id);
-    } else {
-      setClientPaymentMethods([]);
-      setSelectedPaymentMethod("");
-    }
-  }, [selectedClient]);
-
-  const fetchClientPaymentMethods = async (clientId: string) => {
-    setLoadingPaymentMethods(true);
+  async function act(body: Record<string, unknown>) {
+    if (busy) return false;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const raw = JSON.stringify(body);
+    if (retry.current?.body !== raw)
+      retry.current = { body: raw, key: crypto.randomUUID() };
     try {
-      const res = await fetch(`/api/clients/${clientId}/payment-methods`);
-      if (res.ok) {
-        const data = await res.json();
-        setClientPaymentMethods(data.paymentMethods || []);
-        if (data.paymentMethods?.length > 0) {
-          setSelectedPaymentMethod(data.paymentMethods[0].id);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching payment methods:", error);
-    } finally {
-      setLoadingPaymentMethods(false);
-    }
-  };
-
-  // Apply discount
-  const applyDiscount = () => {
-    const value = parseFloat(discountValue);
-    if (isNaN(value) || value <= 0) return;
-
-    if (discountType === "percent") {
-      setDiscount(subtotal * (value / 100));
-    } else {
-      setDiscount(value);
-    }
-    setShowDiscountModal(false);
-    setDiscountValue("");
-  };
-
-  // Check gift card balance
-  const checkGiftCard = async () => {
-    setGiftCardError("");
-    setGiftCardBalance(null);
-
-    try {
-      const res = await fetch(`/api/gift-cards/check?code=${giftCardCode}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.currentBalance > 0) {
-          setGiftCardBalance(data.currentBalance);
-        } else {
-          setGiftCardError("Gift card has no balance");
-        }
-      } else {
-        setGiftCardError("Gift card not found");
-      }
-    } catch {
-      setGiftCardError("Error checking gift card");
-    }
-  };
-
-  // Apply gift card
-  const applyGiftCard = () => {
-    const amount = parseFloat(giftCardAmount);
-    if (isNaN(amount) || amount <= 0 || !giftCardBalance) return;
-
-    const maxApply = Math.min(amount, giftCardBalance, total - giftCardApplied);
-    setGiftCardApplied(prev => prev + maxApply);
-    setShowGiftCardModal(false);
-    setGiftCardCode("");
-    setGiftCardBalance(null);
-    setGiftCardAmount("");
-  };
-
-  // Process cash payment
-  const processCashPayment = async () => {
-    if (!selectedClient) {
-      setShowClientSelect(true);
-      return;
-    }
-
-    const received = parseFloat(cashReceived);
-    if (isNaN(received) || received < finalTotal) return;
-
-    setIsProcessing(true);
-    try {
-      const res = await fetch("/api/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId: selectedClient.id,
-          staffId: selectedStaff,
-          subtotal,
-          discount,
-          tax,
-          tip: tipAmount,
-          giftCardAmount: giftCardApplied,
-          total: finalTotal,
-          paymentMethod: "CASH",
-          items: cart.map(item => ({
-            type: item.type,
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-          })),
-        }),
-      });
-
-      if (res.ok) {
-        setPaymentSuccess(true);
-        setTimeout(() => {
-          resetTransaction();
-        }, 2000);
-      }
-    } catch (error) {
-      console.error("Payment error:", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Process card payment with Stripe using saved payment method
-  const processCardPayment = async () => {
-    if (!selectedClient) {
-      setShowClientSelect(true);
-      return;
-    }
-
-    if (!selectedPaymentMethod) {
-      toast({ title: "Error", description: "Please select a payment method", variant: "destructive" });
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const res = await fetch("/api/payments/charge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Math.round(finalTotal * 100), // Convert to cents
-          clientId: selectedClient.id,
-          paymentMethodId: selectedPaymentMethod,
-          staffId: selectedStaff,
-          metadata: {
-            subtotal,
-            discount,
-            tax,
-            tip: tipAmount,
-            giftCardAmount: giftCardApplied,
-          },
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        // Create transaction record
-        await fetch("/api/transactions", {
+      const r = await fetch("/api/operations/sales", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clientId: selectedClient.id,
-            staffId: selectedStaff,
-            subtotal,
-            discount,
-            tax,
-            tip: tipAmount,
-            giftCardAmount: giftCardApplied,
-            total: finalTotal,
-            paymentMethod: "CARD",
-            stripePaymentIntentId: data.paymentIntentId,
-            items: cart.map(item => ({
-              type: item.type,
-              id: item.id,
-              name: item.name,
-              price: item.price,
-              quantity: item.quantity,
-            })),
-          }),
-        });
-
-        setPaymentSuccess(true);
-        setTimeout(() => {
-          resetTransaction();
-        }, 2000);
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": retry.current.key,
+          },
+          body: raw,
+        }),
+        j = await r.json();
+      if (!r.ok) throw Error(j.error || "Operation failed");
+      retry.current = null;
+      if (j.url) {
+        const u = new URL(j.url);
+        if (u.protocol !== "https:" || u.hostname !== "checkout.stripe.com")
+          throw Error("Unexpected payment destination");
+        window.location.assign(u.href);
       } else {
-        toast({ title: "Error", description: data.error || "Payment failed", variant: "destructive" });
+        if (body.action === "create") {
+          setSelected(j.id);
+          setCart([]);
+          setAppointmentId("");
+        }
+        setNotice(
+          j.changeCents
+            ? `Saved. Cash change: ${usd(j.changeCents / 100)}.`
+            : "Saved.",
+        );
+        await load();
       }
-    } catch (error) {
-      console.error("Payment error:", error);
-      toast({ title: "Error", description: "Payment failed. Please try again.", variant: "destructive" });
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Operation failed");
+      return false;
     } finally {
-      setIsProcessing(false);
+      setBusy(false);
     }
-  };
-
-  // Reset transaction
-  const resetTransaction = () => {
-    setCart([]);
-    setSelectedClient(null);
-    setTipAmount(0);
-    setTipPercent("");
-    setDiscount(0);
-    setGiftCardApplied(0);
-    setCashReceived("");
-    setPaymentSuccess(false);
-    setShowCashModal(false);
-    setShowCardModal(false);
-  };
-
-  // Calculate final total after gift card
-  const finalTotal = Math.max(0, total - giftCardApplied);
-  const cashChange = parseFloat(cashReceived) - finalTotal;
-
+  }
+  if (!data)
+    return (
+      <main className="p-6">
+        <h1 className="text-2xl font-bold">Point of Sale</h1>
+        <p role={error ? "alert" : undefined}>{error || "Loading sales…"}</p>
+        <Button onClick={load}>Reload</Button>
+      </main>
+    );
+  const manager = ["OWNER", "MANAGER"].includes(data.role),
+    catalog: Row[] = [
+      ...data.services.map((s) => ({ ...s, type: "SERVICE" })),
+      ...data.products.map((p) => ({ ...p, type: "PRODUCT" })),
+    ],
+    sale = data.sales.find((s) => s.id === selected);
   return (
-    <div className="h-[calc(100vh-140px)] flex gap-6">
-      {/* Left Panel - Items */}
-      <div className="flex-1 flex flex-col">
-        <Card className="flex-1 flex flex-col overflow-hidden">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                {appointmentId ? "Appointment Checkout" : "Point of Sale"}
-              </CardTitle>
-              <div className="flex gap-2">
-                <Button
-                  variant={activeTab === "services" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveTab("services")}
-                >
-                  Services
-                </Button>
-                <Button
-                  variant={activeTab === "products" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveTab("products")}
-                >
-                  Products
-                </Button>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Staff" />
-                </SelectTrigger>
-                <SelectContent>
-                  {staff.map((s, idx) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: s.color || getStaffColor(idx) }}
-                        />
-                        {getStaffName(s)}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto">
-            {isLoading ? (
-              <div className="text-center py-8 text-slate-500">Loading...</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {activeTab === "services"
-                  ? filteredServices.map((service) => (
-                      <button
-                        key={service.id}
-                        onClick={() => addToCart({ id: service.id, name: service.name, price: service.price || 0 }, "service")}
-                        className="p-4 rounded-lg border hover:border-rose-300 hover:bg-rose-50 transition-colors text-left"
-                      >
-                        <p className="font-medium text-sm">{service.name}</p>
-                        <p className="text-xs text-slate-500">{getServiceCategory(service)}</p>
-                        <p className="text-rose-600 font-semibold mt-1">
-                          {formatCurrency(service.price || 0)}
-                        </p>
-                      </button>
-                    ))
-                  : filteredProducts.map((product) => {
-                      const productPrice = parseFloat(String(product.price)) || 0;
-                      return (
-                        <button
-                          key={product.id}
-                          onClick={() => addToCart({ id: product.id, name: product.name, price: productPrice }, "product")}
-                          className="p-4 rounded-lg border hover:border-rose-300 hover:bg-rose-50 transition-colors text-left"
-                        >
-                          <p className="font-medium text-sm">{product.name}</p>
-                          <p className="text-xs text-slate-500">{getProductCategory(product)}</p>
-                          <p className="text-rose-600 font-semibold mt-1">
-                            {formatCurrency(productPrice)}
-                          </p>
-                        </button>
-                      );
-                    })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+    <main className="p-6 max-w-7xl space-y-6">
+      <div className="flex flex-wrap justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Point of Sale</h1>
+          <p>
+            Create a sale, review saved prices and tax, then record actual
+            payments.
+          </p>
+        </div>
+        <Button variant="outline" onClick={load}>
+          Refresh receipts
+        </Button>
       </div>
-
-      {/* Right Panel - Cart */}
-      <Card className="w-[400px] flex flex-col">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Cart</CardTitle>
-            {selectedClient ? (
-              <div className="flex items-center gap-2">
-                <Avatar className="h-6 w-6">
-                  <AvatarFallback className="text-xs bg-rose-100 text-rose-600">
-                    {getInitials(selectedClient.firstName, selectedClient.lastName)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm">{selectedClient.firstName} {selectedClient.lastName}</span>
-                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setSelectedClient(null)}>
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setShowClientSelect(true)}>
-                <User className="h-4 w-4 mr-1" />
-                Add Client
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="flex-1 flex flex-col">
-          {/* Cart Items */}
-          <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-            {cart.length === 0 ? (
-              <div className="text-center text-slate-400 py-8">
-                <p>Cart is empty</p>
-                <p className="text-sm">Add services or products</p>
-              </div>
-            ) : (
-              cart.map((item) => (
-                <div
-                  key={`${item.type}-${item.id}`}
-                  className="flex items-center justify-between p-2 rounded-lg bg-slate-50"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{item.name}</p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <Badge variant="outline" className="text-xs">
-                        {item.type}
-                      </Badge>
-                      {item.staffId && (
-                        <span>
-                          {getStaffName(staff.find((s) => s.id === item.staffId) || { id: "", displayName: "Unknown" })}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => updateQuantity(item.id, item.type, -1)}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-6 text-center text-sm">
-                        {item.quantity}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => updateQuantity(item.id, item.type, 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <span className="w-16 text-right font-medium text-sm">
-                      {formatCurrency((item.price || 0) * item.quantity)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-red-500"
-                      onClick={() => removeFromCart(item.id, item.type)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Tip Selection */}
-          <div className="border-t pt-3 mb-3">
-            <p className="text-sm font-medium mb-2">Tip</p>
-            <div className="flex gap-2">
-              {["15", "18", "20", "25"].map((percent) => (
-                <Button
-                  key={percent}
-                  variant={tipPercent === percent ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleTipPercent(percent)}
-                >
-                  {percent}%
-                </Button>
-              ))}
-              <Input
-                placeholder="$"
-                className="w-20"
+      {error && (
+        <p role="alert" className="bg-red-50 p-4 text-red-800">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="bg-green-50 p-4 text-green-800">
+          {notice}
+        </p>
+      )}
+      {manager && (
+        <details className="border rounded p-4">
+          <summary className="font-semibold cursor-pointer">
+            Sales-tax settings{" "}
+            {data.business.taxReviewedAt ? "— reviewed" : "— review required"}
+          </summary>
+          <div className="space-y-3 mt-3">
+            <label>
+              Tax rate (%)
+              <input
+                className={inputClass}
                 type="number"
-                value={tipAmount > 0 && !tipPercent ? tipAmount : ""}
-                onChange={(e) => {
-                  setTipPercent("");
-                  setTipAmount(parseFloat(e.target.value) || 0);
-                }}
+                min="0"
+                max="100"
+                step="0.01"
+                value={tax}
+                onChange={(e) => setTax(Number(e.target.value))}
               />
-            </div>
-          </div>
-
-          {/* Totals */}
-          <div className="border-t pt-3 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Subtotal</span>
-              <span>{formatCurrency(subtotal)}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span className="flex items-center gap-1">
-                  Discount
-                  <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => setDiscount(0)}>
-                    <X className="h-3 w-3" />
-                  </Button>
-                </span>
-                <span>-{formatCurrency(discount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Tax (8.75%)</span>
-              <span>{formatCurrency(tax)}</span>
-            </div>
-            {tipAmount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Tip</span>
-                <span>{formatCurrency(tipAmount)}</span>
-              </div>
-            )}
-            {giftCardApplied > 0 && (
-              <div className="flex justify-between text-sm text-purple-600">
-                <span className="flex items-center gap-1">
-                  Gift Card
-                  <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => setGiftCardApplied(0)}>
-                    <X className="h-3 w-3" />
-                  </Button>
-                </span>
-                <span>-{formatCurrency(giftCardApplied)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-bold pt-2 border-t">
-              <span>Total</span>
-              <span>{formatCurrency(finalTotal)}</span>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 mt-4">
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowDiscountModal(true)}>
-              <Percent className="h-4 w-4 mr-1" />
-              Discount
-            </Button>
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowGiftCardModal(true)}>
-              <Gift className="h-4 w-4 mr-1" />
-              Gift Card
-            </Button>
-          </div>
-
-          {/* Payment Buttons */}
-          <div className="grid grid-cols-2 gap-2 mt-3">
+            </label>
+            <label className="flex gap-2">
+              <input
+                type="checkbox"
+                checked={servicesTaxable}
+                onChange={(e) => setServicesTaxable(e.target.checked)}
+              />
+              Tax salon services at this rate. Products use their own taxable
+              flag.
+            </label>
+            <p>
+              Discounts are allocated proportionally across taxable and
+              non-taxable lines before tax. Tips are excluded from this
+              calculation. Review applicability for the business before saving.
+            </p>
+            <label className="flex gap-2">
+              <input
+                type="checkbox"
+                checked={taxReviewed}
+                onChange={(e) => setTaxReviewed(e.target.checked)}
+              />
+              I reviewed the rate and taxable items.
+            </label>
             <Button
-              variant="outline"
-              className="h-12"
-              disabled={cart.length === 0}
+              disabled={busy || !taxReviewed}
+              onClick={() =>
+                act({
+                  action: "tax",
+                  taxRate: tax / 100,
+                  servicesTaxable,
+                  reviewConfirmed: true,
+                })
+              }
+            >
+              Save reviewed tax settings
+            </Button>
+          </div>
+        </details>
+      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>New sale</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {appointmentId && <p>Linked appointment: {appointmentId} <button type="button" className="underline" onClick={()=>setAppointmentId("")}>Unlink</button></p>}
+          <div className="grid md:grid-cols-3 gap-3">
+            <label>
+              Location
+              <select
+                className={inputClass}
+                value={location}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  setStaff("");
+                }}
+              >
+                {data.locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Staff
+              <select
+                className={inputClass}
+                value={staff}
+                onChange={(e) => setStaff(e.target.value)}
+              >
+                <option value="">Choose staff</option>
+                {data.staff
+                  .filter((s) => s.locationId === location)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.displayName ||
+                        `${s.user.firstName} ${s.user.lastName}`}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Client
+              <select
+                className={inputClass}
+                value={client}
+                onChange={(e) => setClient(e.target.value)}
+              >
+                <option value="">Walk-in</option>
+                {data.clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.firstName} {c.lastName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <label className="grow">
+              Service or product
+              <select
+                className={inputClass}
+                value={pick}
+                onChange={(e) => setPick(e.target.value)}
+              >
+                <option value="">Choose item</option>
+                {catalog.map((c) => (
+                  <option key={c.type + ":" + c.id} value={c.type + ":" + c.id}>
+                    {c.name} · {usd(c.price)}
+                    {c.trackInventory ? ` · ${c.quantityOnHand} available` : ""}
+                    {c.priceType && c.priceType !== "FIXED"
+                      ? " · manager price required"
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              className="self-end"
+              disabled={!pick}
               onClick={() => {
-                if (!selectedClient) {
-                  setShowClientSelect(true);
-                } else {
-                  setShowCashModal(true);
-                }
+                const [type, id] = pick.split(":");
+                setCart((v) =>
+                  v.some((i) => i.id === id && i.type === type)
+                    ? v.map((i) =>
+                        i.id === id && i.type === type
+                          ? { ...i, quantity: i.quantity + 1 }
+                          : i,
+                      )
+                    : [...v, { id, type: type as "SERVICE", quantity: 1 }],
+                );
               }}
             >
-              <Banknote className="h-4 w-4 mr-2" />
-              Cash
-            </Button>
-            <Button
-              className="h-12"
-              disabled={cart.length === 0}
-              onClick={() => {
-                if (!selectedClient) {
-                  setShowClientSelect(true);
-                } else {
-                  setShowCardModal(true);
-                }
-              }}
-            >
-              <CreditCard className="h-4 w-4 mr-2" />
-              Card
+              Add
             </Button>
           </div>
+          {cart.map((line, index) => {
+            const item = catalog.find(
+              (c) => c.id === line.id && c.type === line.type,
+            );
+            return (
+              <div
+                className="grid md:grid-cols-4 gap-3 items-end border-b pb-3"
+                key={line.type + line.id}
+              >
+                <p>
+                  {item?.name} · {usd(item?.price)}
+                </p>
+                <label>
+                  Quantity
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={line.quantity}
+                    onChange={(e) =>
+                      setCart(
+                        cart.map((l, n) =>
+                          n === index
+                            ? { ...l, quantity: Number(e.target.value) }
+                            : l,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                {manager && (
+                  <label>
+                    Override price (optional)
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={line.unitPrice ?? ""}
+                      onChange={(e) =>
+                        setCart(
+                          cart.map((l, n) =>
+                            n === index
+                              ? {
+                                  ...l,
+                                  unitPrice:
+                                    e.target.value === ""
+                                      ? undefined
+                                      : Number(e.target.value),
+                                }
+                              : l,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setCart(cart.filter((_, n) => n !== index))}
+                >
+                  Remove
+                </Button>
+              </div>
+            );
+          })}
+          <div className="grid md:grid-cols-3 gap-3">
+            {manager && (
+              <>
+                <label>
+                  Discount (USD)
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={discount}
+                    onChange={(e) => setDiscount(Number(e.target.value))}
+                  />
+                </label>
+                <label>
+                  Discount / price override reason
+                  <input
+                    className={inputClass}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </label>
+              </>
+            )}
+            <label>
+              Tip (USD)
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                step="0.01"
+                value={tip}
+                onChange={(e) => setTip(Number(e.target.value))}
+              />
+            </label>
+          </div>
+          <p>
+            Saving reserves tracked stock. Void an unpaid draft to release it.
+            Prices and tax are calculated on the server; review the saved sale
+            before taking payment.
+          </p>
+          <Button
+            disabled={
+              busy || !cart.length || !staff || !data.business.taxReviewedAt
+            }
+            onClick={() =>
+              act({
+                action: "create",
+                locationId: location,
+                staffId: staff,
+                clientId: client || undefined,
+                appointmentId: appointmentId || undefined,
+                items: cart,
+                discount,
+                discountReason: reason,
+                tip,
+              })
+            }
+          >
+            Save sale for review
+          </Button>
         </CardContent>
       </Card>
-
-      {/* Client Selection Modal */}
-      <Dialog open={showClientSelect} onOpenChange={setShowClientSelect}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Select Client</DialogTitle>
-            <DialogDescription>Choose a client for this transaction</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                placeholder="Search by name, email, or phone..."
-                value={clientSearchQuery}
-                onChange={(e) => setClientSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <div className="max-h-[300px] overflow-y-auto space-y-2">
-              {filteredClients.map((client) => (
-                <button
-                  key={client.id}
-                  onClick={() => {
-                    setSelectedClient(client);
-                    setShowClientSelect(false);
-                    setClientSearchQuery("");
-                  }}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-slate-50 text-left"
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-rose-100 text-rose-600">
-                      {getInitials(client.firstName, client.lastName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{client.firstName} {client.lastName}</p>
-                    <p className="text-sm text-slate-500">{client.email || client.phone}</p>
-                  </div>
-                </button>
+      <label className="block font-semibold">
+        Sales (latest 100)
+        <select
+          className={inputClass}
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          <option value="">Choose sale</option>
+          {data.sales.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.transactionNumber} · {s.status} · {usd(s.totalAmount)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {sale && (
+        <SalePanel
+          key={sale.id + ":" + sale.version}
+          sale={sale}
+          manager={manager}
+          busy={busy}
+          act={act}
+        />
+      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Provider reconciliation</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p>
+            Returning from checkout does not prove payment. Unknown outcomes are
+            held until the provider session or refund receipt is reconciled.
+          </p>
+          {[
+            ...data.checkouts.map((r) => ({ ...r, kind: "checkout" })),
+            ...data.refunds
+              .filter((r) =>
+                ["PENDING", "UNKNOWN", "PROCESSING"].includes(r.status),
+              )
+              .map((r) => ({ ...r, kind: "refund" })),
+          ].map((r) => (
+            <ReconcileRow key={r.id} row={r} busy={busy} act={act} />
+          ))}
+          {!data.checkouts.length && !data.refunds.length && (
+            <p>No provider requests yet.</p>
+          )}
+          <Link
+            className="text-rose-700 underline"
+            href="/operations/integrations"
+          >
+            Configure salon Stripe credentials and webhook →
+          </Link>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+function SalePanel({
+  sale,
+  manager,
+  busy,
+  act,
+}: {
+  sale: Row;
+  manager: boolean;
+  busy: boolean;
+  act: (body: Record<string, unknown>) => Promise<boolean>;
+}) {
+  const [review, setReview] = useState(false),
+    [amount, setAmount] = useState(""),
+    [method, setMethod] = useState("CASH"),
+    [cash, setCash] = useState(""),
+    [code, setCode] = useState(""),
+    [received, setReceived] = useState(false),
+    [reason, setReason] = useState(""),
+    [refundPayment, setRefundPayment] = useState(""),
+    [refundAmount, setRefundAmount] = useState(""),
+    [cashReturned, setCashReturned] = useState(false);
+  const paid = sale.payments
+      .filter((p: Row) => p.verifiedAt)
+      .reduce(
+        (sum: number, p: Row) =>
+          sum +
+          Number(p.amount) -
+          p.refunds
+            .filter((r: Row) => r.status === "SUCCEEDED")
+            .reduce((n: number, r: Row) => n + Number(r.amount), 0),
+        0,
+      ),
+    balance = Number(sale.totalAmount) - paid;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{sale.transactionNumber}</CardTitle>
+        <p>
+          {sale.status} · Version {sale.version}
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!sale.reviewedAt && sale.status !== "PENDING" && (
+          <p className="p-3 bg-amber-50">
+            Legacy record: payments are not verified by this workflow.
+          </p>
+        )}
+        <div className="overflow-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Quantity</th>
+                <th>Unit price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sale.lineItems.map((l: Row) => (
+                <tr key={l.id}>
+                  <td>{l.name}</td>
+                  <td>{l.quantity}</td>
+                  <td>{usd(l.unitPrice)}</td>
+                  <td>{usd(l.totalPrice)}</td>
+                </tr>
               ))}
-              {filteredClients.length === 0 && (
-                <p className="text-center text-slate-500 py-4">No clients found</p>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Discount Modal */}
-      <Dialog open={showDiscountModal} onOpenChange={setShowDiscountModal}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Apply Discount</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Button
-                variant={discountType === "amount" ? "default" : "outline"}
-                className="flex-1"
-                onClick={() => setDiscountType("amount")}
-              >
-                $ Amount
-              </Button>
-              <Button
-                variant={discountType === "percent" ? "default" : "outline"}
-                className="flex-1"
-                onClick={() => setDiscountType("percent")}
-              >
-                % Percent
-              </Button>
-            </div>
-            <div>
-              <Label>Discount {discountType === "percent" ? "%" : "$"}</Label>
-              <Input
-                type="number"
-                placeholder={discountType === "percent" ? "Enter percentage" : "Enter amount"}
-                value={discountValue}
-                onChange={(e) => setDiscountValue(e.target.value)}
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Subtotal {usd(sale.subtotal)} · Discount {usd(sale.discountAmount)} ·
+          Tax {usd(sale.taxAmount)} · Tip {usd(sale.tipAmount)}
+        </p>
+        <p className="font-semibold">
+          Total {usd(sale.totalAmount)} · Verified net receipts {usd(paid)}
+          {sale.status === "PENDING" ? ` · Amount due ${usd(balance)}` : ""}
+        </p>
+        {sale.status === "PENDING" && !sale.reviewedAt && (
+          <>
+            <label className="flex gap-2">
+              <input
+                type="checkbox"
+                checked={review}
+                onChange={(e) => setReview(e.target.checked)}
               />
-            </div>
-            {discountType === "percent" && discountValue && (
-              <p className="text-sm text-slate-500">
-                Discount: {formatCurrency(subtotal * (parseFloat(discountValue) / 100))}
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDiscountModal(false)}>Cancel</Button>
-            <Button onClick={applyDiscount}>Apply</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Gift Card Modal */}
-      <Dialog open={showGiftCardModal} onOpenChange={setShowGiftCardModal}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Redeem Gift Card</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Gift Card Code</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter code"
-                  value={giftCardCode}
-                  onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
-                />
-                <Button variant="outline" onClick={checkGiftCard}>Check</Button>
-              </div>
-            </div>
-            {giftCardError && (
-              <p className="text-sm text-red-500">{giftCardError}</p>
-            )}
-            {giftCardBalance !== null && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-700">Available Balance: {formatCurrency(giftCardBalance)}</p>
-                <div className="mt-2">
-                  <Label>Amount to Apply</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter amount"
-                    value={giftCardAmount}
-                    onChange={(e) => setGiftCardAmount(e.target.value)}
-                    max={Math.min(giftCardBalance, finalTotal)}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowGiftCardModal(false);
-              setGiftCardCode("");
-              setGiftCardBalance(null);
-              setGiftCardError("");
-            }}>Cancel</Button>
-            <Button onClick={applyGiftCard} disabled={!giftCardBalance || !giftCardAmount}>
-              Apply
+              I reviewed the saved items, prices, discount, tax and tip.
+            </label>
+            <Button
+              disabled={busy || !review}
+              onClick={() =>
+                act({
+                  action: "issue",
+                  id: sale.id,
+                  version: sale.version,
+                  reviewConfirmed: true,
+                })
+              }
+            >
+              Approve sale for payment
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cash Payment Modal */}
-      <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Cash Payment</DialogTitle>
-            <DialogDescription>Total: {formatCurrency(finalTotal)}</DialogDescription>
-          </DialogHeader>
-          {paymentSuccess ? (
-            <div className="text-center py-8">
-              <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="h-8 w-8 text-green-600" />
-              </div>
-              <p className="text-lg font-semibold text-green-600">Payment Successful!</p>
-              {cashChange > 0 && (
-                <p className="text-slate-500 mt-2">Change: {formatCurrency(cashChange)}</p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <Label>Cash Received</Label>
-                <Input
+          </>
+        )}
+        {sale.status === "PENDING" && sale.reviewedAt && (
+          <div className="border rounded p-4 space-y-3">
+            <h3 className="font-semibold">Record a payment</h3>
+            <div className="grid md:grid-cols-3 gap-3">
+              <label>
+                Amount (USD)
+                <input
+                  className={inputClass}
                   type="number"
-                  placeholder="Enter amount"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
+                  min="0.01"
+                  max={balance}
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
                 />
-              </div>
-              {parseFloat(cashReceived) >= finalTotal && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-700">Change: {formatCurrency(parseFloat(cashReceived) - finalTotal)}</p>
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-2">
-                {[20, 50, 100].map((amount) => (
-                  <Button
-                    key={amount}
-                    variant="outline"
-                    onClick={() => setCashReceived(String(amount))}
-                  >
-                    ${amount}
-                  </Button>
-                ))}
-              </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setCashReceived(String(Math.ceil(finalTotal)))}
-              >
-                Exact Amount ({formatCurrency(Math.ceil(finalTotal))})
-              </Button>
-            </div>
-          )}
-          {!paymentSuccess && (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCashModal(false)}>Cancel</Button>
-              <Button
-                onClick={processCashPayment}
-                disabled={isProcessing || parseFloat(cashReceived) < finalTotal}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  "Complete Payment"
-                )}
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Card Payment Modal */}
-      <Dialog open={showCardModal} onOpenChange={setShowCardModal}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Card Payment</DialogTitle>
-            <DialogDescription>Total: {formatCurrency(finalTotal)}</DialogDescription>
-          </DialogHeader>
-          {paymentSuccess ? (
-            <div className="text-center py-8">
-              <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="h-8 w-8 text-green-600" />
-              </div>
-              <p className="text-lg font-semibold text-green-600">Payment Successful!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {loadingPaymentMethods ? (
-                <div className="text-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400" />
-                  <p className="text-sm text-slate-500 mt-2">Loading payment methods...</p>
-                </div>
-              ) : clientPaymentMethods.length > 0 ? (
-                <div className="space-y-2">
-                  <Label>Select Card</Label>
-                  {clientPaymentMethods.map((pm) => (
-                    <button
-                      key={pm.id}
-                      onClick={() => setSelectedPaymentMethod(pm.id)}
-                      className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
-                        selectedPaymentMethod === pm.id
-                          ? "border-rose-500 bg-rose-50"
-                          : "hover:bg-slate-50"
-                      }`}
-                    >
-                      <CreditCard className="h-5 w-5 text-slate-400" />
-                      <div>
-                        <p className="font-medium capitalize">{pm.card?.brand} •••• {pm.card?.last4}</p>
-                        <p className="text-sm text-slate-500">Expires {pm.card?.exp_month}/{pm.card?.exp_year}</p>
-                      </div>
-                      {selectedPaymentMethod === pm.id && (
-                        <Check className="h-5 w-5 text-rose-500 ml-auto" />
-                      )}
-                    </button>
-                  ))}
-                </div>
+              </label>
+              <label>
+                Method
+                <select
+                  className={inputClass}
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value)}
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="GIFT_CARD">Gift card</option>
+                </select>
+              </label>
+              {method === "CASH" ? (
+                <label>
+                  Cash received
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={cash}
+                    onChange={(e) => setCash(e.target.value)}
+                  />
+                </label>
               ) : (
-                <div className="p-6 border-2 border-dashed rounded-lg text-center">
-                  <CreditCard className="h-12 w-12 mx-auto text-slate-400 mb-3" />
-                  <p className="text-slate-600">No saved cards found</p>
-                  <p className="text-sm text-slate-400 mt-1">Client needs to add a payment method</p>
-                </div>
+                <label>
+                  Gift card code
+                  <input
+                    className={inputClass}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                </label>
               )}
             </div>
-          )}
-          {!paymentSuccess && (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCardModal(false)}>Cancel</Button>
+            <label className="flex gap-2">
+              <input
+                type="checkbox"
+                checked={received}
+                onChange={(e) => setReceived(e.target.checked)}
+              />
+              I confirm this payment has actually been received or the gift card
+              is authorized for this sale.
+            </label>
+            <Button
+              disabled={busy || !received || !amount}
+              onClick={() =>
+                act({
+                  action: "payment",
+                  id: sale.id,
+                  version: sale.version,
+                  amount: Number(amount),
+                  method,
+                  cashReceived: method === "CASH" ? Number(cash) : undefined,
+                  giftCardCode: method === "GIFT_CARD" ? code : undefined,
+                  receivedConfirmed: true,
+                })
+              }
+            >
+              Record payment
+            </Button>
+            <Button
+              className="ml-2"
+              variant="outline"
+              disabled={busy}
+              onClick={() => act({ action: "checkout", id: sale.id })}
+            >
+              Pay remaining balance with Stripe
+            </Button>
+          </div>
+        )}
+        <div className="overflow-auto">
+          <h3 className="font-semibold">Payment receipts</h3>
+          <table className="w-full text-left">
+            <thead>
+              <tr>
+                <th>Amount</th>
+                <th>Method</th>
+                <th>Verification</th>
+                <th>Refunds</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sale.payments.map((p: Row) => (
+                <tr key={p.id}>
+                  <td>{usd(p.amount)}</td>
+                  <td>{p.method}</td>
+                  <td>
+                    {p.verifiedAt
+                      ? "Verified / recorded"
+                      : "Legacy; unverified"}
+                  </td>
+                  <td>
+                    {p.refunds
+                      .map((r: Row) => `${usd(r.amount)} ${r.status}`)
+                      .join(", ") || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {sale.status === "PENDING" && paid === 0 && (
+          <>
+            <label className="block">
+              Void reason
+              <input
+                className={inputClass}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+            <Button
+              disabled={busy || reason.trim().length < 5}
+              variant="outline"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Void this sale and release its reserved stock?",
+                  )
+                )
+                  act({
+                    action: "void",
+                    id: sale.id,
+                    version: sale.version,
+                    reason,
+                  });
+              }}
+            >
+              Void and release stock
+            </Button>
+          </>
+        )}
+        {manager && sale.payments.some((p: Row) => p.verifiedAt) && (
+          <details className="border rounded p-4">
+            <summary className="cursor-pointer font-semibold">
+              Refund a verified payment
+            </summary>
+            <div className="space-y-3 mt-3">
+              <label>
+                Payment
+                <select
+                  className={inputClass}
+                  value={refundPayment}
+                  onChange={(e) => setRefundPayment(e.target.value)}
+                >
+                  <option value="">Choose payment</option>
+                  {sale.payments
+                    .filter((p: Row) => p.verifiedAt)
+                    .map((p: Row) => (
+                      <option key={p.id} value={p.id}>
+                        {p.method} · {usd(p.amount)} · {p.id.slice(-6)}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Refund amount (USD)
+                <input
+                  type="number"
+                  className={inputClass}
+                  min="0.01"
+                  step="0.01"
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(e.target.value)}
+                />
+              </label>
+              <label>
+                Reason
+                <input
+                  className={inputClass}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </label>
+              {sale.payments.find((p: Row) => p.id === refundPayment)
+                ?.method === "CASH" && (
+                <label className="flex gap-2">
+                  <input
+                    type="checkbox"
+                    checked={cashReturned}
+                    onChange={(e) => setCashReturned(e.target.checked)}
+                  />
+                  The cash has actually been handed back.
+                </label>
+              )}
+              <p>
+                Refunds return to the original payment source. Products are not
+                automatically restocked.
+              </p>
               <Button
-                onClick={processCardPayment}
-                disabled={isProcessing || !selectedPaymentMethod || clientPaymentMethods.length === 0}
+                disabled={
+                  busy ||
+                  !refundPayment ||
+                  !refundAmount ||
+                  reason.trim().length < 5
+                }
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Refund ${usd(refundAmount)} to the original payment source?`,
+                    )
+                  )
+                    act({
+                      action: "refund",
+                      paymentId: refundPayment,
+                      amount: Number(refundAmount),
+                      reason,
+                      cashReturnedConfirmed: cashReturned,
+                    });
+                }}
               >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Charge {formatCurrency(finalTotal)}
-                  </>
-                )}
+                Submit refund
               </Button>
-            </DialogFooter>
+            </div>
+          </details>
+        )}
+        <Button variant="outline" onClick={() => window.print()}>
+          Print displayed sale
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+function ReconcileRow({
+  row,
+  busy,
+  act,
+}: {
+  row: Row;
+  busy: boolean;
+  act: (body: Record<string, unknown>) => Promise<boolean>;
+}) {
+  const [ref, setRef] = useState(row.providerRef || "");
+  return (
+    <div className="border-b pb-3 space-y-2">
+      <p>
+        {row.kind} · {row.status} ·{" "}
+        {row.amountCents ? usd(row.amountCents / 100) : usd(row.amount)}
+      </p>
+      <p className="text-sm">
+        {row.providerRef || row.id} {row.lastError || ""}
+      </p>
+      {["PENDING", "OPEN", "UNKNOWN", "PROCESSING"].includes(row.status) && (
+        <>
+          <label>
+            Provider {row.kind === "refund" ? "refund" : "checkout session"} ID
+            <input
+              className={inputClass}
+              value={ref}
+              onChange={(e) => setRef(e.target.value)}
+            />
+          </label>
+          <Button
+            disabled={busy || !ref}
+            variant="outline"
+            onClick={() =>
+              act({
+                action: row.kind + "-reconcile",
+                id: row.id,
+                providerRef: ref,
+              })
+            }
+          >
+            Reconcile receipt
+          </Button>
+          {row.kind === "checkout" && row.providerRef && (
+            <Button
+              className="ml-2"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm("Expire this open checkout?"))
+                  act({
+                    action: "checkout-expire",
+                    id: row.id,
+                    providerRef: ref,
+                  });
+              }}
+            >
+              Expire checkout
+            </Button>
           )}
-        </DialogContent>
-      </Dialog>
+        </>
+      )}
     </div>
   );
 }

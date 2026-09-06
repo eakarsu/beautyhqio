@@ -93,11 +93,12 @@ export default function CampaignDetailPage() {
     try {
       const response = await fetch(`/api/marketing/campaigns/${campaign.id}/send`, {
         method: "POST",
+        headers: { "Idempotency-Key": `campaign-send-${campaign.id}` },
       });
 
       if (response.ok) {
         const updatedCampaign = await response.json();
-        setCampaign(updatedCampaign);
+        setCampaign(updatedCampaign.campaign);
       } else {
         const error = await response.json();
         toast({ title: "Error", description: error.error || "Failed to send campaign", variant: "destructive" });

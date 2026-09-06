@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useMemo } from "react";
+import { useState, useEffect, useRef, use, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -109,14 +109,17 @@ export default function ConfirmBookingPage({
       .catch(() => setLoading(false));
   }, [locationId, staffId, serviceIds]);
 
+  const bookingAttempt = useRef<{ body: string; key: string } | null>(null);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
 
     try {
+      const requestBody = JSON.stringify({ locationId, serviceIds, staffId, date, time, ...formData, source: "online", rescheduleId: rescheduleId || undefined });
+      if (bookingAttempt.current?.body !== requestBody) bookingAttempt.current = { body: requestBody, key: crypto.randomUUID() };
       const response = await fetch("/api/booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": bookingAttempt.current.key },
         body: JSON.stringify({
           locationId,
           serviceIds, // All selected services

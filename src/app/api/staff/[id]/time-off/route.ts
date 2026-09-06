@@ -1,59 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-
-// GET /api/staff/[id]/time-off - Get time off requests
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-
-    const timeOff = await prisma.timeOff.findMany({
-      where: { staffId: id },
-      orderBy: { startDate: "desc" },
-    });
-
-    return NextResponse.json(timeOff);
-  } catch (error) {
-    console.error("Error fetching time off:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch time off" },
-      { status: 500 }
-    );
-  }
-}
-
-// POST /api/staff/[id]/time-off - Request time off
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const body = await request.json();
-    const { type, startDate, endDate, allDay, startTime, endTime, notes } = body;
-
-    const timeOff = await prisma.timeOff.create({
-      data: {
-        staffId: id,
-        type,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        allDay,
-        startTime,
-        endTime,
-        notes,
-        status: "pending",
-      },
-    });
-
-    return NextResponse.json(timeOff, { status: 201 });
-  } catch (error) {
-    console.error("Error creating time off:", error);
-    return NextResponse.json(
-      { error: "Failed to create time off" },
-      { status: 500 }
-    );
-  }
-}
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { audit, context, endpoint, fail, idSchema } from '@/lib/operations/core';
+import { leaveSchema, staffAccess } from '@/lib/operations/staffing';
+type Params = { params: Promise<{ id: string }> };
+export async function GET(req: Request, { params }: Params) { return endpoint(async () => { const ctx = await context(['OWNER', 'MANAGER', 'STAFF']); const { id } = await params; await staffAccess(prisma, ctx, id); return prisma.timeOff.findMany({ where: { staffId: id }, orderBy: { startDate: 'desc' }, take: 200 }); }); }
+export async function POST(req: Request, { params }: Params) { return endpoint(async () => { const ctx = await context(['OWNER', 'MANAGER', 'STAFF']); const { id } = await params; await staffAccess(prisma, ctx, id); const input = leaveSchema.parse(await req.json()); return prisma.timeOff.create({ data: { ...input, staffId: id, status: 'pending' } }); }); }
+export async function PUT(req: Request, { params }: Params) { return endpoint(async () => { const ctx = await context(['OWNER', 'MANAGER']); const { id } = await params; const input = z.object({ id: idSchema, status: z.enum(['approved', 'rejected', 'cancelled']) }).parse(await req.json()); return prisma.$transaction(async tx => { await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${ctx.businessId}, 0))::text`; await staffAccess(tx, ctx, id); const row = await tx.timeOff.findFirst({ where: { id: input.id, staffId: id } }); if (!row || row.status === 'cancelled') return fail(404, 'Active time-off request not found'); if (input.status === 'approved') { const overlap = await tx.appointment.findFirst({ where: { staffId: id, status: { in: ['BOOKED', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'] }, scheduledStart: { lt: new Date(row.endDate.getTime() + 86400000) }, scheduledEnd: { gt: row.startDate } } }); if (overlap) return fail(409, 'Reschedule appointments on these dates before approving time off'); } const updated = await tx.timeOff.update({ where: { id: row.id }, data: { status: input.status } }); await audit(tx, ctx, 'TIME_OFF_REVIEWED', 'TimeOff', row.id, { from: row.status, to: input.status }); return updated; }); }); }

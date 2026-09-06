@@ -1,4 +1,4 @@
-import { syncBusinessSubscription } from "@/lib/business-billing";
+import { syncBusinessSubscription,reconcileBusinessCheckout } from "@/lib/business-billing";
 import { NextRequest, NextResponse } from "next/server";
 import { constructWebhookEvent } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +7,7 @@ import Stripe from "stripe";
 // POST /api/webhooks/stripe - Handle Stripe webhooks
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.text();
+    const reader=request.body?.getReader();if(!reader)return NextResponse.json({error:'Body required'},{status:400});let size=0;const chunks:Uint8Array[]=[];while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>100000){await reader.cancel();return NextResponse.json({error:'Payload too large'},{status:413})}chunks.push(value)}const body=Buffer.concat(chunks).toString('utf8');
     const signature = request.headers.get("stripe-signature");
 
     if (!signature) {
@@ -30,6 +30,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if(event.type==='checkout.session.completed'||event.type==='checkout.session.expired'){
+      const checkout=event.data.object as Stripe.Checkout.Session;
+      if(checkout.metadata?.type==='business_subscription'&&checkout.metadata.billingAttemptId&&checkout.metadata.businessId){
+        await reconcileBusinessCheckout(checkout.metadata.businessId,checkout.metadata.billingAttemptId,checkout.id);
+        return NextResponse.json({received:true});
+      }
+    }
     if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(event.type)) {
       const subscription = event.data.object as Stripe.Subscription;
       if (subscription.metadata?.type === "business_subscription") {
@@ -46,32 +53,10 @@ export async function POST(request: NextRequest) {
 
     // Handle different event types
     switch (event.type) {
-      case "payment_intent.succeeded": {
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        console.log("Payment succeeded:", paymentIntent.id);
-
-        // Update transaction if metadata contains transactionId
-        if (paymentIntent.metadata?.transactionId) {
-          await prisma.transaction.update({
-            where: { id: paymentIntent.metadata.transactionId },
-            data: { status: "COMPLETED" },
-          });
-        }
+      case "payment_intent.succeeded":
+      case "payment_intent.payment_failed":
+        // Salon payments use the signed, business-scoped reserved-checkout endpoint.
         break;
-      }
-
-      case "payment_intent.payment_failed": {
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        console.log("Payment failed:", paymentIntent.id);
-
-        if (paymentIntent.metadata?.transactionId) {
-          await prisma.transaction.update({
-            where: { id: paymentIntent.metadata.transactionId },
-            data: { status: "PENDING" },
-          });
-        }
-        break;
-      }
 
       case "customer.subscription.created": {
         const subscription = event.data.object as Stripe.Subscription;

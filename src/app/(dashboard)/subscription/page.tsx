@@ -1,13 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Zap, Crown, Building2, Check, Calendar, DollarSign } from "lucide-react";
+import {
+  CreditCard,
+  Zap,
+  Crown,
+  Building2,
+  Check,
+  Calendar,
+  DollarSign,
+} from "lucide-react";
 
 interface MySubscription {
   id: string;
@@ -60,10 +74,10 @@ const PLAN_DETAILS = [
     features: [
       "No commission on leads",
       "Top placement in search",
-      "Verified badge",
-      "Dedicated account manager",
+      "Expanded salon tools",
+      "Business workspace",
       "Custom integrations",
-      "Priority support 24/7",
+      "Advanced plan",
     ],
   },
 ];
@@ -71,6 +85,20 @@ const PLAN_DETAILS = [
 export default function MySubscriptionPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [attempts, setAttempts] = useState<
+      {
+        id: string;
+        plan: string;
+        status: string;
+        providerSessionId: string | null;
+        lastError: string | null;
+      }[]
+    >([]),
+    [refs, setRefs] = useState<Record<string, string>>({});
+  const retry = useRef<{ body: string; key: string } | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<MySubscription | null>(null);
 
@@ -93,28 +121,58 @@ export default function MySubscriptionPage() {
   }, [session, status, router]);
 
   const fetchMySubscription = async () => {
+    setError("");
     try {
-      const response = await fetch("/api/my-subscription");
-      if (response.ok) {
-        const data = await response.json();
-        setSubscription(data.subscription);
-      }
-    } catch (error) {
-      console.error("Error fetching subscription:", error);
+      const response = await fetch("/api/business/subscription"),
+        data = await response.json();
+      if (!response.ok) throw Error(data.error || "Subscription unavailable");
+      setSubscription({
+        ...data.subscription,
+        commissionRate: data.subscription.marketplaceCommissionPct,
+      });
+      setAttempts(data.billingAttempts || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Subscription unavailable");
     } finally {
       setLoading(false);
     }
   };
-
-  const handleUpgrade = async (plan: string) => {
+  const billingAction = async (input: Record<string, unknown>) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    const body = JSON.stringify(input);
+    if (retry.current?.body !== body)
+      retry.current = { body, key: crypto.randomUUID() };
     try {
-      const response = await fetch("/api/business/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Billing could not start");
-      if (result.url) window.location.assign(result.url);
-      else await fetchMySubscription();
-    } catch (error) { toast({ title: "Billing unavailable", description: error instanceof Error ? error.message : "Retry later", variant: "destructive" }); }
+      const response = await fetch("/api/business/subscription", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": retry.current.key,
+          },
+          body,
+        }),
+        result = await response.json();
+      if (!response.ok)
+        throw Error(result.error || "Billing could not complete");
+      retry.current = null;
+      if (result.url) {
+        const u = new URL(result.url);
+        if (
+          u.protocol !== "https:" ||
+          !["checkout.stripe.com", "billing.stripe.com"].includes(u.hostname)
+        )
+          throw Error("Unexpected provider destination");
+        window.location.assign(u.href);
+      } else await fetchMySubscription();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Billing unavailable");
+    } finally {
+      setBusy(false);
+    }
   };
+  const handleUpgrade = (plan: string) => billingAction({ plan });
 
   if (status === "loading" || loading) {
     return (
@@ -124,7 +182,8 @@ export default function MySubscriptionPage() {
     );
   }
 
-  const currentPlan = PLAN_DETAILS.find((p) => p.name === subscription?.plan) || PLAN_DETAILS[0];
+  const currentPlan =
+    PLAN_DETAILS.find((p) => p.name === subscription?.plan) || PLAN_DETAILS[0];
   const CurrentIcon = currentPlan.icon;
 
   return (
@@ -134,6 +193,89 @@ export default function MySubscriptionPage() {
         <p className="text-slate-600">Manage your subscription plan</p>
       </div>
 
+      {error && (
+        <div role="alert" className="p-4 bg-red-50 text-red-800">
+          {error}{" "}
+          <Button variant="outline" onClick={fetchMySubscription}>
+            Reload
+          </Button>
+        </div>
+      )}
+      <p>
+        Paid access requires a current paid provider invoice. Returning from
+        checkout alone does not activate a plan. Only the business owner can
+        change billing.
+      </p>
+      <Button
+        disabled={busy || session?.user?.role !== "OWNER"}
+        variant="outline"
+        onClick={() => billingAction({ action: "refresh" })}
+      >
+        Refresh verified billing status
+      </Button>
+      {attempts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing requests</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {attempts.map((a) => (
+              <div className="border-b pb-4 space-y-2" key={a.id}>
+                <p>
+                  {a.plan} · {a.status}
+                </p>
+                {a.lastError && <p className="text-amber-800">{a.lastError}</p>}
+                <p className="text-xs">
+                  {a.providerSessionId || "No provider session returned"}
+                </p>
+                {["UNKNOWN", "PENDING", "OPEN"].includes(a.status) && (
+                  <>
+                    <label className="block">
+                      Stripe checkout session ID
+                      <input
+                        className="border rounded w-full p-2"
+                        value={refs[a.id] ?? a.providerSessionId ?? ""}
+                        onChange={(e) =>
+                          setRefs({ ...refs, [a.id]: e.target.value })
+                        }
+                      />
+                    </label>
+                    <Button
+                      disabled={busy || session?.user?.role !== "OWNER"}
+                      variant="outline"
+                      onClick={() =>
+                        billingAction({
+                          action: "reconcile",
+                          id: a.id,
+                          sessionId: refs[a.id] || a.providerSessionId,
+                        })
+                      }
+                    >
+                      Reconcile with Stripe
+                    </Button>
+                    {a.providerSessionId && (
+                      <Button
+                        disabled={busy || session?.user?.role !== "OWNER"}
+                        variant="outline"
+                        onClick={() => {
+                          if (window.confirm("Expire this open checkout?"))
+                            billingAction({
+                              action: "expire",
+                              id: a.id,
+                              sessionId: a.providerSessionId,
+                            });
+                        }}
+                      >
+                        Expire checkout
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
       {/* Current Subscription */}
       <Card className="border-2 border-rose-200">
         <CardHeader>
@@ -143,13 +285,15 @@ export default function MySubscriptionPage() {
                 <CurrentIcon className="h-6 w-6 text-rose-600" />
               </div>
               <div>
-                <CardTitle>Current Plan: {subscription?.plan || "STARTER"}</CardTitle>
+                <CardTitle>
+                  Current Plan: {subscription?.plan || "STARTER"}
+                </CardTitle>
                 <CardDescription>
                   {subscription?.status === "ACTIVE"
                     ? "Your subscription is active"
                     : subscription?.status === "TRIAL"
-                    ? "You are on a trial period"
-                    : "Subscription status: " + subscription?.status}
+                      ? "You are on a trial period"
+                      : "Subscription status: " + subscription?.status}
                 </CardDescription>
               </div>
             </div>
@@ -158,8 +302,8 @@ export default function MySubscriptionPage() {
                 subscription?.status === "ACTIVE"
                   ? "bg-green-100 text-green-800"
                   : subscription?.status === "TRIAL"
-                  ? "bg-blue-100 text-blue-800"
-                  : "bg-gray-100 text-gray-800"
+                    ? "bg-blue-100 text-blue-800"
+                    : "bg-gray-100 text-gray-800"
               }
             >
               {subscription?.status || "ACTIVE"}
@@ -172,14 +316,18 @@ export default function MySubscriptionPage() {
               <DollarSign className="h-5 w-5 text-slate-400" />
               <div>
                 <p className="text-sm text-slate-500">Monthly Price</p>
-                <p className="font-semibold">${subscription?.monthlyPrice || 0}/month</p>
+                <p className="font-semibold">
+                  ${subscription?.monthlyPrice || 0}/month
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <CreditCard className="h-5 w-5 text-slate-400" />
               <div>
                 <p className="text-sm text-slate-500">Commission Rate</p>
-                <p className="font-semibold">{subscription?.commissionRate || 9}%</p>
+                <p className="font-semibold">
+                  {subscription?.commissionRate || 9}%
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -188,7 +336,9 @@ export default function MySubscriptionPage() {
                 <p className="text-sm text-slate-500">Next Billing</p>
                 <p className="font-semibold">
                   {subscription?.currentPeriodEnd
-                    ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
+                    ? new Date(
+                        subscription.currentPeriodEnd,
+                      ).toLocaleDateString()
                     : "N/A"}
                 </p>
               </div>
@@ -204,10 +354,28 @@ export default function MySubscriptionPage() {
           {PLAN_DETAILS.map((plan) => {
             const Icon = plan.icon;
             const isCurrentPlan = plan.name === subscription?.plan;
-            const colorClasses: Record<string, { border: string; bg: string; text: string; icon: string }> = {
-              purple: { border: "border-purple-300", bg: "bg-purple-50", text: "text-purple-600", icon: "text-purple-500" },
-              rose: { border: "border-rose-300", bg: "bg-rose-50", text: "text-rose-600", icon: "text-rose-500" },
-              gray: { border: "border-gray-300", bg: "bg-gray-50", text: "text-gray-600", icon: "text-gray-500" },
+            const colorClasses: Record<
+              string,
+              { border: string; bg: string; text: string; icon: string }
+            > = {
+              purple: {
+                border: "border-purple-300",
+                bg: "bg-purple-50",
+                text: "text-purple-600",
+                icon: "text-purple-500",
+              },
+              rose: {
+                border: "border-rose-300",
+                bg: "bg-rose-50",
+                text: "text-rose-600",
+                icon: "text-rose-500",
+              },
+              gray: {
+                border: "border-gray-300",
+                bg: "bg-gray-50",
+                text: "text-gray-600",
+                icon: "text-gray-500",
+              },
             };
             const colors = colorClasses[plan.color];
 
@@ -225,7 +393,9 @@ export default function MySubscriptionPage() {
                       <CardTitle className="flex items-center gap-2">
                         {plan.name}
                         {isCurrentPlan && (
-                          <Badge className="bg-rose-100 text-rose-800">Current</Badge>
+                          <Badge className="bg-rose-100 text-rose-800">
+                            Current
+                          </Badge>
                         )}
                       </CardTitle>
                       <CardDescription>{plan.description}</CardDescription>
@@ -235,7 +405,9 @@ export default function MySubscriptionPage() {
                     <span className="text-4xl font-bold">${plan.price}</span>
                     <span className="text-slate-500">/month</span>
                     <p className={`text-sm font-medium ${colors.text} mt-1`}>
-                      {plan.commission > 0 ? `${plan.commission}% commission` : "No commission"}
+                      {plan.commission > 0
+                        ? `${plan.commission}% commission`
+                        : "No commission"}
                     </p>
                   </div>
                 </CardHeader>
@@ -252,9 +424,15 @@ export default function MySubscriptionPage() {
                     <Button
                       className="w-full"
                       variant={plan.name === "PRO" ? "default" : "outline"}
+                      disabled={
+                        busy || !subscription || session?.user?.role !== "OWNER"
+                      }
                       onClick={() => handleUpgrade(plan.name)}
                     >
-                      {plan.price > (subscription?.monthlyPrice || 0) ? "Upgrade" : "Switch"} to {plan.name}
+                      {plan.price > (subscription?.monthlyPrice || 0)
+                        ? "Upgrade"
+                        : "Switch"}{" "}
+                      to {plan.name}
                     </Button>
                   )}
                   {isCurrentPlan && (

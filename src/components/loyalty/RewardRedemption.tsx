@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -42,6 +42,8 @@ const CATEGORY_ICONS = {
 };
 
 export function RewardRedemption({ clientId, currentPoints, onRedeem }: RewardRedemptionProps) {
+  const [error, setError] = useState('');
+  const redemptionKey = useRef<string | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
@@ -53,124 +55,44 @@ export function RewardRedemption({ clientId, currentPoints, onRedeem }: RewardRe
   }, []);
 
   const fetchRewards = async () => {
+    setIsLoading(true); setError('');
     try {
-      const response = await fetch("/api/loyalty/rewards");
-      if (response.ok) {
-        const data = await response.json();
-        setRewards(data);
-      }
-    } catch (error) {
-      console.error("Error fetching rewards:", error);
-      // Demo data
-      setRewards([
-        {
-          id: "r1",
-          name: "Free Conditioning Treatment",
-          description: "Deep conditioning treatment with any haircut",
-          pointsCost: 500,
-          category: "service",
-          value: 35,
-          valueType: "fixed",
-          expiresInDays: 30,
-          available: true,
-        },
-        {
-          id: "r2",
-          name: "$10 Off Any Service",
-          description: "Get $10 off your next service",
-          pointsCost: 300,
-          category: "discount",
-          value: 10,
-          valueType: "fixed",
-          expiresInDays: 60,
-          available: true,
-        },
-        {
-          id: "r3",
-          name: "Free Hair Product",
-          description: "Choose any travel-size hair product",
-          pointsCost: 400,
-          category: "product",
-          value: 25,
-          valueType: "fixed",
-          expiresInDays: 30,
-          available: true,
-          stock: 15,
-        },
-        {
-          id: "r4",
-          name: "20% Off Color Service",
-          description: "Save 20% on any color service",
-          pointsCost: 800,
-          category: "discount",
-          value: 20,
-          valueType: "percentage",
-          expiresInDays: 45,
-          available: true,
-        },
-        {
-          id: "r5",
-          name: "VIP Styling Session",
-          description: "One-on-one consultation with our senior stylist",
-          pointsCost: 1500,
-          category: "service",
-          value: 100,
-          valueType: "fixed",
-          expiresInDays: 60,
-          available: true,
-        },
-        {
-          id: "r6",
-          name: "Premium Hair Care Set",
-          description: "Full-size shampoo and conditioner set",
-          pointsCost: 1200,
-          category: "product",
-          value: 75,
-          valueType: "fixed",
-          expiresInDays: 30,
-          available: false,
-          stock: 0,
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
+      const response = await fetch('/api/loyalty/rewards');
+      if (!response.ok) throw new Error('Unable to load rewards');
+      const data = await response.json();
+      setRewards(data.map((r: { id: string; name: string; description: string; pointsCost: number; type: string; isActive: boolean }) => ({ ...r, category: r.type === 'product' ? 'product' : r.type === 'service' ? 'service' : 'discount', available: r.isActive })));
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load rewards'); }
+    finally { setIsLoading(false); }
   };
-
   const handleRedeem = async () => {
-    if (!selectedReward) return;
-
-    setIsRedeeming(true);
+    if (!selectedReward || isRedeeming) return;
+    setIsRedeeming(true); setError('');
+    redemptionKey.current ||= crypto.randomUUID();
     try {
-      const response = await fetch(`/api/clients/${clientId}/loyalty/redeem`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rewardId: selectedReward.id }),
+      const response = await fetch('/api/loyalty/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': redemptionKey.current },
+        body: JSON.stringify({ clientId, rewardId: selectedReward.id }),
       });
-
-      if (response.ok) {
-        setRedeemSuccess(true);
-        onRedeem?.(selectedReward.id);
-      }
-    } catch (error) {
-      console.error("Error redeeming reward:", error);
-      // Demo mode - show success
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to redeem reward');
       setRedeemSuccess(true);
       onRedeem?.(selectedReward.id);
-    } finally {
-      setIsRedeeming(false);
-    }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to redeem reward'); }
+    finally { setIsRedeeming(false); }
   };
 
   const canAfford = (reward: Reward) => currentPoints >= reward.pointsCost;
 
   const closeDialog = () => {
+    redemptionKey.current = null;
     setSelectedReward(null);
     setRedeemSuccess(false);
   };
 
   return (
     <Card>
+      {error && <div role="alert" className="p-4 text-red-700">{error} <Button variant="outline" onClick={fetchRewards}>Reload rewards</Button></div>}
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>

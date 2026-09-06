@@ -1,24 +1,4 @@
-/**
- * Fitbit integration — status stub (apply pass 7 — backlog #4).
- * NEEDS-CREDS: requires FITBIT_CLIENT_ID + FITBIT_CLIENT_SECRET OAuth pair.
- */
-import { NextRequest, NextResponse } from "next/server";
-
-const REQUIRED = ["FITBIT_CLIENT_ID", "FITBIT_CLIENT_SECRET"];
-
-export async function GET(_req: NextRequest) {
-  const missing = REQUIRED.filter((k) => !process.env[k]);
-  return NextResponse.json(
-    {
-      provider: "fitbit",
-      configured: missing.length === 0,
-      connected: false,
-      required_env: REQUIRED,
-      missing,
-      disclaimer:
-        "Fitbit integration is not provisioned. No Fitbit data is being consumed.",
-      requires_human_review: true,
-    },
-    { status: missing.length ? 503 : 200 }
-  );
-}
+import { prisma } from '@/lib/prisma';
+import { endpoint } from '@/lib/operations/core';
+import { wearableContext } from '@/lib/operations/wearables';
+export async function GET() { return endpoint(async () => { const ctx = await wearableContext(); const row = await prisma.integrationConnection.findUnique({ where: { businessId_provider: { businessId: ctx.businessId, provider: `google-health:${ctx.clientId}` } }, select: { status: true, lastVerifiedAt: true } }); return { provider: 'google-health', configured: Boolean(process.env.GOOGLE_HEALTH_CLIENT_ID && process.env.GOOGLE_HEALTH_CLIENT_SECRET), connected: row?.status === 'CONNECTED', last_synced_at: row?.lastVerifiedAt || null, message: 'Fitbit activity import uses Google Health OAuth. Only your own linked client profile can connect.' }; }); }

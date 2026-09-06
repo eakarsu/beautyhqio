@@ -1,3 +1,4 @@
+import { appointmentListRange } from "@/lib/appointments/list-range";
 import { publicUserSelect } from "@/lib/public-user";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -16,10 +17,11 @@ export async function GET(request: NextRequest) {
     if (!parsed.success) return NextResponse.json({ error: "INVALID_STATUS" }, { status: 422 });
     where.status = parsed.data;
   }
-  const date = url.searchParams.get("date");
-  if (date) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: "INVALID_DATE" }, { status: 422 });
-    where.scheduledStart = { gte: new Date(`${date}T00:00:00.000Z`), lte: new Date(`${date}T23:59:59.999Z`) };
+  try {
+    const range = appointmentListRange(url.searchParams);
+    if (range) where.scheduledStart = range;
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 422 });
   }
   if (user.role === "CLIENT") {
     if (!user.clientId) return NextResponse.json([]);

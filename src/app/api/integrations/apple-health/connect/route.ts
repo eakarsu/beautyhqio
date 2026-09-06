@@ -1,39 +1,5 @@
-/**
- * Apple Health integration — OAuth connect stub (apply pass 7 — backlog #4).
- * NEEDS-CREDS: returns 503 until APPLE_HEALTH_CLIENT_ID is provisioned.
- */
-import { NextRequest, NextResponse } from "next/server";
-
-const REQUIRED = ["APPLE_HEALTH_CLIENT_ID"];
-
-export async function POST(_req: NextRequest) {
-  const missing = REQUIRED.filter((k) => !process.env[k]);
-  return NextResponse.json(
-    {
-      provider: "apple-health",
-      connected: false,
-      authorization_url: null,
-      required_env: REQUIRED,
-      missing,
-      disclaimer:
-        "Apple Health OAuth bridge is not provisioned. This endpoint is a 503 stub until credentials are configured.",
-      requires_human_review: true,
-    },
-    { status: 503 }
-  );
-}
-
-export async function GET(_req: NextRequest) {
-  return NextResponse.json(
-    {
-      provider: "apple-health",
-      method_allowed: "POST",
-      required_env: REQUIRED,
-      missing: REQUIRED.filter((k) => !process.env[k]),
-      disclaimer:
-        "Use POST to initiate Apple Health connect. Currently disabled (NEEDS-CREDS).",
-      requires_human_review: true,
-    },
-    { status: 503 }
-  );
-}
+import { z } from 'zod';
+import { endpoint } from '@/lib/operations/core';
+import { healthKitConsent, wearableContext } from '@/lib/operations/wearables';
+export async function POST(req: Request) { return endpoint(async () => { const ctx = await wearableContext(); const { granted } = z.object({ granted: z.boolean() }).parse(await req.json()); return healthKitConsent(ctx, granted); }); }
+export async function GET() { return endpoint(async () => { await wearableContext(); return { provider: 'apple-health', nativeAuthorizationRequired: true, message: 'Use the BeautyHQ iPhone app to grant HealthKit access and import step samples.' }; }); }

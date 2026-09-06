@@ -1,0 +1,6 @@
+import {z} from 'zod'
+import {prisma} from '@/lib/prisma'
+import {fail,moneySchema,type Context} from './core'
+import {refundSalePayment} from './sale-payments'
+export const refundSchema=z.object({paymentIntentId:z.string().min(1).max(191),transactionId:z.string().max(191).optional(),amount:moneySchema.optional(),reason:z.enum(['duplicate','fraudulent','requested_by_customer']).default('requested_by_customer')})
+export async function refundPayment(ctx:Context,req:Request,input:z.infer<typeof refundSchema>){const payment=await prisma.transactionPayment.findFirst({where:{stripePaymentId:input.paymentIntentId,...(input.transactionId?{transactionId:input.transactionId}:{}),transaction:{location:{businessId:ctx.businessId}}}});if(!payment)fail(404,'Payment not found');if(!payment.verifiedAt)fail(409,'Legacy payment requires verified receipt reconciliation');const refunded=await prisma.paymentRefund.aggregate({where:{paymentId:payment.id,status:{notIn:['FAILED','CANCELLED']}},_sum:{amount:true}}),amount=input.amount??Number(payment.amount.minus(refunded._sum.amount||0));const row=await refundSalePayment(ctx,req,{paymentId:payment.id,amount,reason:input.reason});return {success:row.status==='SUCCEEDED',refund:{id:row.providerRef||row.id,recordId:row.id,amount:Number(row.amount),status:row.status,error:row.lastError}}}

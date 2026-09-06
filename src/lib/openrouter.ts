@@ -2,9 +2,9 @@
 // Supports multiple AI models through OpenRouter API
 import { z } from "zod";
 
-interface OpenRouterMessage {
+export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | ({ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } })[];
 }
 
 interface OpenRouterResponse {
@@ -21,6 +21,7 @@ interface OpenRouterResponse {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
+    cost?: number;
   };
 }
 
@@ -29,6 +30,7 @@ interface AIGenerateOptions {
   maxTokens?: number;
   temperature?: number;
   stream?: boolean;
+  model?: string;
 }
 
 function parseAiJson<T>(text: string, schema: z.ZodType<T>): T {
@@ -75,6 +77,10 @@ class OpenRouterClient {
   }
 
   async generate(options: AIGenerateOptions): Promise<string> {
+    return (await this.generateDetailed(options)).content;
+  }
+
+  async generateDetailed(options: AIGenerateOptions): Promise<{ content: string; model: string; requestId: string; tokens: number | null; costUsd: number | null }> {
     const { messages, maxTokens = 10000, temperature = 0.7 } = options;
 
     if (!this.apiKey) {
@@ -85,14 +91,14 @@ class OpenRouterClient {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.apiKey}`, "HTTP-Referer": process.env.NEXTAUTH_URL || "http://localhost:3000", "X-Title": "Beauty & Wellness AI" },
-        body: JSON.stringify({ model: this.model, messages, max_tokens: Math.min(maxTokens, 10_000), temperature }),
+        body: JSON.stringify({ model: options.model || this.model, messages, max_tokens: Math.min(maxTokens, 10_000), temperature }),
         signal: AbortSignal.timeout(30_000),
       });
       if (response.ok) {
         const data: OpenRouterResponse = await response.json();
         const content = data.choices[0]?.message?.content;
         if (!content || content.length > 100_000) throw new Error("AI_OUTPUT_EMPTY_OR_TOO_LARGE");
-        return content;
+        return { content, model: data.model || options.model || this.model, requestId: data.id, tokens: Number.isInteger(data.usage?.total_tokens) ? data.usage.total_tokens : null, costUsd: typeof data.usage?.cost === 'number' && data.usage.cost >= 0 ? data.usage.cost : null };
       }
       if (attempt === 3 || (response.status < 500 && response.status !== 429)) throw new Error(`AI_PROVIDER_${response.status}`);
       await new Promise((resolve) => setTimeout(resolve, attempt * 250));

@@ -72,33 +72,16 @@ export default function StaffSchedulePage({ params }: { params: Promise<{ id: st
 
       if (scheduleRes.ok) {
         const scheduleData = await scheduleRes.json();
-        setSchedule(scheduleData);
+        setSchedule(DAYS_OF_WEEK.map((day, index) => {
+          const row = scheduleData.find((r: { dayOfWeek: number }) => r.dayOfWeek === (index + 1) % 7);
+          return { day, isWorking: row?.isWorking || false, startTime: row?.startTime || '09:00', endTime: row?.endTime || '17:00', breakStart: row?.breaks?.[0]?.startTime || '', breakEnd: row?.breaks?.[0]?.endTime || '' };
+        }));
       } else {
-        // Default schedule
-        setSchedule(
-          DAYS_OF_WEEK.map((day) => ({
-            day,
-            isWorking: !["Saturday", "Sunday"].includes(day),
-            startTime: "09:00",
-            endTime: "17:00",
-            breakStart: "12:00",
-            breakEnd: "13:00",
-          }))
-        );
+        throw new Error('Unable to load staff schedule');
       }
     } catch (error) {
-      console.error("Error fetching data:", error);
-      // Set default schedule on error
-      setSchedule(
-        DAYS_OF_WEEK.map((day) => ({
-          day,
-          isWorking: !["Saturday", "Sunday"].includes(day),
-          startTime: "09:00",
-          endTime: "17:00",
-          breakStart: "12:00",
-          breakEnd: "13:00",
-        }))
-      );
+      setSchedule([]);
+      toast({ title: 'Schedule unavailable', description: error instanceof Error ? error.message : 'Reload the page to retry', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +105,7 @@ export default function StaffSchedulePage({ params }: { params: Promise<{ id: st
       const response = await fetch(`/api/staff/${id}/schedule`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(schedule),
+        body: JSON.stringify({ schedules: schedule.map(day => ({ dayOfWeek: (DAYS_OF_WEEK.indexOf(day.day) + 1) % 7, isWorking: day.isWorking, startTime: day.startTime, endTime: day.endTime, breaks: day.breakStart && day.breakEnd ? [{ startTime: day.breakStart, endTime: day.breakEnd, label: 'Break' }] : [] })) }),
       });
 
       if (response.ok) {

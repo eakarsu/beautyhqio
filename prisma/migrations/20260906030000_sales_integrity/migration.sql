@@ -1,0 +1,11 @@
+ALTER TABLE "Business" ADD COLUMN "taxReviewedAt" TIMESTAMP(3), ADD COLUMN "taxReviewedById" TEXT REFERENCES "User"(id), ADD COLUMN "servicesTaxable" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Transaction" ADD COLUMN version INTEGER NOT NULL DEFAULT 1, ADD COLUMN "reviewedAt" TIMESTAMP(3), ADD COLUMN "reviewedById" TEXT REFERENCES "User"(id), ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD';
+ALTER TABLE "TransactionPayment" ADD COLUMN "verifiedAt" TIMESTAMP(3), ADD COLUMN source TEXT, ADD COLUMN "actorId" TEXT REFERENCES "User"(id);
+CREATE UNIQUE INDEX "TransactionPayment_verified_stripe_receipt" ON "TransactionPayment"("stripePaymentId") WHERE source='STRIPE' AND "verifiedAt" IS NOT NULL;
+ALTER TABLE "Product" ADD CONSTRAINT "Product_stock_nonnegative" CHECK ("quantityOnHand">=0) NOT VALID;
+CREATE TABLE "SalonCheckout" (id TEXT PRIMARY KEY, "businessId" TEXT NOT NULL REFERENCES "Business"(id), "transactionId" TEXT NOT NULL REFERENCES "Transaction"(id), "amountCents" INTEGER NOT NULL CHECK("amountCents">0), "requestKey" TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', "providerRef" TEXT, "paymentIntentId" TEXT, "createdById" TEXT NOT NULL REFERENCES "User"(id), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE UNIQUE INDEX "SalonCheckout_businessId_requestKey_key" ON "SalonCheckout"("businessId","requestKey");
+CREATE UNIQUE INDEX "SalonCheckout_providerRef_key" ON "SalonCheckout"("providerRef");
+CREATE INDEX "SalonCheckout_businessId_status_idx" ON "SalonCheckout"("businessId",status);
+CREATE FUNCTION retain_verified_sale_payment() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF OLD."verifiedAt" IS NOT NULL THEN RAISE EXCEPTION 'Verified payment receipts are append-only'; END IF; IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW; END $$;
+CREATE TRIGGER "TransactionPayment_verified_append_only" BEFORE UPDATE OR DELETE ON "TransactionPayment" FOR EACH ROW EXECUTE FUNCTION retain_verified_sale_payment();

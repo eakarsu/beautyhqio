@@ -129,7 +129,6 @@ export default function ProductDetailPage() {
           barcode: formData.barcode || null,
           price: parseFloat(formData.price) || 0,
           cost: formData.cost ? parseFloat(formData.cost) : null,
-          quantityOnHand: formData.quantityOnHand,
           reorderLevel: formData.reorderLevel,
           reorderQuantity: formData.reorderQuantity,
           categoryId: formData.categoryId || null,
@@ -349,6 +348,8 @@ export default function ProductDetailPage() {
                   <Label>Quantity</Label>
                   <Input
                     type="number"
+                    disabled
+                    title="Use Adjust Stock to change quantity"
                     value={formData.quantityOnHand}
                     onChange={(e) => setFormData({ ...formData, quantityOnHand: parseInt(e.target.value) || 0 })}
                   />

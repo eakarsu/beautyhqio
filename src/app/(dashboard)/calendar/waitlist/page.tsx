@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +53,9 @@ const statusColors: Record<string, string> = {
 };
 
 export default function WaitlistPage() {
+  const [loadError, setLoadError] = useState('');
+  const addAttempt = useRef<string | null>(null);
+  const [consentToSms, setConsentToSms] = useState(false);
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -72,11 +75,14 @@ export default function WaitlistPage() {
   const fetchWaitlist = async () => {
     try {
       const response = await fetch("/api/waitlist");
+      if (!response.ok) { const failure = await response.json(); throw new Error(failure.error || "Waitlist request failed"); }
+      setLoadError("");
       if (response.ok) {
         const data = await response.json();
         setEntries(data);
       }
     } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Waitlist request failed");
       console.error("Error fetching waitlist:", error);
     } finally {
       setIsLoading(false);
@@ -85,17 +91,22 @@ export default function WaitlistPage() {
 
   const handleAddEntry = async () => {
     try {
+      addAttempt.current ||= crypto.randomUUID();
       const response = await fetch("/api/waitlist", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newEntry),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": addAttempt.current! },
+        body: JSON.stringify({ ...newEntry, consentToSms }),
       });
+      if (!response.ok) { const failure = await response.json(); throw new Error(failure.error || "Waitlist request failed"); }
+      setLoadError("");
       if (response.ok) {
+        addAttempt.current = null;
         setIsAddDialogOpen(false);
         setNewEntry({ clientName: "", phone: "", serviceNotes: "", estimatedDuration: 30 });
         fetchWaitlist();
       }
     } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Waitlist request failed");
       console.error("Error adding to waitlist:", error);
     }
   };
@@ -104,11 +115,15 @@ export default function WaitlistPage() {
     try {
       const response = await fetch(`/api/waitlist/${id}/seat`, {
         method: "POST",
+        headers: { "Idempotency-Key": `waitlist-seat-${id}` },
       });
+      if (!response.ok) { const failure = await response.json(); throw new Error(failure.error || "Waitlist request failed"); }
+      setLoadError("");
       if (response.ok) {
         fetchWaitlist();
       }
     } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Waitlist request failed");
       console.error("Error seating client:", error);
     }
   };
@@ -117,11 +132,15 @@ export default function WaitlistPage() {
     try {
       const response = await fetch(`/api/waitlist/${id}`, {
         method: "DELETE",
+        headers: { "Idempotency-Key": `waitlist-left-${id}` },
       });
+      if (!response.ok) { const failure = await response.json(); throw new Error(failure.error || "Waitlist request failed"); }
+      setLoadError("");
       if (response.ok) {
         fetchWaitlist();
       }
     } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Waitlist request failed");
       console.error("Error removing from waitlist:", error);
     }
   };
@@ -130,13 +149,16 @@ export default function WaitlistPage() {
     try {
       const response = await fetch(`/api/waitlist/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": `waitlist-notify-${id}` },
         body: JSON.stringify({ status: "NOTIFIED" }),
       });
+      if (!response.ok) { const failure = await response.json(); throw new Error(failure.error || "Waitlist request failed"); }
+      setLoadError("");
       if (response.ok) {
         fetchWaitlist();
       }
     } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Waitlist request failed");
       console.error("Error notifying client:", error);
     }
   };
@@ -159,6 +181,7 @@ export default function WaitlistPage() {
 
   return (
     <div className="p-6">
+      {loadError && <p role="alert" className="text-red-700">{loadError}</p>}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Walk-in Waitlist</h1>
@@ -216,6 +239,7 @@ export default function WaitlistPage() {
                 />
               </div>
             </div>
+            <label className="flex gap-2"><input type="checkbox" checked={consentToSms} onChange={e => setConsentToSms(e.target.checked)}/> Client agrees to SMS notifications</label>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancel

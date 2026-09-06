@@ -1,0 +1,2 @@
+import { z } from 'zod';
+export const campaignSchema = z.object({ name: z.string().trim().min(1).max(150), type: z.enum(['EMAIL', 'SMS']), subject: z.string().max(200).optional().nullable(), content: z.string().trim().min(1).max(10000), targetTags: z.array(z.string().max(100)).max(100).default([]), targetSegment: z.string().max(100).optional().nullable(), scheduledAt: z.preprocess(v => v === '' || v === null ? undefined : v, z.coerce.date().optional()) });

@@ -1,89 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-
-// GET /api/waitlist/[id] - Get waitlist entry
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-
-    const entry = await prisma.waitlistEntry.findUnique({
-      where: { id },
-      include: {
-        client: true,
-        location: true,
-      },
-    });
-
-    if (!entry) {
-      return NextResponse.json(
-        { error: "Waitlist entry not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(entry);
-  } catch (error) {
-    console.error("Error fetching waitlist entry:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch waitlist entry" },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT /api/waitlist/[id] - Update waitlist entry
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const body = await request.json();
-
-    const entry = await prisma.waitlistEntry.update({
-      where: { id },
-      data: body,
-      include: {
-        client: true,
-        location: true,
-      },
-    });
-
-    return NextResponse.json(entry);
-  } catch (error) {
-    console.error("Error updating waitlist entry:", error);
-    return NextResponse.json(
-      { error: "Failed to update waitlist entry" },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE /api/waitlist/[id] - Remove from waitlist
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-
-    await prisma.waitlistEntry.update({
-      where: { id },
-      data: {
-        status: "LEFT",
-        leftAt: new Date(),
-      },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error removing from waitlist:", error);
-    return NextResponse.json(
-      { error: "Failed to remove from waitlist" },
-      { status: 500 }
-    );
-  }
-}
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { context, endpoint, fail, mutation } from '@/lib/operations/core';
+import { updateWaitlist } from '@/lib/operations/waitlist';
+type Params = { params: Promise<{ id: string }> };
+export async function GET(req: Request, { params }: Params) { return endpoint(async () => { const ctx = await context(); const { id } = await params; return await prisma.waitlistEntry.findFirst({ where: { id, location: { businessId: ctx.businessId } }, include: { client: true, location: true } }) || fail(404, 'Waitlist entry not found'); }); }
+export async function PATCH(req: Request, { params }: Params) { return endpoint(async () => { const ctx = await context(); const { id } = await params; const { status } = z.object({ status: z.enum(['SEATED', 'LEFT', 'NOTIFIED']) }).parse(await req.json()); return mutation(ctx, req, 'waitlist.update', { id, status }, tx => updateWaitlist(tx, ctx, id, status)); }); }
+export const PUT = PATCH;
+export async function DELETE(req: Request, { params }: Params) { return endpoint(async () => { const ctx = await context(); const { id } = await params; return mutation(ctx, req, 'waitlist.leave', { id }, tx => updateWaitlist(tx, ctx, id, 'LEFT')); }); }

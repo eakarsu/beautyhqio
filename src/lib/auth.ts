@@ -217,7 +217,7 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.AUTH_DEBUG === "true" && process.env.NODE_ENV !== "production",
   cookies: {
     sessionToken: {
-      name: secureCookie ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
+      name: secureCookie ? `__Secure-beautyhqio.session-token` : `beautyhqio.session-token`,
       options: {
         httpOnly: true,
         sameSite: "lax" as const,
@@ -226,7 +226,7 @@ export const authOptions: NextAuthOptions = {
       },
     },
     callbackUrl: {
-      name: secureCookie ? `__Secure-next-auth.callback-url` : `next-auth.callback-url`,
+      name: secureCookie ? `__Secure-beautyhqio.callback-url` : `beautyhqio.callback-url`,
       options: {
         httpOnly: true,
         sameSite: "lax" as const,
@@ -235,7 +235,7 @@ export const authOptions: NextAuthOptions = {
       },
     },
     csrfToken: {
-      name: secureCookie ? `__Secure-next-auth.csrf-token` : `next-auth.csrf-token`,
+      name: secureCookie ? `__Secure-beautyhqio.csrf-token` : `beautyhqio.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: "lax" as const,

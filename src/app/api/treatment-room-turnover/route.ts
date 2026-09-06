@@ -1,18 +1,18 @@
-import { NextResponse } from "next/server";
-
+import { prisma } from '@/lib/prisma';
+import { context, endpoint, mutation } from '@/lib/operations/core';
+import { roomAction, roomActionSchema } from '@/lib/operations/rooms';
 export async function GET() {
-  return NextResponse.json({
-    feature: "Treatment Room Turnover",
-    summary: { roomsTracked: 8, readyNow: 5, cleaningBlocked: 2, averageTurnoverMinutes: 11 },
-    rooms: [
-      { room: "Spa 1", service: "Hydrafacial", status: "ready", nextAppointment: "10:30 AM", action: "Stock serum tray" },
-      { room: "Treatment 3", service: "Laser", status: "blocked", nextAppointment: "10:45 AM", action: "Complete safety checklist" },
-      { room: "Massage 2", service: "Deep tissue", status: "cleaning", nextAppointment: "11:00 AM", action: "Replace linens and aromatherapy kit" },
-    ],
-    supplies: [
-      { item: "Sterile gauze", roomsLow: 2 },
-      { item: "Facial serum set", roomsLow: 1 },
-      { item: "Disposable headbands", roomsLow: 3 },
-    ],
+  return endpoint(async () => {
+    const ctx = await context(['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF']);
+    const rooms = await prisma.treatmentRoom.findMany({ where: { businessId: ctx.businessId }, include: { location: { select: { name: true } }, reservations: { where: { end: { gte: new Date() }, appointment: { status: { notIn: ['CANCELLED', 'NO_SHOW', 'RESCHEDULED'] } } }, orderBy: { start: 'asc' }, take: 10 } }, orderBy: { name: 'asc' }, take: 200 });
+    const locations = await prisma.location.findMany({ where: { businessId: ctx.businessId, isActive: true }, select: { id: true, name: true } });
+    return { rooms, locations, canCreate: ['OWNER', 'MANAGER'].includes(ctx.user.role), summary: { roomsTracked: rooms.length, readyNow: rooms.filter(r => r.status === 'READY').length, cleaningBlocked: rooms.filter(r => r.status === 'BLOCKED').length } };
+  });
+}
+export async function POST(req: Request) {
+  return endpoint(async () => {
+    const ctx = await context(['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF']);
+    const input = roomActionSchema.parse(await req.json());
+    return mutation(ctx, req, 'room', input, tx => roomAction(tx, ctx, input));
   });
 }

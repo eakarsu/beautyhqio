@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import {getAuthenticatedUser} from "@/lib/api-auth";
+import {boundedBody} from "@/lib/operations/core";
 import { prisma } from "@/lib/prisma";
 
 const PLAN_CONFIG = {
@@ -10,13 +12,15 @@ const PLAN_CONFIG = {
 // POST /api/all-subscriptions - Create a new subscription
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const actor=await getAuthenticatedUser();if(!actor)return NextResponse.json({error:"Unauthorized"},{status:401});if(!actor.isPlatformAdmin)return NextResponse.json({error:"Platform administrator required"},{status:403});
+    const body = await boundedBody(request);
     const { businessName, email, phone, address, city, state, zipCode, businessType, plan } = body;
 
     if (!businessName || !email || !businessType || !plan) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    if(plan!=="STARTER")return NextResponse.json({error:"Paid plans require owner checkout and a verified paid subscription."},{status:409});
     const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
     if (!planConfig) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
@@ -60,7 +64,7 @@ export async function POST(request: NextRequest) {
         data: {
           businessId: business.id,
           slug: slug,
-          isListed: true,
+          isListed: false,
           specialties: [],
           amenities: [],
           galleryImages: [],
@@ -86,13 +90,14 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Subscription operation failed" }, { status: 500 });
   }
 }
 
 // GET /api/all-subscriptions - Get all subscriptions
 export async function GET(request: NextRequest) {
   try {
+    const actor=await getAuthenticatedUser();if(!actor)return NextResponse.json({error:"Unauthorized"},{status:401});if(!actor.isPlatformAdmin)return NextResponse.json({error:"Platform administrator required"},{status:403});
     const subscriptions = await prisma.businessSubscription.findMany({
       include: {
         business: {
@@ -133,6 +138,6 @@ export async function GET(request: NextRequest) {
       }))
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Subscription operation failed" }, { status: 500 });
   }
 }

@@ -11,6 +11,11 @@ datasource db {
 // ============ BUSINESS & LOCATIONS ============
 
 model Business {
+  taxReviewedAt DateTime?
+  taxReviewedById String?
+  servicesTaxable Boolean @default(false)
+  saleCheckouts SalonCheckout[]
+  billingAttempts BusinessBillingAttempt[]
   id      String       @id @default(cuid())
   name    String
   type    BusinessType
@@ -67,6 +72,14 @@ model Business {
   subscription     BusinessSubscription?
   publicProfile    PublicSalonProfile?
   marketplaceLeads MarketplaceLead[]
+  mutationReceipts MutationReceipt[]
+  timeEntries TimeEntry[]
+  treatmentRooms TreatmentRoom[]
+  knowledgeDocuments KnowledgeDocument[]
+  integrationConnections IntegrationConnection[]
+  outboundMessages OutboundMessage[]
+  paymentRefunds PaymentRefund[]
+  wearableSamples WearableSample[]
 }
 
 enum BusinessType {
@@ -84,6 +97,7 @@ enum BusinessType {
 }
 
 model Location {
+  treatmentRooms TreatmentRoom[]
   id    String  @id @default(cuid())
   name  String
   phone String?
@@ -210,6 +224,7 @@ enum UserRole {
 }
 
 model Staff {
+  timeEntries TimeEntry[]
   id          String  @id @default(cuid())
   displayName String?
   title       String?
@@ -346,6 +361,7 @@ model TimeOff {
 // ============ CLIENTS ============
 
 model Client {
+  wearableSamples WearableSample[]
   id        String  @id @default(cuid())
   firstName String
   lastName  String
@@ -633,6 +649,7 @@ model ServiceAddOn {
 // ============ APPOINTMENTS ============
 
 model Appointment {
+  roomReservation RoomReservation?
   id     String            @id @default(cuid())
   status AppointmentStatus @default(BOOKED)
 
@@ -855,6 +872,11 @@ enum WaitlistStatus {
 // ============ POINT OF SALE ============
 
 model Transaction {
+  version Int @default(1)
+  reviewedAt DateTime?
+  reviewedById String?
+  currency String @default("USD")
+  saleCheckouts SalonCheckout[]
   id                String            @id @default(cuid())
   transactionNumber String            @unique
   type              TransactionType   @default(SALE)
@@ -943,6 +965,10 @@ enum LineItemType {
 }
 
 model TransactionPayment {
+  verifiedAt DateTime?
+  source String?
+  actorId String?
+  refunds PaymentRefund[]
   id        String        @id @default(cuid())
   method    PaymentMethod
   amount    Decimal       @db.Decimal(10, 2)
@@ -1385,6 +1411,7 @@ model Referral {
 // ============ MARKETING ============
 
 model Campaign {
+  outboundMessages OutboundMessage[]
   id     String       @id @default(cuid())
   name   String
   type   CampaignType
@@ -2089,10 +2116,170 @@ model AiResult {
   output     Json
   tokens     Int?
   durationMs Int?
+  status String @default("DRAFT")
+  reviewedById String?
+  reviewedAt DateTime?
+  reviewNotes String?
+  providerRequestId String?
+  costUsd Decimal? @db.Decimal(12, 6)
   createdAt  DateTime @default(now())
 
   @@index([businessId, feature])
   @@index([feature, createdAt])
+}
+
+// Durable request receipts share a transaction with the business mutation.
+model MutationReceipt {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  key String
+  operation String
+  requestHash String
+  response Json
+  createdAt DateTime @default(now())
+  @@unique([businessId, key])
+}
+
+model TimeEntry {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id])
+  clockIn DateTime @default(now())
+  clockOut DateTime?
+  breakMinutes Int @default(0)
+  hourlyRate Decimal @db.Decimal(10, 2)
+  status String @default("OPEN")
+  notes String?
+  approvedById String?
+  approvedAt DateTime?
+  version Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([businessId, clockIn])
+  @@index([staffId, status])
+}
+
+model TreatmentRoom {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  locationId String
+  location Location @relation(fields: [locationId], references: [id])
+  name String
+  status String @default("READY")
+  checklist String[]
+  completedChecklist String[]
+  notes String?
+  lastCleanedAt DateTime?
+  updatedById String?
+  version Int @default(0)
+  reservations RoomReservation[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([locationId, name])
+  @@index([businessId, status])
+}
+
+model RoomReservation {
+  id String @id @default(cuid())
+  roomId String
+  room TreatmentRoom @relation(fields: [roomId], references: [id])
+  appointmentId String @unique
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  start DateTime
+  end DateTime
+  createdAt DateTime @default(now())
+  @@index([roomId, start, end])
+}
+
+model KnowledgeDocument {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  title String
+  content String
+  sourceUrl String?
+  tags String[]
+  isActive Boolean @default(true)
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([businessId, isActive])
+}
+
+model IntegrationConnection {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  provider String
+  encryptedCredentials String
+  configuration Json
+  status String @default("CONFIGURED")
+  lastVerifiedAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([businessId, provider])
+}
+
+model OutboundMessage {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  campaignId String?
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  clientId String
+  channel String
+  subject String?
+  content String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  dedupeKey String @unique
+  providerRef String?
+  lastError String?
+  nextAttemptAt DateTime @default(now())
+  deliveredAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([businessId, status])
+  @@index([status, nextAttemptAt])
+}
+
+model PaymentRefund {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  paymentId String
+  payment TransactionPayment @relation(fields: [paymentId], references: [id])
+  amount Decimal @db.Decimal(10, 2)
+  reason String
+  status String @default("PENDING")
+  providerRef String? @unique
+  lastError String?
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([businessId, status])
+}
+
+model WearableSample {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  clientId String
+  client Client @relation(fields: [clientId], references: [id])
+  provider String
+  externalId String
+  metric String
+  value Float
+  unit String
+  measuredAt DateTime
+  importedAt DateTime @default(now())
+  @@unique([clientId, provider, externalId, metric])
+  @@index([businessId, clientId, measuredAt])
 }
 
 // ============================================
@@ -2128,4 +2315,79 @@ model WellnessAuditLog {
 
   @@index([businessId, feature, createdAt])
   @@index([clientId, createdAt])
+}
+
+model BusinessBillingAttempt {
+ id String @id @default(cuid())
+ businessId String
+ business Business @relation(fields:[businessId],references:[id])
+ requestKey String
+ plan SubscriptionPlan
+ createdById String
+ status String @default("PENDING")
+ providerSessionId String? @unique
+ providerSubscriptionId String?
+ lastError String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@unique([businessId,requestKey])
+ @@index([businessId,status,createdAt])
+}
+
+model SalonCheckout {
+ id String @id @default(cuid())
+ businessId String
+ business Business @relation(fields:[businessId],references:[id])
+ transactionId String
+ transaction Transaction @relation(fields:[transactionId],references:[id])
+ amountCents Int
+ requestKey String
+ status String @default("PENDING")
+ providerRef String? @unique
+ paymentIntentId String?
+ createdById String
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@unique([businessId,requestKey])
+ @@index([businessId,status])
+}
+
+model CashDrawerSession {
+  id String @id @default(cuid())
+  businessId String
+  locationId String
+  openedById String
+  openingCents Int
+  baselineAt DateTime
+  status String @default("OPEN")
+  version Int @default(1)
+  countCents Int?
+  expectedCents Int?
+  varianceCents Int?
+  countedById String?
+  countedAt DateTime?
+  approvedById String?
+  approvedAt DateTime?
+  notes String
+  reviewNotes String?
+  snapshot Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([businessId, locationId, status])
+}
+model CashDrawerMovement {
+  id String @id @default(cuid())
+  sessionId String
+  actorId String
+  amountCents Int
+  reason String
+  createdAt DateTime @default(now())
+  @@index([sessionId, createdAt])
+}
+model CashDrawerAllocation {
+  receiptKey String @id
+  sessionId String
+  amountCents Int
+  createdAt DateTime @default(now())
+  @@index([sessionId])
 }

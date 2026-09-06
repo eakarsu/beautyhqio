@@ -1,0 +1,25 @@
+'use client';
+import { useState } from 'react';
+import { useOperation } from '@/components/operations/use-operation';
+import { Button } from '@/components/ui/button';
+const fields: Record<string, [string, string, boolean][]> = {
+  resend: [['apiKey', 'API key', true], ['from', 'Verified sender email', false]],
+  twilio: [['accountSid', 'Account SID', false], ['authToken', 'Auth token', true], ['from', 'Sender phone (+country code)', false]],
+  stripe: [['secretKey', 'Stripe secret key', true], ['webhookSecret', 'Salon webhook signing secret', true]],
+  google: [['clientId', 'OAuth client ID', false], ['clientSecret', 'OAuth client secret', true], ['refreshToken', 'Refresh token', true], ['calendarId', 'Calendar ID', false]],
+  quickbooks: [['clientId', 'OAuth client ID', false], ['clientSecret', 'OAuth client secret', true], ['refreshToken', 'Refresh token', true], ['realmId', 'Company ID', false]],
+};
+type Delivery = { id: string; channel?: string; kind?: string; status: string; attempts: number; lastError?: string | null; lastErrorCode?: string | null; providerRef: string | null; createdAt: string };
+export default function ProviderOperationsPage() {
+  const c = useOperation<{ connections: { provider: string; status: string; updatedAt: string }[]; canEdit: boolean; encryptionConfigured: boolean }>('/api/operations/connections');
+  const d = useOperation<{ messages: Delivery[]; appointments: Delivery[]; enabled: boolean }>('/api/operations/deliveries');
+  const [provider, setProvider] = useState('resend'); const [values, setValues] = useState<Record<string, string>>({}); const [sandbox, setSandbox] = useState(true);
+  return <main className="p-6 max-w-6xl space-y-6"><h1 className="text-2xl font-bold">Provider connections & deliveries</h1><p>Credentials are encrypted for this business. Saving configuration does not send messages or verify the provider account.</p>
+    {(c.error || d.error) && <div role="alert" className="text-red-700">{c.error || d.error}<Button variant="outline" onClick={() => { void c.load(); void d.load(); }}>Reload</Button></div>}
+    {c.data && !c.data.encryptionConfigured && <p>Ask the server administrator to configure the integration encryption key.</p>}
+    <div className="flex flex-wrap gap-3">{c.data?.connections.map(row => <div key={row.provider} className="border rounded p-3"><strong>{row.provider}</strong> · {row.status}{c.data?.canEdit && <Button variant="ghost" disabled={c.busy} onClick={() => c.save({ action: 'disconnect', provider: row.provider })}>Disconnect</Button>}</div>)}</div>
+    {c.data?.canEdit && <form className="rounded-xl border p-5 space-y-3" onSubmit={async e => { e.preventDefault(); if (await c.save({ action: 'save', provider, credentials: { ...values, ...(provider === 'quickbooks' ? { sandbox } : {}) } })) setValues({}); }}><label className="block">Provider<select className="block border rounded p-2" value={provider} onChange={e => { setProvider(e.target.value); setValues({}); }}>{Object.keys(fields).map(p => <option key={p}>{p}</option>)}</select></label>{fields[provider].map(([key, label, secret]) => <label key={key} className="block">{label}<input required autoComplete="off" type={secret ? 'password' : 'text'} className="block border rounded p-2 w-full" value={values[key] || ''} onChange={e => setValues({ ...values, [key]: e.target.value })}/></label>)}{provider === 'quickbooks' && <label className="block"><input type="checkbox" checked={sandbox} onChange={e => setSandbox(e.target.checked)}/> Sandbox account</label>}<Button disabled={c.busy || !c.data.encryptionConfigured}>Save configuration</Button></form>}
+    <h2 className="text-xl font-semibold">Delivery history</h2>{d.data && <p>Campaign delivery worker: {d.data.enabled ? 'enabled' : 'disabled'}. Accepted means the provider accepted the request; it does not confirm delivery to the recipient.</p>}
+    <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr>{['Created', 'Channel', 'Status', 'Attempts', 'Provider reference / error', 'Action'].map(h => <th className="p-2" key={h}>{h}</th>)}</tr></thead><tbody>{[...(d.data?.messages || []).map(r => ({ ...r, type: 'message' })), ...(d.data?.appointments || []).map(r => ({ ...r, type: 'appointment' }))].map(row => <tr key={row.id} className="border-t"><td className="p-2">{new Date(row.createdAt).toLocaleString()}</td><td className="p-2">{row.channel || row.kind}</td><td className="p-2">{row.status}</td><td className="p-2">{row.attempts}</td><td className="p-2 text-sm">{row.lastError || row.lastErrorCode || row.providerRef || '—'}</td><td className="p-2">{['FAILED', 'RETRY', 'DEAD_LETTER'].includes(row.status) && <Button variant="outline" size="sm" disabled={d.busy} onClick={() => d.save({ id: row.id, type: row.type, action: 'retry' })}>Retry</Button>}{row.type === 'message' && ['PENDING', 'RETRY'].includes(row.status) && <Button variant="ghost" size="sm" disabled={d.busy} onClick={() => d.save({ id: row.id, type: row.type, action: 'cancel' })}>Cancel</Button>}</td></tr>)}</tbody></table></div>
+  </main>;
+}

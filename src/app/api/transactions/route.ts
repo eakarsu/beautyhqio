@@ -29,23 +29,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Apply business filter - filter transactions by their location's businessId
-    if (!user.isPlatformAdmin && user.businessId) {
-      const locations = await prisma.location.findMany({
-        where: { businessId: user.businessId },
-        select: { id: true },
-      });
-      const locationIds = locations.map((l) => l.id);
-      if (locationIds.length > 0) {
-        where.locationId = locationId ? locationId : { in: locationIds };
-      }
-    } else if (locationId) {
-      where.locationId = locationId;
-    }
+    if(!user.isPlatformAdmin&&!user.businessId)return NextResponse.json({error:'Business required'},{status:403});
+    if(!['OWNER','MANAGER','RECEPTIONIST','STAFF','PLATFORM_ADMIN'].includes(user.role))return NextResponse.json({error:'Staff access required'},{status:403});
+    if(!user.isPlatformAdmin)where.location={businessId:user.businessId};
+    if(locationId)where.locationId=locationId;
+    if(user.role==='STAFF')where.staffId=user.staffId||'none';
 
     const transactions = await prisma.transaction.findMany({
       where,
-      take: limit,
+      take: Math.min(500,Math.max(1,limit||100)),
       include: {
         client: {
           select: {
@@ -112,3 +104,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export {POST} from "@/app/api/operations/sales/route";

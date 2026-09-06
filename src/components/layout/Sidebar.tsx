@@ -40,6 +40,11 @@ interface NavigationItem {
 
 // Define navigation with role-based access
 const navigation: NavigationItem[] = [
+  { name: "Cash drawer", href: "/cash-drawer", icon: Package, roles: ["OWNER", "MANAGER", "RECEPTIONIST"] },
+  { name: "Purchasing", href: "/purchasing", icon: Package, roles: ["OWNER", "MANAGER"] },
+  { name: "Provider Connections", href: "/operations/integrations", icon: Settings, roles: ["OWNER", "MANAGER"] },
+  { name: "Timesheets", href: "/timesheets", icon: Clock, roles: ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] },
+  { name: "AI Review & Knowledge", href: "/ai/workspace", icon: Bot, roles: ["OWNER", "MANAGER", "RECEPTIONIST"] },
   // Platform Admin Only
   {
     name: "Platform Overview",
