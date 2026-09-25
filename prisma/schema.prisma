@@ -2391,3 +2391,49 @@ model CashDrawerAllocation {
   createdAt DateTime @default(now())
   @@index([sessionId])
 }
+
+// ---- Salon reimbursement + POS (replaces the gap-nonai placeholders) -----
+model SalonClaim {
+  id               String   @id @default(cuid())
+  clientId         String?
+  appointmentId    String?
+  planType         String
+  serviceCode      String?
+  serviceName      String
+  amount           Decimal  @db.Decimal(12, 2)
+  eligibilityStatus String  @default("unknown")
+  eligibilityReason String?
+  claimStatus      String   @default("draft")
+  submittedAt      DateTime?
+  resolvedAt       DateTime?
+  reimbursedAmount Decimal? @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
+}
+
+model SalonPosTransaction {
+  id         String   @id @default(cuid())
+  registerId String
+  barcode    String?
+  itemName   String?
+  qty        Int      @default(1)
+  unitPrice  Decimal  @db.Decimal(12, 2)
+  total      Decimal  @db.Decimal(12, 2)
+  tenderType String   @default("cash")
+  status     String   @default("completed")
+  createdAt  DateTime @default(now())
+
+  @@index([registerId, createdAt])
+}
+
+model SalonDrawerEvent {
+  id             String   @id @default(cuid())
+  registerId     String
+  eventType      String
+  expectedAmount Decimal  @db.Decimal(12, 2)
+  countedAmount  Decimal  @db.Decimal(12, 2)
+  variance       Decimal  @db.Decimal(12, 2)
+  note           String?
+  recordedAt     DateTime @default(now())
+
+  @@index([registerId, recordedAt])
+}
