@@ -22,13 +22,15 @@ import prisma from "@/lib/prisma";
 import { requireRoles } from "@/lib/api-auth";
 
 /** Allowed transitions for a business subscription. */
+// Keys must match the SubscriptionStatus enum values stored in the database
+// (ACTIVE | PAST_DUE | CANCELLED | TRIAL). With lowercase keys every lookup
+// returned undefined and no transition was ever allowed.
 const FLOW: Record<string, string[]> = {
-  none: ["TRIAL", "PAST_DUE"],
-  trialing: ["ACTIVE", "CANCELLED", "PAST_DUE"],
-  pending_checkout: ["ACTIVE", "none", "PAST_DUE"],
-  past_due: ["ACTIVE", "CANCELLED", "PAST_DUE"],
-  active: ["CANCELLED", "PAST_DUE"],
-  cancelled: ["none", "TRIAL", "PAST_DUE"],
+  none: ['TRIAL', 'PAST_DUE'],        // business has no subscription yet
+  TRIAL: ['ACTIVE', 'PAST_DUE', 'CANCELLED'],
+  PAST_DUE: ['ACTIVE', 'CANCELLED', 'TRIAL'],
+  ACTIVE: ['CANCELLED', 'PAST_DUE'],
+  CANCELLED: ['TRIAL', 'PAST_DUE'],
 };
 
 export async function GET(request: Request) {
