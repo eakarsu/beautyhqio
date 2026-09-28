@@ -1570,10 +1570,11 @@ model SavedFilter {
 // ============ DAILY CLOSEOUT ============
 
 model DailyCloseout {
-  id      String   @id @default(cuid())
-  date    DateTime
-  staffId String?
-  staff   Staff?   @relation(fields: [staffId], references: [id])
+  id         String   @id @default(cuid())
+  date       DateTime
+  staffId    String?
+  staff      Staff?   @relation(fields: [staffId], references: [id])
+  businessId String?
 
   totalTransactions Int
   grossSales        Decimal @db.Decimal(10, 2)
@@ -1603,6 +1604,7 @@ model DailyCloseout {
   createdAt DateTime @default(now())
 
   @@unique([date, staffId])
+  @@index([businessId, date])
 }
 
 // ============ FAMILY GROUPS ============

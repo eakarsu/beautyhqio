@@ -20,6 +20,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireRoles } from "@/lib/api-auth";
+import { COMMISSION_RATES, SUBSCRIPTION_PRICING } from "@/lib/commission";
+import type { SubscriptionPlan } from "@prisma/client";
 
 /** Allowed transitions for a business subscription. */
 // Keys must match the SubscriptionStatus enum values stored in the database
@@ -80,10 +82,10 @@ export async function POST(request: Request) {
     const mode = String(body.mode ?? "trial"); // "trial" | "checkout"
     const PLANS = ["STARTER", "GROWTH", "PRO"] as const;
     const rawPlan = String(body.plan ?? "STARTER").toUpperCase();
-    const plan = (PLANS as readonly string[]).includes(rawPlan) ? (rawPlan as any) : "STARTER";
     if (!(PLANS as readonly string[]).includes(rawPlan)) {
       return NextResponse.json({ error: `plan must be one of: ${PLANS.join(", ")}` }, { status: 400 });
     }
+    const plan: SubscriptionPlan = rawPlan as SubscriptionPlan;
     const billingCycle = body.billingCycle === "annual" ? "annual" : "monthly";
     const trialDays = Number(body.trialDays ?? 14);
 
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
         {
           error: "This business already has an active paid subscription.",
           subscription: { plan: existing.plan, status: existing.status, currentPeriodEnd: existing.currentPeriodEnd },
-          allowedTransitions: FLOW.active,
+          allowedTransitions: FLOW.ACTIVE,
         },
         { status: 409 },
       );
@@ -122,6 +124,20 @@ export async function POST(request: Request) {
 
     /* ------------------------- trial activation ------------------------ */
     if (mode === "trial") {
+      // A trial is recorded once and never activates a paid plan: the record
+      // keeps TRIAL status until the signed webhook confirms a paid invoice.
+      if (existing?.trialEndsAt) {
+        return NextResponse.json(
+          {
+            activated: false,
+            mode: "trial",
+            state: current,
+            error:
+              "This business has already used its trial. Activate a paid plan through Stripe Checkout.",
+          },
+          { status: 409 },
+        );
+      }
       const trialEndsAt = new Date(Date.now() + trialDays * 86_400_000);
       const sub = await prisma.businessSubscription.upsert({
         where: { businessId },
@@ -131,20 +147,24 @@ export async function POST(request: Request) {
           status: "TRIAL",
           billingCycle,
           trialEndsAt,
-          monthlyPrice: body.monthlyPrice ?? 0,
+          monthlyPrice: SUBSCRIPTION_PRICING[plan],
+          marketplaceCommissionPct: COMMISSION_RATES[plan],
         },
         update: {
           plan,
           status: "TRIAL",
           billingCycle,
           trialEndsAt,
-          monthlyPrice: body.monthlyPrice ?? 0,
+          monthlyPrice: SUBSCRIPTION_PRICING[plan],
+          marketplaceCommissionPct: COMMISSION_RATES[plan],
         },
       });
 
       return NextResponse.json({
-        activated: true,
+        activated: false,
+        trialStarted: true,
         mode: "trial",
+        state: "TRIAL",
         subscription: {
           plan: sub.plan,
           status: sub.status,
@@ -152,7 +172,7 @@ export async function POST(request: Request) {
           monthlyPrice: sub.monthlyPrice,
           billingCycle: sub.billingCycle,
         },
-        note: `Trial active until ${trialEndsAt.toISOString().slice(0, 10)}. No payment is taken during a trial.`,
+        note: `Trial recorded until ${trialEndsAt.toISOString().slice(0, 10)}. No payment is taken and no paid plan is active; paid access begins only when Stripe confirms a paid subscription.`,
         nextStep: "Convert to paid with mode: \"checkout\" before the trial ends.",
       });
     }
@@ -197,11 +217,34 @@ export async function POST(request: Request) {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
-      line_items: [{ price: String(body.priceId), quantity: 1 }],
+      // Price comes from the server pricing table, so the amount charged and
+      // the plan the webhook syncs can never disagree.
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: SUBSCRIPTION_PRICING[plan] * 100,
+            recurring: { interval: "month" },
+            product_data: { name: `BeautyHQ ${plan}` },
+          },
+        },
+      ],
       success_url: String(body.successUrl ?? "/settings/billing?activation=success"),
       cancel_url: String(body.cancelUrl ?? "/settings/billing?activation=cancelled"),
-      metadata: { businessId: String(businessId), plan, billingCycle },
-      subscription_data: { metadata: { businessId: String(businessId), plan } },
+      metadata: {
+        businessId: String(businessId),
+        plan,
+        billingCycle,
+        type: "business_subscription",
+      },
+      subscription_data: {
+        metadata: {
+          businessId: String(businessId),
+          plan,
+          type: "business_subscription",
+        },
+      },
     });
 
     const sub = await prisma.businessSubscription.upsert({
@@ -211,9 +254,20 @@ export async function POST(request: Request) {
         plan,
         status: "PAST_DUE",
         billingCycle,
-        monthlyPrice: body.monthlyPrice ?? 0,
+        monthlyPrice: SUBSCRIPTION_PRICING[plan],
+        marketplaceCommissionPct: COMMISSION_RATES[plan],
+        stripeCustomerId: customerId,
       },
-      update: { plan, status: "PAST_DUE", billingCycle },
+      update: {
+        plan,
+        status: "PAST_DUE",
+        billingCycle,
+        monthlyPrice: SUBSCRIPTION_PRICING[plan],
+        marketplaceCommissionPct: COMMISSION_RATES[plan],
+        // The signed webhook only syncs when the stored customer matches the
+        // subscription's customer, so bind it to the checkout customer.
+        stripeCustomerId: customerId,
+      },
     });
 
     return NextResponse.json(
@@ -230,7 +284,7 @@ export async function POST(request: Request) {
         sessionId: session.id,
         note:
           "Redirect the customer to checkoutUrl. The subscription becomes active only when Stripe " +
-          "posts checkout.session.completed to the webhook — this endpoint never marks a plan active itself.",
+          "posts the signed subscription event to the webhook — this endpoint never marks a plan active itself.",
       },
       { status: 201 },
     );

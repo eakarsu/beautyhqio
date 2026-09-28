@@ -1,5 +1,6 @@
 // Receipt Generation Library
 import { Resend } from "resend";
+import { Prisma } from "@prisma/client";
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -38,6 +39,69 @@ export interface ReceiptData {
     reference?: string;
   }[];
   notes?: string;
+}
+
+export type ReceiptTransaction = Prisma.TransactionGetPayload<{
+  include: {
+    client: true;
+    staff: { include: { user: { select: { firstName: true; lastName: true } } } };
+    lineItems: { include: { service: true; product: true } };
+    payments: true;
+    tips: true;
+  };
+}>;
+
+// Single source of truth for the receipt payload shared by the receipt routes.
+export function buildReceiptData(
+  transaction: ReceiptTransaction,
+  settings: {
+    businessName: string | null;
+    address: string | null;
+    phone: string | null;
+    email: string | null;
+    taxRate: Prisma.Decimal | null;
+  } | null
+): ReceiptData {
+  return {
+    businessName: settings?.businessName || "Beauty & Wellness",
+    businessAddress: settings?.address || undefined,
+    businessPhone: settings?.phone || undefined,
+    businessEmail: settings?.email || undefined,
+    transactionId: transaction.id,
+    date: transaction.createdAt,
+    client: transaction.client
+      ? {
+          name: `${transaction.client.firstName} ${transaction.client.lastName}`,
+          email: transaction.client.email || undefined,
+          phone: transaction.client.phone || undefined,
+        }
+      : undefined,
+    staff: transaction.staff
+      ? {
+          name:
+            transaction.staff.displayName ||
+            `${transaction.staff.user.firstName} ${transaction.staff.user.lastName}`,
+        }
+      : undefined,
+    items: transaction.lineItems.map((item) => ({
+      name: item.service?.name || item.product?.name || "Item",
+      quantity: item.quantity,
+      price: Number(item.unitPrice),
+      discount: undefined,
+    })),
+    subtotal: Number(transaction.subtotal),
+    tax: Number(transaction.taxAmount),
+    taxRate: settings?.taxRate ? Number(settings.taxRate) : 8.875,
+    tip: transaction.tips.reduce((sum, t) => sum + Number(t.amount), 0) || undefined,
+    discount: transaction.discountAmount ? Number(transaction.discountAmount) : undefined,
+    total: Number(transaction.totalAmount),
+    payments: transaction.payments.map((p) => ({
+      method: p.method,
+      amount: Number(p.amount),
+      reference: p.reference || undefined,
+    })),
+    notes: transaction.notes || undefined,
+  };
 }
 
 // Generate receipt HTML
@@ -258,7 +322,7 @@ ${divider}
 export async function emailReceipt(
   to: string,
   data: ReceiptData
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   if (!resend) {
     return { success: false, error: "Email service not configured" };
   }
@@ -266,14 +330,21 @@ export async function emailReceipt(
   const html = generateReceiptHTML(data);
 
   try {
-    await resend.emails.send({
+    const { data: sent, error } = await resend.emails.send({
       from: `${data.businessName} <receipts@${process.env.EMAIL_DOMAIN || "beautywellness.com"}>`,
       to,
       subject: `Receipt from ${data.businessName} - ${data.transactionId}`,
       html,
     });
 
-    return { success: true };
+    if (error) {
+      return {
+        success: false,
+        error: error.message || "Email provider rejected the receipt",
+      };
+    }
+
+    return { success: true, messageId: sent?.id };
   } catch (error) {
     console.error("Error sending receipt email:", error);
     return {

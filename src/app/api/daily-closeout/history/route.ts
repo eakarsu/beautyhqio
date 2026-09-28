@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
 // GET /api/daily-closeout/history - Get closeout history
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("start");
     const endDate = searchParams.get("end");
     const staffId = searchParams.get("staffId");
     const limit = parseInt(searchParams.get("limit") || "30");
 
-    const whereClause: Record<string, unknown> = {};
+    const whereClause: Record<string, unknown> = { businessId: ctx.businessId };
 
     if (startDate || endDate) {
       whereClause.date = {};
@@ -23,13 +25,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (staffId) {
+      const staff = await prisma.staff.findFirst({
+        where: { id: staffId, location: { businessId: ctx.businessId } },
+        select: { id: true },
+      });
+      if (!staff) fail(404, "Staff member not found in this business");
       whereClause.staffId = staffId;
     }
 
     const closeouts = await prisma.dailyCloseout.findMany({
       where: whereClause,
       orderBy: { date: "desc" },
-      take: limit,
+      take: Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 500) : 30,
       include: {
         staff: {
           include: {
@@ -82,11 +89,5 @@ export async function GET(request: NextRequest) {
       })),
       summary,
     });
-  } catch (error) {
-    console.error("Error fetching closeout history:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch closeout history" },
-      { status: 500 }
-    );
-  }
+  });
 }

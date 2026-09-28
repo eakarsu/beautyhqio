@@ -1,30 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, requireRoles } from "@/lib/api-auth";
 
-// GET /api/settings - Get settings
+// GET /api/settings - Get settings (authenticated; never creates a row)
 export async function GET() {
   try {
-    let settings = await prisma.settings.findUnique({
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+
+    const settings = await prisma.settings.findUnique({
       where: { id: "default" },
     });
 
-    // If no settings exist, create default settings
-    if (!settings) {
-      settings = await prisma.settings.create({
-        data: {
-          id: "default",
-          businessName: "Glamour Studio",
-          address: "123 Beauty Lane, Suite 100",
-          phone: "(555) 123-4567",
-          email: "hello@glamourstudio.com",
-          taxRate: 0.0875,
-          openTime: "9:00 AM",
-          closeTime: "7:00 PM",
-        },
-      });
-    }
-
-    return NextResponse.json(settings);
+    // Missing settings are reported as empty; creation is a write operation.
+    return NextResponse.json(settings ?? {});
   } catch (error) {
     console.error("Error fetching settings:", error);
     return NextResponse.json(
@@ -34,9 +23,12 @@ export async function GET() {
   }
 }
 
-// PUT /api/settings - Update settings
+// PUT /api/settings - Update settings (owner/management only)
 export async function PUT(request: Request) {
   try {
+    const auth = await requireRoles(["OWNER", "MANAGER"]);
+    if (auth instanceof NextResponse) return auth;
+
     const data = await request.json();
 
     const settings = await prisma.settings.upsert({

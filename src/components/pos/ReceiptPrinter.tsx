@@ -67,6 +67,7 @@ export function ReceiptPrinter({
 }: ReceiptPrinterProps) {
   const [isSending, setIsSending] = useState(false);
   const [sentMethod, setSentMethod] = useState<"email" | "sms" | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
@@ -116,20 +117,26 @@ export function ReceiptPrinter({
     if (!receipt.client?.email) return;
 
     setIsSending(true);
+    setSendError(null);
     try {
-      await fetch("/api/receipts/send", {
+      const response = await fetch("/api/receipts/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiptId: receipt.id,
+          transactionId: receipt.transactionId,
           method: "email",
           email: receipt.client.email,
         }),
       });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send receipt email");
+      }
       setSentMethod("email");
       onEmailSent?.();
     } catch (error) {
       console.error("Error sending email:", error);
+      setSendError(error instanceof Error ? error.message : "Failed to send receipt email");
     } finally {
       setIsSending(false);
     }
@@ -139,20 +146,26 @@ export function ReceiptPrinter({
     if (!receipt.client?.phone) return;
 
     setIsSending(true);
+    setSendError(null);
     try {
-      await fetch("/api/receipts/send", {
+      const response = await fetch("/api/receipts/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiptId: receipt.id,
+          transactionId: receipt.transactionId,
           method: "sms",
           phone: receipt.client.phone,
         }),
       });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send receipt text");
+      }
       setSentMethod("sms");
       onSmsSent?.();
     } catch (error) {
       console.error("Error sending SMS:", error);
+      setSendError(error instanceof Error ? error.message : "Failed to send receipt text");
     } finally {
       setIsSending(false);
     }
@@ -295,6 +308,12 @@ export function ReceiptPrinter({
             <p>We hope to see you again soon.</p>
           </div>
         </div>
+
+        {sendError && (
+          <p role="alert" className="text-sm text-red-600 text-center">
+            {sendError}
+          </p>
+        )}
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <div className="flex gap-2 flex-1">

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
+
+const AVAILABILITY_ROLES = ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] as const;
 
 // GET /api/appointments/availability - Get available time slots with buffer time
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context([...AVAILABILITY_ROLES]);
     const { searchParams } = new URL(request.url);
     const staffId = searchParams.get("staffId");
     const serviceId = searchParams.get("serviceId");
@@ -11,31 +15,32 @@ export async function GET(request: NextRequest) {
     const bufferMinutes = parseInt(searchParams.get("buffer") || "15");
 
     if (!date) {
-      return NextResponse.json(
-        { error: "date is required" },
-        { status: 400 }
-      );
+      fail(400, "date is required");
+    }
+
+    if (!Number.isFinite(bufferMinutes) || bufferMinutes < 0 || bufferMinutes > 1440) {
+      fail(422, "buffer must be between 0 and 1440 minutes");
     }
 
     const targetDate = new Date(date);
+    if (Number.isNaN(targetDate.getTime())) {
+      fail(422, "A valid date is required");
+    }
+
     const startOfDay = new Date(targetDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Get service duration if serviceId provided
+    // Get service duration if serviceId provided (scoped to this business)
     let serviceDuration = 60; // Default 60 minutes
     if (serviceId) {
-      const service = await prisma.service.findUnique({
-        where: { id: serviceId },
+      const service = await prisma.service.findFirst({
+        where: { id: serviceId, businessId: ctx.businessId },
         select: { duration: true, bufferTime: true },
       });
       if (service) {
         serviceDuration = service.duration;
-        // Use service-specific buffer time if set
-        if (service.bufferTime) {
-          // bufferMinutes = service.bufferTime; // Could override here
-        }
       }
     }
 
@@ -46,14 +51,13 @@ export async function GET(request: NextRequest) {
       close: settings?.closeTime || "19:00",
     };
 
-    // Get staff to check
-    const staffWhere: Record<string, unknown> = { isActive: true };
-    if (staffId) {
-      staffWhere.id = staffId;
-    }
-
+    // Only staff of this business are offered
     const staff = await prisma.staff.findMany({
-      where: staffWhere,
+      where: {
+        isActive: true,
+        location: { businessId: ctx.businessId },
+        ...(staffId ? { id: staffId } : {}),
+      },
       select: {
         id: true,
         displayName: true,
@@ -64,9 +68,14 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get existing appointments for the day
+    if (staffId && staff.length === 0) {
+      fail(404, "Staff member not found in this business");
+    }
+
+    // Get existing appointments for the day in this business
     const existingAppointments = await prisma.appointment.findMany({
       where: {
+        businessId: ctx.businessId,
         scheduledStart: {
           gte: startOfDay,
           lte: endOfDay,
@@ -159,40 +168,54 @@ export async function GET(request: NextRequest) {
       bufferMinutes,
       availability,
     });
-  } catch (error) {
-    console.error("Error getting availability:", error);
-    return NextResponse.json(
-      { error: "Failed to get availability" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
-// POST /api/appointments/availability - Check if specific time is available
+// POST /api/appointments/availability - Check if a specific time is available
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
+  return endpoint(async () => {
+    const ctx = await context([...AVAILABILITY_ROLES]);
+    const body = await request.json().catch(() => ({}));
     const { staffId, startTime, endTime, excludeAppointmentId, bufferMinutes = 15 } = body;
 
     if (!staffId || !startTime || !endTime) {
-      return NextResponse.json(
-        { error: "staffId, startTime, and endTime are required" },
-        { status: 400 }
-      );
+      fail(400, "staffId, startTime, and endTime are required");
     }
 
     const requestedStart = new Date(startTime);
     const requestedEnd = new Date(endTime);
+    if (Number.isNaN(requestedStart.getTime()) || Number.isNaN(requestedEnd.getTime())) {
+      fail(422, "startTime and endTime must be valid dates");
+    }
+    if (requestedEnd <= requestedStart) {
+      fail(422, "endTime must be after startTime");
+    }
+
+    const buffer = Number(bufferMinutes);
+    if (!Number.isFinite(buffer) || buffer < 0 || buffer > 1440) {
+      fail(422, "bufferMinutes must be between 0 and 1440");
+    }
+
+    // The staff member must belong to the caller's business
+    const staff = await prisma.staff.findFirst({
+      where: { id: staffId, location: { businessId: ctx.businessId } },
+      select: { id: true },
+    });
+    if (!staff) {
+      fail(404, "Staff member not found in this business");
+    }
 
     // Add buffer time
-    const bufferedStart = new Date(requestedStart.getTime() - bufferMinutes * 60000);
-    const bufferedEnd = new Date(requestedEnd.getTime() + bufferMinutes * 60000);
+    const bufferedStart = new Date(requestedStart.getTime() - buffer * 60000);
+    const bufferedEnd = new Date(requestedEnd.getTime() + buffer * 60000);
 
-    // Check for conflicts
+    // Check for conflicts against the real schema: appointments end at
+    // scheduledEnd and use the AppointmentStatus enum values.
     const whereClause: Record<string, unknown> = {
+      businessId: ctx.businessId,
       staffId,
       status: {
-        in: ["CONFIRMED", "BOOKED", "IN_PROGRESS"],
+        in: ["BOOKED", "CONFIRMED", "CHECKED_IN", "IN_SERVICE"],
       },
       OR: [
         {
@@ -204,7 +227,7 @@ export async function POST(request: NextRequest) {
         },
         {
           // Appointment ends during requested time
-          endTime: {
+          scheduledEnd: {
             gt: bufferedStart,
             lte: bufferedEnd,
           },
@@ -213,7 +236,7 @@ export async function POST(request: NextRequest) {
           // Appointment spans requested time
           AND: [
             { scheduledStart: { lte: bufferedStart } },
-            { endTime: { gte: bufferedEnd } },
+            { scheduledEnd: { gte: bufferedEnd } },
           ],
         },
       ],
@@ -251,11 +274,5 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-  } catch (error) {
-    console.error("Error checking availability:", error);
-    return NextResponse.json(
-      { error: "Failed to check availability" },
-      { status: 500 }
-    );
-  }
+  });
 }

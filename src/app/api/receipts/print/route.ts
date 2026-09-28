@@ -1,89 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateReceiptText, generateESCPOS, ReceiptData } from "@/lib/receipt";
+import { buildReceiptData, generateReceiptText, generateESCPOS } from "@/lib/receipt";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
-// POST /api/receipts/print - Get printable receipt data
+const RECEIPT_ROLES = ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] as const;
+
+const transactionInclude = {
+  client: true,
+  staff: { include: { user: { select: { firstName: true, lastName: true } } } },
+  lineItems: { include: { service: true, product: true } },
+  payments: true,
+  tips: true,
+} as const;
+
+// POST /api/receipts/print - Get printable receipt data for a tenant transaction
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
+  return endpoint(async () => {
+    const ctx = await context([...RECEIPT_ROLES]);
+    const body = await request.json().catch(() => ({}));
     const { transactionId, format = "text" } = body;
 
-    if (!transactionId) {
-      return NextResponse.json(
-        { error: "transactionId is required" },
-        { status: 400 }
-      );
-    }
+    if (!transactionId) fail(422, "transactionId is required");
 
-    // Get transaction with all related data
-    const transaction = await prisma.transaction.findUnique({
-      where: { id: transactionId },
-      include: {
-        client: true,
-        staff: {
-          include: { user: { select: { firstName: true, lastName: true } } },
-        },
-        lineItems: {
-          include: {
-            service: true,
-            product: true,
-          },
-        },
-        payments: true,
-        tips: true,
-      },
+    const transaction = await prisma.transaction.findFirst({
+      where: { id: transactionId, location: { businessId: ctx.businessId } },
+      include: transactionInclude,
     });
 
-    if (!transaction) {
-      return NextResponse.json(
-        { error: "Transaction not found" },
-        { status: 404 }
-      );
-    }
+    if (!transaction) fail(404, "Transaction not found");
 
-    // Get business settings
     const settings = await prisma.settings.findFirst();
-
-    // Build receipt data
-    const receiptData: ReceiptData = {
-      businessName: settings?.businessName || "Beauty & Wellness",
-      businessAddress: settings?.address || undefined,
-      businessPhone: settings?.phone || undefined,
-      businessEmail: settings?.email || undefined,
-      transactionId: transaction.id,
-      date: transaction.createdAt,
-      client: transaction.client
-        ? {
-            name: `${transaction.client.firstName} ${transaction.client.lastName}`,
-            email: transaction.client.email || undefined,
-            phone: transaction.client.phone || undefined,
-          }
-        : undefined,
-      staff: transaction.staff
-        ? {
-            name: transaction.staff.displayName ||
-              `${transaction.staff.user.firstName} ${transaction.staff.user.lastName}`,
-          }
-        : undefined,
-      items: transaction.lineItems.map((item) => ({
-        name: item.service?.name || item.product?.name || "Item",
-        quantity: item.quantity,
-        price: Number(item.unitPrice),
-        discount: undefined,
-      })),
-      subtotal: Number(transaction.subtotal),
-      tax: Number(transaction.taxAmount),
-      taxRate: settings?.taxRate ? Number(settings.taxRate) : 8.875,
-      tip: transaction.tips.reduce((sum, t) => sum + Number(t.amount), 0) || undefined,
-      discount: transaction.discountAmount ? Number(transaction.discountAmount) : undefined,
-      total: Number(transaction.totalAmount),
-      payments: transaction.payments.map((p) => ({
-        method: p.method,
-        amount: Number(p.amount),
-        reference: p.reference || undefined,
-      })),
-      notes: transaction.notes || undefined,
-    };
+    const receiptData = buildReceiptData(transaction, settings);
 
     // Generate print data based on format
     if (format === "escpos") {
@@ -104,11 +51,5 @@ export async function POST(request: NextRequest) {
       text: textReceipt,
       data: receiptData,
     });
-  } catch (error) {
-    console.error("Error generating print receipt:", error);
-    return NextResponse.json(
-      { error: "Failed to generate print receipt" },
-      { status: 500 }
-    );
-  }
+  });
 }
