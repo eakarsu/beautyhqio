@@ -656,11 +656,13 @@ async function main(prisma: Prisma.TransactionClient) {
 
   // First, create 15+ COMPLETED appointments for EACH staff member with unique clients
   for (const staff of staffMembers) {
-    // Each staff gets appointments with first 18 clients (ensuring at least 15 unique)
+    // Each staff gets appointments with first 18 clients (ensuring at least 15 unique).
+    // One appointment per past day per staff, so a staff member never has two
+    // overlapping bookings (the DB enforces a staff no-overlap exclusion constraint).
     for (let i = 0; i < 18; i++) {
       const client = clients[i];
-      const dayOffset = -1 - Math.floor(Math.random() * 30); // Past 30 days
-      const hour = 9 + Math.floor(Math.random() * 9); // 9am to 6pm
+      const dayOffset = -1 - i; // distinct past day per appointment
+      const hour = 9 + (i % 9); // 9am to 5pm
       const appointmentDate = new Date(today);
       appointmentDate.setDate(today.getDate() + dayOffset);
       appointmentDate.setHours(hour, 0, 0, 0);
@@ -694,10 +696,12 @@ async function main(prisma: Prisma.TransactionClient) {
     }
   }
 
-  // Add appointments for TODAY and upcoming days (more visible on calendar)
-  for (let i = 0; i < 50; i++) {
-    const dayOffset = Math.floor(Math.random() * 7); // 0 to 6 days (today + next 6 days)
-    const hour = 9 + Math.floor(Math.random() * 9);
+  // Add appointments for TODAY and upcoming days (more visible on calendar).
+  // Round-robin staff with a distinct day per staff so bookings never overlap.
+  for (let i = 0; i < 50 && staffMembers.length > 0; i++) {
+    const staff = staffMembers[i % staffMembers.length];
+    const dayOffset = Math.floor(i / staffMembers.length); // distinct day per staff
+    const hour = 9 + (i % 9);
     const appointmentDate = new Date(today);
     appointmentDate.setDate(today.getDate() + dayOffset);
     appointmentDate.setHours(hour, 0, 0, 0);
@@ -708,17 +712,17 @@ async function main(prisma: Prisma.TransactionClient) {
 
     const status = Math.random() > 0.3 ? "CONFIRMED" : "BOOKED";
 
-    if (staffMembers.length > 0) {
+    {
       const apt = await prisma.appointment.create({
         data: {
           businessId: business.id,
-          clientId: clients[Math.floor(Math.random() * clients.length)].id,
-          staffId: staffMembers[Math.floor(Math.random() * staffMembers.length)].id,
+          clientId: clients[i % clients.length].id,
+          staffId: staff.id,
           locationId: locations[0].id,
           scheduledStart: appointmentDate,
           scheduledEnd: endDate,
           status: status as any,
-          source: ["ONLINE", "PHONE", "WALK_IN", "APP"][Math.floor(Math.random() * 4)] as any,
+          source: ["ONLINE", "PHONE", "WALK_IN", "APP"][i % 4] as any,
         },
       });
 
