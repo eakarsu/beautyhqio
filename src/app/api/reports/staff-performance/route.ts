@@ -1,21 +1,43 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
 // GET /api/reports/staff-performance - Staff performance report
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-    const locationId = searchParams.get("locationId");
+    const startDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("startDate") || undefined);
+    const endDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("endDate") || undefined);
+    const locationId = z
+      .string()
+      .trim()
+      .min(1)
+      .max(191)
+      .optional()
+      .parse(searchParams.get("locationId") || undefined);
 
     const dateFilter: Record<string, Date> = {};
     if (startDate) dateFilter.gte = new Date(startDate);
     if (endDate) dateFilter.lte = new Date(endDate);
 
-    // Get all staff
+    // Get all staff (Staff has no businessId; scope through location)
     const staff = await prisma.staff.findMany({
-      where: locationId ? { locationId } : {},
+      where: {
+        location: {
+          businessId: ctx.businessId,
+          ...(locationId && { id: locationId }),
+        },
+      },
       select: {
         id: true,
         displayName: true,
@@ -38,6 +60,7 @@ export async function GET(request: NextRequest) {
         const appointments = await prisma.appointment.findMany({
           where: {
             staffId: member.id,
+            businessId: ctx.businessId,
             ...(Object.keys(dateFilter).length && { scheduledStart: dateFilter }),
           },
           select: {
@@ -75,6 +98,7 @@ export async function GET(request: NextRequest) {
           where: {
             performedById: member.id,
             transaction: {
+              location: { businessId: ctx.businessId },
               status: "COMPLETED",
               ...(Object.keys(dateFilter).length && { date: dateFilter }),
             },
@@ -129,7 +153,7 @@ export async function GET(request: NextRequest) {
     // Sort by revenue
     staffPerformance.sort((a, b) => b.revenue.total - a.revenue.total);
 
-    return NextResponse.json({
+    return {
       period: { startDate, endDate },
       staff: staffPerformance,
       totals: {
@@ -140,12 +164,6 @@ export async function GET(request: NextRequest) {
         revenue: staffPerformance.reduce((sum, s) => sum + s.revenue.total, 0),
         hoursWorked: staffPerformance.reduce((sum, s) => sum + s.hoursWorked, 0),
       },
-    });
-  } catch (error) {
-    console.error("Error generating staff performance report:", error);
-    return NextResponse.json(
-      { error: "Failed to generate report" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

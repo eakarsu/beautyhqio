@@ -50,6 +50,7 @@ import {
   Gift,
   Heart,
 } from "lucide-react";
+import { CardScenarioButtons } from "@/components/ai/CardScenarioButtons";
 
 interface AIResponse {
   loading: boolean;
@@ -258,6 +259,127 @@ const aiFeatures = [
     href: "/dashboard/ai-wellness/loyalty-optimizer",
     badge: "Wellness",
   },
+  // ── Tools that previously existed only as API routes ─────────────────────
+  {
+    id: "translate",
+    title: "Translate",
+    description: "Translate client-facing messages into another language",
+    icon: Languages,
+    color: "from-teal-500 to-emerald-600",
+    href: "/ai/translate",
+  },
+  {
+    id: "message-generator",
+    title: "Message Generator",
+    description: "Draft client messages for a chosen purpose and tone",
+    icon: MessageSquare,
+    color: "from-sky-500 to-blue-600",
+    href: "/ai/message-generator",
+  },
+  {
+    id: "review-response",
+    title: "Review Response",
+    description: "Draft replies to customer reviews",
+    icon: Star,
+    color: "from-amber-500 to-orange-600",
+    href: "/ai/review-response",
+  },
+  {
+    id: "business-insights",
+    title: "Business Insights",
+    description: "Summarise operating performance over a period",
+    icon: BarChart3,
+    color: "from-indigo-500 to-violet-600",
+    href: "/ai/business-insights",
+  },
+  {
+    id: "appointment-optimizer",
+    title: "Appointment Optimizer",
+    description: "Find schedule gaps and suggest improvements for a day",
+    icon: Calendar,
+    color: "from-cyan-500 to-blue-600",
+    href: "/ai/appointment-optimizer",
+  },
+  {
+    id: "staff-matcher",
+    title: "Staff Matcher",
+    description: "Match a client and service to the best-suited staff member",
+    icon: Users,
+    color: "from-fuchsia-500 to-pink-600",
+    href: "/ai/staff-matcher",
+  },
+  {
+    id: "therapist-match",
+    title: "Therapist Match",
+    description: "Match a client to a suitable therapist for a service",
+    icon: Users,
+    color: "from-rose-500 to-red-600",
+    href: "/ai/therapist-match",
+  },
+  {
+    id: "booking-assistant",
+    title: "Booking Assistant",
+    description: "Turn a natural-language request into a booking suggestion",
+    icon: Calendar,
+    color: "from-emerald-500 to-teal-600",
+    href: "/ai/booking-assistant",
+  },
+  {
+    id: "checkin-recommend",
+    title: "Check-in Recommendations",
+    description: "Suggest add-ons and next steps when a client checks in",
+    icon: UserCheck,
+    color: "from-lime-500 to-green-600",
+    href: "/ai/checkin-recommend",
+  },
+  {
+    id: "waitlist-intelligence",
+    title: "Waitlist Intelligence",
+    description: "Rank waitlisted clients for a given opening",
+    icon: Clock,
+    color: "from-orange-500 to-amber-600",
+    href: "/ai/waitlist-intelligence",
+  },
+  {
+    id: "inventory-autopilot",
+    title: "Inventory Autopilot",
+    description: "Review stock and suggest reorders",
+    icon: Package,
+    color: "from-slate-500 to-gray-600",
+    href: "/ai/inventory-autopilot",
+  },
+  {
+    id: "before-after",
+    title: "Before & After",
+    description: "Compare two service photographs",
+    icon: Sparkles,
+    color: "from-pink-500 to-purple-600",
+    href: "/ai/before-after",
+  },
+  {
+    id: "staff-shift-preferences",
+    title: "Shift Preferences",
+    description: "Infer preferred shifts from a staff member's history",
+    icon: Clock,
+    color: "from-violet-500 to-indigo-600",
+    href: "/ai/staff-shift-preferences",
+  },
+  {
+    id: "voice-receptionist",
+    title: "Voice Receptionist",
+    description: "Handle an incoming caller and draft the receptionist reply",
+    icon: Mic,
+    color: "from-blue-500 to-indigo-600",
+    href: "/ai/voice-receptionist",
+  },
+  {
+    id: "skin-kiosk",
+    title: "Skin Kiosk",
+    description: "Cosmetic observations from a photo, within consent limits",
+    icon: Sparkles,
+    color: "from-fuchsia-500 to-rose-600",
+    href: "/ai/skin-kiosk",
+  },
 ];
 
 export default function AIDashboardPage() {
@@ -375,7 +497,11 @@ export default function AIDashboardPage() {
                   {feature.title}
                 </h3>
                 <p className="text-sm text-slate-500 mb-4">{feature.description}</p>
-                <div className="flex items-center text-rose-500 text-sm font-medium">
+                <CardScenarioButtons
+                  fixtureKey={feature.href.split("/").filter(Boolean).pop() ?? ""}
+                  href={feature.href}
+                />
+                <div className="flex items-center text-rose-500 text-sm font-medium pt-3">
                   <span>Open</span>
                   <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                 </div>

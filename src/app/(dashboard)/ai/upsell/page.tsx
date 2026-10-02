@@ -23,6 +23,8 @@ import {
   Shuffle,
   Star,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface Client {
   id: string;
@@ -93,8 +95,9 @@ export default function UpsellPage() {
     setSelectedClientId("");
   };
 
-  const handleGenerate = async () => {
-    if (!currentService) {
+  const handleGenerate = async (override?: Record<string, string>) => {
+    const currentServiceValue = override?.currentService ?? currentService;
+    if (!currentServiceValue) {
       setError("Please select a current service");
       return;
     }
@@ -109,7 +112,7 @@ export default function UpsellPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId: selectedClientId || undefined,
-          currentServices: [{ name: currentService, price: 0 }],
+          currentServices: [{ name: currentServiceValue, price: 0 }],
         }),
       });
 
@@ -176,6 +179,17 @@ export default function UpsellPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FillButtons
+              fixture={AI_FIXTURES["upsell"]}
+              apply={(values) => {
+                if (values.clientName !== undefined) setClientName(values.clientName);
+                if (values.currentService !== undefined) setCurrentService(values.currentService);
+                if (values.clientHistory !== undefined) setClientHistory(values.clientHistory);
+              }}
+              onRun={(values) => handleGenerate(values)}
+              onClear={() => { setClientName(""); setCurrentService(""); setClientHistory(""); }}
+              running={loading}
+            />
             {/* Client Selection */}
             <div className="space-y-2">
               <Label>Client</Label>
@@ -239,7 +253,7 @@ export default function UpsellPage() {
 
             <Button
               className="w-full"
-              onClick={handleGenerate}
+              onClick={() => handleGenerate()}
               disabled={loading || !currentService}
             >
               {loading ? (

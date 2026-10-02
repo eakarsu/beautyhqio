@@ -1,20 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { ActivityType } from "@prisma/client";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
+
+const activityTypes = [
+  "APPOINTMENT_BOOKED",
+  "APPOINTMENT_COMPLETED",
+  "APPOINTMENT_CANCELLED",
+  "APPOINTMENT_RESCHEDULED",
+  "APPOINTMENT_NO_SHOW",
+  "PURCHASE",
+  "LOYALTY_EARNED",
+  "LOYALTY_REDEEMED",
+  "EMAIL_SENT",
+  "SMS_SENT",
+  "CALL_LOGGED",
+  "NOTE_ADDED",
+  "PHOTO_ADDED",
+  "REVIEW_RECEIVED",
+  "PROFILE_UPDATED",
+  "REFERRAL_MADE",
+  "GIFT_CARD_PURCHASED",
+  "GIFT_CARD_REDEEMED",
+] as const;
+
+const activityTypeSchema = z.enum(activityTypes);
 
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get("clientId");
-    const type = searchParams.get("type");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const typeParam = searchParams.get("type");
+    const limit = z.coerce.number().int().min(1).max(200).parse(searchParams.get("limit") || 50);
+    const offset = z.coerce.number().int().min(0).max(1000000).parse(searchParams.get("offset") || 0);
+    const type = typeParam ? activityTypeSchema.parse(typeParam) : undefined;
+
+    const where: Prisma.ActivityWhereInput = {
+      client: { businessId: ctx.businessId },
+      ...(clientId && { clientId }),
+      ...(type && { type }),
+    };
 
     const activities = await prisma.activity.findMany({
-      where: {
-        ...(clientId && { clientId }),
-        ...(type && { type: type as ActivityType }),
-      },
+      where,
       include: {
         client: {
           select: {
@@ -29,47 +59,43 @@ export async function GET(request: NextRequest) {
       skip: offset,
     });
 
-    const total = await prisma.activity.count({
-      where: {
-        ...(clientId && { clientId }),
-        ...(type && { type: type as ActivityType }),
-      },
-    });
+    const total = await prisma.activity.count({ where });
 
-    return NextResponse.json({
+    return {
       activities,
       total,
       hasMore: offset + limit < total,
-    });
-  } catch (error) {
-    console.error("Error fetching activities:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch activities" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { clientId, userId, type, title, description, metadata } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    const body = z
+      .object({
+        clientId: idSchema,
+        type: activityTypeSchema,
+        title: z.string().trim().min(1).max(200),
+        description: z.string().max(2000).optional().nullable(),
+        metadata: z.unknown().optional(),
+      })
+      .parse(await request.json());
 
-    if (!clientId || !type || !title) {
-      return NextResponse.json(
-        { error: "clientId, type, and title are required" },
-        { status: 400 }
-      );
-    }
+    const client = await prisma.client.findFirst({
+      where: { id: body.clientId, businessId: ctx.businessId },
+      select: { id: true },
+    });
+    if (!client) fail(404, "Client not found");
 
-    const activity = await prisma.activity.create({
+    return prisma.activity.create({
       data: {
-        clientId,
-        userId,
-        type,
-        title,
-        description,
-        metadata: metadata || {},
+        clientId: body.clientId,
+        userId: ctx.user.id,
+        type: body.type,
+        title: body.title,
+        description: body.description ?? null,
+        metadata: (body.metadata ?? {}) as Prisma.InputJsonValue,
       },
       include: {
         client: {
@@ -77,13 +103,5 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-
-    return NextResponse.json(activity);
-  } catch (error) {
-    console.error("Error creating activity:", error);
-    return NextResponse.json(
-      { error: "Failed to create activity" },
-      { status: 500 }
-    );
-  }
+  });
 }

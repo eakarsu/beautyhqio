@@ -1,30 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
+import twilio from "twilio";
+import { endpoint } from "@/lib/operations/core";
 import { prisma } from "@/lib/prisma";
 
-// POST /api/voice/transcription - Handle voicemail transcription
+// Provider-initiated (Twilio voicemail transcription callback). Signature-gated.
 export async function POST(request: NextRequest) {
-  try {
+  return endpoint(async () => {
     const formData = await request.formData();
+
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!authToken) {
+      return NextResponse.json({ error: "Twilio integration is not configured" }, { status: 503 });
+    }
+    const signature = request.headers.get("x-twilio-signature") || "";
+    const params: Record<string, string> = {};
+    formData.forEach((value, key) => {
+      if (typeof value === "string") params[key] = value;
+    });
+    // Sign the public URL Twilio was configured with, falling back to the request URL.
+    const signingUrl = process.env.NEXT_PUBLIC_APP_URL
+      ? new URL(request.nextUrl.pathname + request.nextUrl.search, process.env.NEXT_PUBLIC_APP_URL).toString()
+      : request.url;
+    if (!signature || !twilio.validateRequest(authToken, signature, signingUrl, params)) {
+      return NextResponse.json({ error: "Invalid Twilio signature" }, { status: 403 });
+    }
+
     const transcriptionText = formData.get("TranscriptionText") as string;
     const transcriptionStatus = formData.get("TranscriptionStatus") as string;
     const recordingSid = formData.get("RecordingSid") as string;
     const from = formData.get("From") as string;
 
-    console.log(`Transcription received for ${recordingSid}: ${transcriptionStatus}`);
-
     if (transcriptionStatus === "completed" && transcriptionText) {
-      // Find the activity with this recording
-      const activity = await prisma.activity.findFirst({
-        where: {
-          metadata: {
-            path: ["recordingSid"],
-            equals: recordingSid,
-          },
-        },
-      });
+      // Resolve the caller's client first, then scope the activity to that client.
+      const client = from
+        ? await prisma.client.findFirst({
+            where: {
+              phone: {
+                contains: from.replace(/\D/g, "").slice(-10),
+              },
+            },
+            select: { id: true, businessId: true },
+          })
+        : null;
+
+      const activity = client
+        ? await prisma.activity.findFirst({
+            where: {
+              clientId: client.id,
+              metadata: {
+                path: ["recordingSid"],
+                equals: recordingSid,
+              },
+            },
+          })
+        : null;
 
       if (activity) {
-        // Update the activity with transcription
         const currentMetadata = activity.metadata as Record<string, unknown>;
         await prisma.activity.update({
           where: { id: activity.id },
@@ -37,42 +68,25 @@ export async function POST(request: NextRequest) {
             },
           },
         });
-      } else {
-        // Create new activity if original not found
-        const client = await prisma.client.findFirst({
-          where: {
-            phone: {
-              contains: from?.replace(/\D/g, "").slice(-10) || "",
+      } else if (client) {
+        await prisma.activity.create({
+          data: {
+            clientId: client.id,
+            type: "CALL_LOGGED",
+            title: "Voicemail transcription",
+            description: `Voicemail: "${transcriptionText}"`,
+            metadata: {
+              recordingSid,
+              transcription: transcriptionText,
+              transcriptionStatus,
+              from,
+              businessId: client.businessId,
             },
           },
         });
-
-        // Only create activity if client exists (clientId is required)
-        if (client) {
-          await prisma.activity.create({
-            data: {
-              clientId: client.id,
-              type: "CALL_LOGGED",
-              title: "Voicemail transcription",
-              description: `Voicemail: "${transcriptionText}"`,
-              metadata: {
-                recordingSid,
-                transcription: transcriptionText,
-                transcriptionStatus,
-                from,
-              },
-            },
-          });
-        }
       }
     }
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error handling transcription:", error);
-    return NextResponse.json(
-      { error: "Failed to process transcription" },
-      { status: 500 }
-    );
-  }
+    return { success: true };
+  });
 }

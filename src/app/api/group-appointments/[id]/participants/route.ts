@@ -1,56 +1,69 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
+
+const addParticipantSchema = z.object({
+  name: z.string().trim().min(1).max(150),
+  phone: z.string().trim().max(40).optional().nullable(),
+  email: z.union([z.string().email().max(200), z.literal("")]).optional().nullable(),
+  clientId: idSchema.optional().nullable(),
+  paidAmount: z.coerce.number().finite().nonnegative().max(1_000_000).optional().nullable(),
+});
+
+const updateParticipantSchema = z.object({
+  name: z.string().trim().min(1).max(150).optional(),
+  phone: z.string().trim().max(40).optional().nullable(),
+  email: z.union([z.string().email().max(200), z.literal("")]).optional().nullable(),
+  status: z.string().trim().max(40).optional(),
+  checkedIn: z.boolean().optional(),
+  paidAmount: z.coerce.number().finite().nonnegative().max(1_000_000).optional().nullable(),
+});
+
+async function tenantLocationIds(businessId: string) {
+  return (await prisma.location.findMany({ where: { businessId }, select: { id: true } })).map((l) => l.id);
+}
+
+async function assertAppointment(ctx: { businessId: string }, id: string) {
+  // GroupAppointment has no businessId column and no Location relation, so the
+  // tenant filter is expressed through the tenant's location ids.
+  const locationIds = await tenantLocationIds(ctx.businessId);
+  const appointment = await prisma.groupAppointment.findFirst({
+    where: { id, locationId: { in: locationIds } },
+    select: { id: true, maxParticipants: true, minParticipants: true, status: true, _count: { select: { participants: true } } },
+  });
+  if (!appointment) return fail(404, "Group appointment not found");
+  return appointment;
+}
 
 // POST /api/group-appointments/[id]/participants - Add participant
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
     const { id } = await params;
-    const body = await request.json();
-    const { name, phone, email, clientId, paidAmount } = body;
+    const input = addParticipantSchema.parse(await request.json());
 
-    if (!name) {
-      return NextResponse.json(
-        { error: "name is required" },
-        { status: 400 }
-      );
-    }
-
-    // Check if group appointment exists and has space
-    const appointment = await prisma.groupAppointment.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: { participants: true },
-        },
-      },
-    });
-
-    if (!appointment) {
-      return NextResponse.json(
-        { error: "Group appointment not found" },
-        { status: 404 }
-      );
-    }
+    const appointment = await assertAppointment(ctx, id);
 
     if (appointment._count.participants >= appointment.maxParticipants) {
-      return NextResponse.json(
-        { error: "Group appointment is full" },
-        { status: 400 }
-      );
+      return fail(400, "Group appointment is full");
     }
 
-    // Create participant
+    if (input.clientId && !(await prisma.client.findFirst({ where: { id: input.clientId, businessId: ctx.businessId }, select: { id: true } }))) {
+      return fail(404, "Client not found");
+    }
+
     const participant = await prisma.groupParticipant.create({
       data: {
         groupAppointmentId: id,
-        name,
-        phone,
-        email,
-        clientId,
-        paidAmount,
+        name: input.name,
+        phone: input.phone,
+        email: input.email,
+        clientId: input.clientId,
+        paidAmount: input.paidAmount,
       },
     });
 
@@ -63,76 +76,62 @@ export async function POST(
       });
     }
 
-    return NextResponse.json(
-      {
-        ...participant,
-        paidAmount: participant.paidAmount ? Number(participant.paidAmount) : null,
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Error adding participant:", error);
-    return NextResponse.json(
-      { error: "Failed to add participant" },
-      { status: 500 }
-    );
-  }
+    return {
+      ...participant,
+      paidAmount: participant.paidAmount ? Number(participant.paidAmount) : null,
+    };
+  });
 }
 
-// DELETE /api/group-appointments/[id]/participants - Remove participant
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const participantId = searchParams.get("participantId");
+// DELETE /api/group-appointments/[id]/participants?participantId=... - Remove participant
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
+    const { id } = await params;
+    const participantId = new URL(request.url).searchParams.get("participantId");
+    if (!participantId) return fail(400, "participantId is required");
 
-    if (!participantId) {
-      return NextResponse.json(
-        { error: "participantId is required" },
-        { status: 400 }
-      );
-    }
-
-    await prisma.groupParticipant.delete({
-      where: { id: participantId },
+    const participant = await prisma.groupParticipant.findFirst({
+      where: { id: participantId, groupAppointment: { id, locationId: { in: await tenantLocationIds(ctx.businessId) } } },
+      select: { id: true },
     });
+    if (!participant) return fail(404, "Participant not found");
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error removing participant:", error);
-    return NextResponse.json(
-      { error: "Failed to remove participant" },
-      { status: 500 }
-    );
-  }
+    await prisma.groupParticipant.delete({ where: { id: participantId } });
+
+    return { success: true };
+  });
 }
 
 // PATCH /api/group-appointments/[id]/participants - Update participant
-export async function PATCH(request: NextRequest) {
-  try {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
+    const { id } = await params;
     const body = await request.json();
-    const { participantId, ...updates } = body;
+    const participantId = idSchema.parse((body as { participantId?: unknown }).participantId);
+    const updates = updateParticipantSchema.parse(body);
 
-    if (!participantId) {
-      return NextResponse.json(
-        { error: "participantId is required" },
-        { status: 400 }
-      );
-    }
+    const participant = await prisma.groupParticipant.findFirst({
+      where: { id: participantId, groupAppointment: { id, locationId: { in: await tenantLocationIds(ctx.businessId) } } },
+      select: { id: true },
+    });
+    if (!participant) return fail(404, "Participant not found");
 
-    const participant = await prisma.groupParticipant.update({
+    const updated = await prisma.groupParticipant.update({
       where: { id: participantId },
       data: updates,
     });
 
-    return NextResponse.json({
-      ...participant,
-      paidAmount: participant.paidAmount ? Number(participant.paidAmount) : null,
-    });
-  } catch (error) {
-    console.error("Error updating participant:", error);
-    return NextResponse.json(
-      { error: "Failed to update participant" },
-      { status: 500 }
-    );
-  }
+    return {
+      ...updated,
+      paidAmount: updated.paidAmount ? Number(updated.paidAmount) : null,
+    };
+  });
 }

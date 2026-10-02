@@ -25,6 +25,8 @@ import {
   Shuffle,
   BarChart3,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 const sampleData = [
   {
@@ -71,8 +73,12 @@ export default function PricingPage() {
     setGoal(sample.goal);
   };
 
-  const handleAnalyze = async () => {
-    if (!service || !currentPrice) {
+  const handleAnalyze = async (override?: Record<string, string>) => {
+    const serviceValue = override?.service ?? service;
+    const currentPriceValue = override?.currentPrice ?? currentPrice;
+    const goalValue = override?.goal ?? goal;
+    const marketPositionValue = override?.marketPosition ?? marketPosition;
+    if (!serviceValue || !currentPriceValue) {
       setError("Please enter service and current price");
       return;
     }
@@ -86,9 +92,9 @@ export default function PricingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          strategy: goal === "increase_revenue" ? "maximize" :
-                   goal === "stay_competitive" ? "competitive" :
-                   goal === "maximize_profit" ? "value" : "demand",
+          strategy: goalValue === "increase_revenue" ? "maximize" :
+                   goalValue === "stay_competitive" ? "competitive" :
+                   goalValue === "maximize_profit" ? "value" : "demand",
         }),
       });
 
@@ -100,10 +106,10 @@ export default function PricingPage() {
 
       // Find recommendation for selected service or use first one
       const serviceRec = data.analysis?.recommendations?.find(
-        (r: any) => r.service.toLowerCase().includes(service.toLowerCase())
+        (r: any) => r.service.toLowerCase().includes(serviceValue.toLowerCase())
       ) || data.analysis?.recommendations?.[0];
 
-      const currentPriceNum = parseFloat(currentPrice);
+      const currentPriceNum = parseFloat(currentPriceValue);
       const suggestedPrice = serviceRec?.suggestedPrice || currentPriceNum * 1.1;
       const priceChange = suggestedPrice - currentPriceNum;
 
@@ -116,8 +122,8 @@ export default function PricingPage() {
           low: Math.round(currentPriceNum * 0.7),
           average: Math.round(currentPriceNum),
           high: Math.round(currentPriceNum * 1.4),
-          yourPosition: marketPosition === "premium" ? "Upper quartile" :
-                       marketPosition === "budget" ? "Lower quartile" : "Mid-range",
+          yourPosition: marketPositionValue === "premium" ? "Upper quartile" :
+                       marketPositionValue === "budget" ? "Lower quartile" : "Mid-range",
         },
         revenueImpact: {
           revenueChange: Math.round(priceChange * 20),
@@ -165,6 +171,18 @@ export default function PricingPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FillButtons
+              fixture={AI_FIXTURES["pricing"]}
+              apply={(values) => {
+                if (values.service !== undefined) setService(values.service);
+                if (values.currentPrice !== undefined) setCurrentPrice(values.currentPrice);
+                if (values.marketPosition !== undefined) setMarketPosition(values.marketPosition);
+                if (values.goal !== undefined) setGoal(values.goal);
+              }}
+              onRun={(values) => handleAnalyze(values)}
+              onClear={() => { setService(""); setCurrentPrice(""); setMarketPosition(""); setGoal(""); }}
+              running={loading}
+            />
             {/* Service */}
             <div className="space-y-2">
               <Label>Service Name *</Label>
@@ -238,7 +256,7 @@ export default function PricingPage() {
 
             <Button
               className="w-full"
-              onClick={handleAnalyze}
+              onClick={() => handleAnalyze()}
               disabled={loading || !service || !currentPrice}
             >
               {loading ? (

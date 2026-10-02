@@ -20,6 +20,8 @@ import {
   TrendingUp,
   Loader2,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface Message {
   id: string;
@@ -247,6 +249,20 @@ export default function AIChatPage() {
         {/* Input */}
         <div className="p-4 border-t">
           <form onSubmit={handleSubmit} className="flex gap-2">
+      <FillButtons
+        fixture={AI_FIXTURES["chat"]}
+        apply={(values) => {
+              if (values.input !== undefined) setInput(values.input);
+        }}
+        onRun={(values) => {
+              if (values.input) void sendMessage(values.input);
+        }}
+        onClear={() => {
+              setInput("");
+        }}
+        running={loading}
+        compact
+      />
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}

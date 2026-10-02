@@ -10,10 +10,10 @@ test('local production startup allows opted-in demo roles without returning pass
  try {
   const status=await GET(new NextRequest('http://localhost:30802/api/auth/demo-credentials?status=1'))
   const meta=await status.json()
-  assert.equal(meta.enabled,true);assert.equal(meta.accounts.length,4);assert.ok(!JSON.stringify(meta).includes('password'))
+  assert.equal(meta.enabled,true);assert.equal(meta.accounts.length,5);assert.ok(!JSON.stringify(meta).includes('password'))
   const data=await(await GET(new NextRequest('http://localhost:30802/api/auth/demo-credentials'))).json()
   assert.equal(data.password,values.ADMIN_PASSWORD)
-  assert.equal(data.accounts.length,4)
+  assert.equal(data.accounts.length,5)
   for(const request of [new NextRequest('https://public.example/api/auth/demo-credentials'),new NextRequest('http://localhost/api/auth/demo-credentials',{headers:{'x-forwarded-host':'public.example'}}),new NextRequest('http://localhost/api/auth/demo-credentials',{headers:{origin:'https://foreign.example'}})]){
    assert.deepEqual(await(await GET(request)).json(),{enabled:false,accounts:[]})
   }

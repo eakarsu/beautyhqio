@@ -29,6 +29,8 @@ import {
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { Device, Call } from "@twilio/voice-sdk";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface CallLog {
   id: string;
@@ -346,6 +348,15 @@ export default function VoiceReceptionistPage() {
 
       {/* Call Now Card */}
       <Card className={`mb-6 ${callStatus === "connected" ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}>
+      <FillButtons
+        fixture={AI_FIXTURES["voice"]}
+        apply={(values) => {
+              if (values.twilioPhoneNumber !== undefined) setTwilioPhoneNumber(values.twilioPhoneNumber);
+        }}
+        onClear={() => {
+              setTwilioPhoneNumber("");
+        }}
+      />
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

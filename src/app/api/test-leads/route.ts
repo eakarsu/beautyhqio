@@ -1,35 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
-// GET /api/test-leads - Test endpoint to see leads directly
-export async function GET(request: NextRequest) {
-  try {
-    // Get the first business (Luxe Beauty Studio)
-    const business = await prisma.business.findFirst({
-      where: { name: "Luxe Beauty Studio" }
-    });
+// GET /api/test-leads - Inspect the caller's own recent marketplace leads
+export async function GET() {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
 
-    if (!business) {
-      return NextResponse.json({ error: "Business not found" });
-    }
-
-    // Get leads for this business
     const leads = await prisma.marketplaceLead.findMany({
-      where: { businessId: business.id },
+      where: { businessId: ctx.businessId },
       include: {
         client: {
-          select: { firstName: true, lastName: true, phone: true }
-        }
+          select: { firstName: true, lastName: true, phone: true },
+        },
       },
       orderBy: { createdAt: "desc" },
-      take: 20
+      take: 20,
     });
 
-    return NextResponse.json({
-      business: business.name,
-      businessId: business.id,
+    return {
+      business: ctx.user.businessName,
+      businessId: ctx.businessId,
       totalLeads: leads.length,
-      leads: leads.map(l => ({
+      leads: leads.map((l) => ({
         id: l.id,
         status: l.status,
         source: l.source,
@@ -40,9 +32,7 @@ export async function GET(request: NextRequest) {
         viewedAt: l.viewedAt,
         bookedAt: l.bookedAt,
         completedAt: l.completedAt,
-      }))
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message });
-  }
+      })),
+    };
+  });
 }

@@ -195,7 +195,7 @@ const navigation: NavigationItem[] = [
     roles: ["OWNER", "MANAGER"],
   },
 
-  // Sales CRM - Platform admin & owners
+  // Sales CRM - platform sales pipeline (platform admins + owners)
   {
     name: "Sales CRM",
     href: "/crm",

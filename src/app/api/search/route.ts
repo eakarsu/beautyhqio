@@ -1,28 +1,33 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { context, endpoint } from "@/lib/operations/core";
 import { prisma } from "@/lib/prisma";
 
-// GET /api/search - Global search
+// GET /api/search - Global search, scoped to the caller's own business.
+//
+// Previously this endpoint had no authentication and no tenant filter, so any
+// anonymous caller could search every tenant's clients (name, email, phone).
+// Every query below is now constrained by ctx.businessId.
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q");
     const type = searchParams.get("type"); // clients, staff, services, products, appointments
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "10", 10) || 10, 1), 50);
 
     if (!query || query.length < 2) {
-      return NextResponse.json(
-        { error: "Search query must be at least 2 characters" },
-        { status: 400 }
-      );
+      return { error: "Search query must be at least 2 characters" };
     }
 
-    const searchTerm = query.toLowerCase();
+    const searchTerm = query.slice(0, 100);
     const results: Record<string, unknown[]> = {};
 
     // Search clients
     if (!type || type === "clients") {
-      const clients = await prisma.client.findMany({
+      results.clients = await prisma.client.findMany({
         where: {
+          businessId: ctx.businessId,
           OR: [
             { firstName: { contains: searchTerm, mode: "insensitive" } },
             { lastName: { contains: searchTerm, mode: "insensitive" } },
@@ -30,22 +35,16 @@ export async function GET(request: NextRequest) {
             { phone: { contains: searchTerm } },
           ],
         },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-        },
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true },
         take: limit,
       });
-      results.clients = clients;
     }
 
-    // Search staff
+    // Search staff (scoped through the location's business)
     if (!type || type === "staff") {
-      const staff = await prisma.staff.findMany({
+      results.staff = await prisma.staff.findMany({
         where: {
+          location: { businessId: ctx.businessId },
           displayName: { contains: searchTerm, mode: "insensitive" },
         },
         select: {
@@ -53,19 +52,17 @@ export async function GET(request: NextRequest) {
           displayName: true,
           title: true,
           photo: true,
-          user: {
-            select: { firstName: true, lastName: true, email: true },
-          },
+          user: { select: { firstName: true, lastName: true, email: true } },
         },
         take: limit,
       });
-      results.staff = staff;
     }
 
     // Search services
     if (!type || type === "services") {
       const services = await prisma.service.findMany({
         where: {
+          businessId: ctx.businessId,
           OR: [
             { name: { contains: searchTerm, mode: "insensitive" } },
             { description: { contains: searchTerm, mode: "insensitive" } },
@@ -76,9 +73,7 @@ export async function GET(request: NextRequest) {
           name: true,
           price: true,
           duration: true,
-          category: {
-            select: { name: true },
-          },
+          category: { select: { name: true } },
         },
         take: limit,
       });
@@ -93,6 +88,7 @@ export async function GET(request: NextRequest) {
     if (!type || type === "products") {
       const products = await prisma.product.findMany({
         where: {
+          businessId: ctx.businessId,
           OR: [
             { name: { contains: searchTerm, mode: "insensitive" } },
             { description: { contains: searchTerm, mode: "insensitive" } },
@@ -106,9 +102,7 @@ export async function GET(request: NextRequest) {
           sku: true,
           brand: true,
           price: true,
-          category: {
-            select: { name: true },
-          },
+          category: { select: { name: true } },
         },
         take: limit,
       });
@@ -121,8 +115,9 @@ export async function GET(request: NextRequest) {
 
     // Search appointments
     if (!type || type === "appointments") {
-      const appointments = await prisma.appointment.findMany({
+      results.appointments = await prisma.appointment.findMany({
         where: {
+          businessId: ctx.businessId,
           OR: [
             { notes: { contains: searchTerm, mode: "insensitive" } },
             {
@@ -136,35 +131,16 @@ export async function GET(request: NextRequest) {
           ],
         },
         include: {
-          client: {
-            select: { firstName: true, lastName: true },
-          },
-          staff: {
-            select: { displayName: true },
-          },
+          client: { select: { firstName: true, lastName: true } },
+          staff: { select: { displayName: true } },
         },
         take: limit,
         orderBy: { scheduledStart: "desc" },
       });
-      results.appointments = appointments;
     }
 
-    // Count total results
-    const totalResults = Object.values(results).reduce(
-      (sum: number, arr) => sum + arr.length,
-      0
-    );
+    const totalResults = Object.values(results).reduce((sum, arr) => sum + arr.length, 0);
 
-    return NextResponse.json({
-      query,
-      totalResults,
-      results,
-    });
-  } catch (error) {
-    console.error("Error performing search:", error);
-    return NextResponse.json(
-      { error: "Failed to perform search" },
-      { status: 500 }
-    );
-  }
+    return { query, totalResults, results };
+  });
 }

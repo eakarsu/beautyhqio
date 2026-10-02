@@ -27,6 +27,8 @@ import {
   Shuffle,
   TrendingUp,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 const sampleData = [
   {
@@ -73,7 +75,8 @@ export default function WaitlistPage() {
     setDayType(sample.dayType);
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (override?: Record<string, string>) => {
+    const dayTypeValue = override?.dayType ?? dayType;
     setLoading(true);
     setError(null);
     setResult(null);
@@ -82,7 +85,7 @@ export default function WaitlistPage() {
       const res = await fetch("/api/ai/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dayType: dayType || null }),
+        body: JSON.stringify({ dayType: dayTypeValue || null }),
       });
 
       const data = await res.json();
@@ -132,6 +135,18 @@ export default function WaitlistPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FillButtons
+              fixture={AI_FIXTURES["waitlist"]}
+              apply={(values) => {
+                if (values.currentWaitlist !== undefined) setCurrentWaitlist(values.currentWaitlist);
+                if (values.averageServiceTime !== undefined) setAverageServiceTime(values.averageServiceTime);
+                if (values.staffAvailable !== undefined) setStaffAvailable(values.staffAvailable);
+                if (values.dayType !== undefined) setDayType(values.dayType);
+              }}
+              onRun={(values) => handleAnalyze(values)}
+              onClear={() => { setCurrentWaitlist(""); setAverageServiceTime(""); setStaffAvailable(""); setDayType(""); }}
+              running={loading}
+            />
             {/* Current Waitlist */}
             <div className="space-y-2">
               <Label>People on Waitlist</Label>
@@ -188,7 +203,7 @@ export default function WaitlistPage() {
               </Select>
             </div>
 
-            <Button className="w-full" onClick={handleAnalyze} disabled={loading}>
+            <Button className="w-full" onClick={() => handleAnalyze()} disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -1,15 +1,29 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
+
+const payTypeSchema = z.enum(["HOURLY", "COMMISSION", "SALARY", "HYBRID"]);
+
+const updateSchema = z.object({
+  commissionPct: z.coerce.number().finite().min(0).max(100).optional(),
+  productCommissionPct: z.coerce.number().finite().min(0).max(100).optional(),
+  payType: payTypeSchema.optional(),
+});
 
 // GET /api/commissions/staff/[staffId] - Get commission summary for specific staff
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ staffId: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { staffId } = await params;
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get("period") || "month";
+    const period = z
+      .enum(["day", "week", "month", "year"])
+      .default("month")
+      .parse(searchParams.get("period") || "month");
 
     // Calculate date range
     const now = new Date();
@@ -33,9 +47,9 @@ export async function GET(
         startDate.setMonth(startDate.getMonth() - 1);
     }
 
-    // Get staff info
-    const staff = await prisma.staff.findUnique({
-      where: { id: staffId },
+    // Get staff info (scoped through location, since Staff has no businessId)
+    const staff = await prisma.staff.findFirst({
+      where: { id: staffId, location: { businessId: ctx.businessId } },
       select: {
         id: true,
         displayName: true,
@@ -49,17 +63,18 @@ export async function GET(
       },
     });
 
-    if (!staff) {
-      return NextResponse.json({ error: "Staff not found" }, { status: 404 });
-    }
+    if (!staff) fail(404, "Staff not found");
+
+    const tenantTransaction = {
+      location: { businessId: ctx.businessId },
+      date: { gte: startDate },
+    };
 
     // Get commissions for the period
     const commissions = await prisma.commission.findMany({
       where: {
         staffId,
-        transaction: {
-          date: { gte: startDate },
-        },
+        transaction: tenantTransaction,
       },
       include: {
         transaction: {
@@ -84,9 +99,7 @@ export async function GET(
       by: ["type"],
       where: {
         staffId,
-        transaction: {
-          date: { gte: startDate },
-        },
+        transaction: tenantTransaction,
       },
       _sum: { amount: true, baseAmount: true },
       _count: true,
@@ -114,15 +127,13 @@ export async function GET(
     const tips = await prisma.tip.aggregate({
       where: {
         staffId,
-        transaction: {
-          date: { gte: startDate },
-        },
+        transaction: tenantTransaction,
       },
       _sum: { amount: true },
       _count: true,
     });
 
-    return NextResponse.json({
+    return {
       staff: {
         ...staff,
         commissionPct: staff.commissionPct
@@ -163,14 +174,8 @@ export async function GET(
         date: c.transaction.date,
         transactionTotal: Number(c.transaction.totalAmount),
       })),
-    });
-  } catch (error) {
-    console.error("Error fetching staff commissions:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch staff commissions" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 // PATCH /api/commissions/staff/[staffId] - Update staff commission rates
@@ -178,10 +183,18 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ staffId: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { staffId } = await params;
-    const body = await request.json();
-    const { commissionPct, productCommissionPct, payType } = body;
+    const { commissionPct, productCommissionPct, payType } = updateSchema.parse(
+      await request.json()
+    );
+
+    const owned = await prisma.staff.findFirst({
+      where: { id: staffId, location: { businessId: ctx.businessId } },
+      select: { id: true },
+    });
+    if (!owned) fail(404, "Staff not found");
 
     const updateData: Record<string, unknown> = {};
     if (commissionPct !== undefined) updateData.commissionPct = commissionPct;
@@ -201,18 +214,12 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({
+    return {
       ...staff,
       commissionPct: staff.commissionPct ? Number(staff.commissionPct) : null,
       productCommissionPct: staff.productCommissionPct
         ? Number(staff.productCommissionPct)
         : null,
-    });
-  } catch (error) {
-    console.error("Error updating staff commission rates:", error);
-    return NextResponse.json(
-      { error: "Failed to update commission rates" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

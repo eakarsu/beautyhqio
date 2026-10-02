@@ -20,6 +20,8 @@ import {
   Phone,
   Loader2,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface Message {
   id: string;
@@ -364,7 +366,19 @@ export default function TwilioSMSChatPage() {
         )}
 
         {/* Input */}
-        <div className="p-4 border-t">
+        <div className="p-4 border-t space-y-3">
+          <FillButtons
+            fixture={AI_FIXTURES["sms-chat"]}
+            apply={(values) => {
+              if (values.input !== undefined) setInput(values.input);
+            }}
+            onRun={(values) => {
+              if (values.input) void sendMessage(values.input);
+            }}
+            onClear={() => setInput("")}
+            running={loading}
+            compact
+          />
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Input
               value={input}

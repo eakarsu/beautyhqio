@@ -1,78 +1,72 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { context, endpoint, fail } from "@/lib/operations/core";
+import { decryptCredentials, encryptCredentials } from "@/lib/operations/connections";
 import { syncTransaction, refreshToken } from "@/lib/quickbooks";
 import { prisma } from "@/lib/prisma";
 
-// Helper to get valid QuickBooks credentials
-async function getQBCredentials() {
-  const settings = await prisma.settings.findFirst({
-    where: { id: "default" },
+const ROLES = ["OWNER", "MANAGER"] as const;
+const QB_PROVIDER = "quickbooks";
+const syncSchema = z.object({ transactionId: z.string().trim().min(1).max(191) });
+
+type QBCredentials = {
+  accessToken: string;
+  refreshToken: string;
+  realmId: string;
+  expiresAt: string | Date;
+};
+
+// Per-business credentials; never read another tenant's connection.
+async function getQBCredentials(businessId: string): Promise<QBCredentials | null> {
+  const row = await prisma.integrationConnection.findUnique({
+    where: { businessId_provider: { businessId, provider: QB_PROVIDER } },
   });
+  if (!row || row.status === "DISCONNECTED") return null;
 
-  if (!settings?.quickbooksAccessToken || !settings?.quickbooksRealmId) {
+  let credentials: QBCredentials;
+  try {
+    credentials = decryptCredentials(businessId, QB_PROVIDER, row.encryptedCredentials) as QBCredentials;
+  } catch {
     return null;
   }
+  if (!credentials?.accessToken || !credentials?.realmId) return null;
 
-  // Check if token is expired
-  if (
-    settings.quickbooksTokenExpiry &&
-    new Date(settings.quickbooksTokenExpiry) < new Date()
-  ) {
-    // Refresh token
-    if (settings.quickbooksRefreshToken) {
-      try {
-        const newTokens = await refreshToken(settings.quickbooksRefreshToken);
-
-        await prisma.settings.update({
-          where: { id: "default" },
-          data: {
-            quickbooksAccessToken: newTokens.accessToken,
-            quickbooksRefreshToken: newTokens.refreshToken,
-            quickbooksTokenExpiry: newTokens.expiresAt,
-          },
-        });
-
-        return {
-          accessToken: newTokens.accessToken,
-          realmId: settings.quickbooksRealmId,
-        };
-      } catch {
-        return null;
-      }
+  const expiresAt = credentials.expiresAt ? new Date(credentials.expiresAt) : null;
+  if (expiresAt && expiresAt < new Date()) {
+    if (!credentials.refreshToken) return null;
+    try {
+      const tokens = await refreshToken(credentials.refreshToken);
+      const next: QBCredentials = {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        realmId: credentials.realmId,
+        expiresAt: tokens.expiresAt,
+      };
+      await prisma.integrationConnection.update({
+        where: { id: row.id },
+        data: { encryptedCredentials: encryptCredentials(businessId, QB_PROVIDER, next) },
+      });
+      return next;
+    } catch {
+      return null;
     }
-    return null;
   }
 
-  return {
-    accessToken: settings.quickbooksAccessToken,
-    realmId: settings.quickbooksRealmId,
-  };
+  return credentials;
 }
 
-// POST /api/quickbooks/sync - Sync a transaction to QuickBooks
+// POST /api/quickbooks/sync - Sync one transaction belonging to the caller's business.
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { transactionId } = body;
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
+    const { transactionId } = syncSchema.parse(await request.json());
 
-    if (!transactionId) {
-      return NextResponse.json(
-        { error: "transactionId is required" },
-        { status: 400 }
-      );
-    }
+    const credentials = await getQBCredentials(ctx.businessId);
+    if (!credentials) return fail(503, "QuickBooks not connected or token expired");
 
-    // Get QuickBooks credentials
-    const credentials = await getQBCredentials();
-    if (!credentials) {
-      return NextResponse.json(
-        { error: "QuickBooks not connected or token expired" },
-        { status: 401 }
-      );
-    }
-
-    // Get transaction
-    const transaction = await prisma.transaction.findUnique({
-      where: { id: transactionId },
+    // Transaction has no businessId; scope through its location.
+    const transaction = await prisma.transaction.findFirst({
+      where: { id: transactionId, location: { businessId: ctx.businessId } },
       include: {
         client: true,
         lineItems: {
@@ -84,44 +78,29 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!transaction) {
-      return NextResponse.json(
-        { error: "Transaction not found" },
-        { status: 404 }
-      );
-    }
+    if (!transaction) return fail(404, "Transaction not found");
 
-    // Check if already synced
     if (transaction.quickbooksInvoiceId) {
-      return NextResponse.json(
-        { error: "Transaction already synced to QuickBooks" },
-        { status: 400 }
-      );
+      return fail(400, "Transaction already synced to QuickBooks");
     }
 
-    // Sync to QuickBooks
-    const result = await syncTransaction(
-      credentials.accessToken,
-      credentials.realmId,
-      {
-        clientName: transaction.client
-          ? `${transaction.client.firstName} ${transaction.client.lastName}`
-          : "Walk-in Client",
-        clientEmail: transaction.client?.email || undefined,
-        clientPhone: transaction.client?.phone || undefined,
-        items: transaction.lineItems.map((item) => ({
-          name: item.service?.name || item.product?.name || "Item",
-          price: Number(item.unitPrice),
-          quantity: item.quantity,
-        })),
-        total: Number(transaction.totalAmount),
-        date: transaction.createdAt,
-      }
-    );
+    const result = await syncTransaction(credentials.accessToken, credentials.realmId, {
+      clientName: transaction.client
+        ? `${transaction.client.firstName} ${transaction.client.lastName}`
+        : "Walk-in Client",
+      clientEmail: transaction.client?.email || undefined,
+      clientPhone: transaction.client?.phone || undefined,
+      items: transaction.lineItems.map((item) => ({
+        name: item.service?.name || item.product?.name || "Item",
+        price: Number(item.unitPrice),
+        quantity: item.quantity,
+      })),
+      total: Number(transaction.totalAmount),
+      date: transaction.createdAt,
+    });
 
-    // Update transaction with QuickBooks IDs
     await prisma.transaction.update({
-      where: { id: transactionId },
+      where: { id: transaction.id },
       data: {
         quickbooksCustomerId: result.customerId,
         quickbooksInvoiceId: result.invoiceId,
@@ -130,53 +109,40 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      quickbooks: result,
-    });
-  } catch (error) {
-    console.error("Error syncing to QuickBooks:", error);
-    return NextResponse.json(
-      { error: "Failed to sync to QuickBooks" },
-      { status: 500 }
-    );
-  }
+    return { success: true, quickbooks: result };
+  });
 }
 
-// GET /api/quickbooks/sync - Sync all unsynced transactions
+// GET /api/quickbooks/sync - Sync all unsynced transactions for the caller's business.
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("start");
     const endDate = searchParams.get("end");
 
-    // Get QuickBooks credentials
-    const credentials = await getQBCredentials();
-    if (!credentials) {
-      return NextResponse.json(
-        { error: "QuickBooks not connected or token expired" },
-        { status: 401 }
-      );
+    const credentials = await getQBCredentials(ctx.businessId);
+    if (!credentials) return fail(503, "QuickBooks not connected or token expired");
+
+    const createdAt: { gte?: Date; lte?: Date } = {};
+    if (startDate) {
+      const from = new Date(startDate);
+      if (Number.isNaN(from.getTime())) return fail(422, "start must be a valid date");
+      createdAt.gte = from;
     }
-
-    // Find unsynced transactions
-    const whereClause: Record<string, unknown> = {
-      quickbooksInvoiceId: null,
-      status: "COMPLETED",
-    };
-
-    if (startDate || endDate) {
-      whereClause.createdAt = {};
-      if (startDate) {
-        (whereClause.createdAt as Record<string, Date>).gte = new Date(startDate);
-      }
-      if (endDate) {
-        (whereClause.createdAt as Record<string, Date>).lte = new Date(endDate);
-      }
+    if (endDate) {
+      const to = new Date(endDate);
+      if (Number.isNaN(to.getTime())) return fail(422, "end must be a valid date");
+      createdAt.lte = to;
     }
 
     const transactions = await prisma.transaction.findMany({
-      where: whereClause,
+      where: {
+        location: { businessId: ctx.businessId },
+        quickbooksInvoiceId: null,
+        status: "COMPLETED",
+        ...(startDate || endDate ? { createdAt } : {}),
+      },
       include: {
         client: true,
         lineItems: {
@@ -193,24 +159,20 @@ export async function GET(request: NextRequest) {
 
     for (const transaction of transactions) {
       try {
-        const result = await syncTransaction(
-          credentials.accessToken,
-          credentials.realmId,
-          {
-            clientName: transaction.client
-              ? `${transaction.client.firstName} ${transaction.client.lastName}`
-              : "Walk-in Client",
-            clientEmail: transaction.client?.email || undefined,
-            clientPhone: transaction.client?.phone || undefined,
-            items: transaction.lineItems.map((item) => ({
-              name: item.service?.name || item.product?.name || "Item",
-              price: Number(item.unitPrice),
-              quantity: item.quantity,
-            })),
-            total: Number(transaction.totalAmount),
-            date: transaction.createdAt,
-          }
-        );
+        const result = await syncTransaction(credentials.accessToken, credentials.realmId, {
+          clientName: transaction.client
+            ? `${transaction.client.firstName} ${transaction.client.lastName}`
+            : "Walk-in Client",
+          clientEmail: transaction.client?.email || undefined,
+          clientPhone: transaction.client?.phone || undefined,
+          items: transaction.lineItems.map((item) => ({
+            name: item.service?.name || item.product?.name || "Item",
+            price: Number(item.unitPrice),
+            quantity: item.quantity,
+          })),
+          total: Number(transaction.totalAmount),
+          date: transaction.createdAt,
+        });
 
         await prisma.transaction.update({
           where: { id: transaction.id },
@@ -236,17 +198,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return {
       total: transactions.length,
       synced: results.filter((r) => r.success).length,
       failed: results.filter((r) => !r.success).length,
       results,
-    });
-  } catch (error) {
-    console.error("Error bulk syncing to QuickBooks:", error);
-    return NextResponse.json(
-      { error: "Failed to bulk sync to QuickBooks" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

@@ -1,24 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
+import twilio from "twilio";
+import { context, endpoint } from "@/lib/operations/core";
 import { generateTwiML } from "@/lib/twilio";
 import { prisma } from "@/lib/prisma";
 
-// POST /api/voice/appointment-action - Handle appointment actions (confirm/reschedule/cancel)
+// POST /api/voice/appointment-action - Handle confirm/reschedule/cancel actions.
+//
+// Twilio-signed callers are accepted via the request signature; other callers
+// must present an authenticated staff session. Retired in production unless
+// ENABLE_LEGACY_APPOINTMENT_WRITES is set (see src/middleware.ts).
 export async function POST(request: NextRequest) {
-  try {
+  return endpoint(async () => {
     const formData = await request.formData();
+
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!authToken) {
+      return NextResponse.json({ error: "Twilio integration is not configured" }, { status: 503 });
+    }
+    const signature = request.headers.get("x-twilio-signature") || "";
+    const params: Record<string, string> = {};
+    formData.forEach((value, key) => {
+      if (typeof value === "string") params[key] = value;
+    });
+    // Sign the public URL Twilio was configured with, falling back to the request URL.
+    const signingUrl = process.env.NEXT_PUBLIC_APP_URL
+      ? new URL(request.nextUrl.pathname + request.nextUrl.search, process.env.NEXT_PUBLIC_APP_URL).toString()
+      : request.url;
+    if (!signature || !twilio.validateRequest(authToken, signature, signingUrl, params)) {
+      await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    }
+
     const digits = formData.get("Digits") as string;
     const from = formData.get("From") as string;
 
-    // Find client and their next appointment
+    // Find the caller's client and scope the appointment lookup to that tenant.
     const client = await prisma.client.findFirst({
       where: {
         phone: {
           contains: from.replace(/\D/g, "").slice(-10),
         },
       },
-      include: {
-        appointments: {
+      select: { id: true, businessId: true },
+    });
+
+    const appointment = client
+      ? await prisma.appointment.findFirst({
           where: {
+            clientId: client.id,
+            businessId: client.businessId,
             scheduledStart: {
               gte: new Date(),
             },
@@ -32,12 +61,8 @@ export async function POST(request: NextRequest) {
           orderBy: {
             scheduledStart: "asc",
           },
-          take: 1,
-        },
-      },
-    });
-
-    const appointment = client?.appointments?.[0];
+        })
+      : null;
 
     if (!appointment) {
       const twiml = generateTwiML({
@@ -60,7 +85,6 @@ export async function POST(request: NextRequest) {
 
     switch (digits) {
       case "1":
-        // Confirm appointment
         await prisma.appointment.update({
           where: { id: appointment.id },
           data: { status: "CONFIRMED" },
@@ -77,15 +101,13 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Add fallback
         twiml = twiml.replace(
           "</Response>",
           "<Say voice=\"Polly.Joanna\">Thank you for calling. Goodbye!</Say><Hangup/></Response>"
         );
         break;
 
-      case "2":
-        // Reschedule - offer new times
+      case "2": {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(9, 0, 0, 0);
@@ -105,15 +127,14 @@ export async function POST(request: NextRequest) {
           },
         });
         break;
+      }
 
-      case "3":
-        // Cancel appointment
+      case "3": {
         await prisma.appointment.update({
           where: { id: appointment.id },
           data: { status: "CANCELLED" },
         });
 
-        // Log activity
         const cancelledServiceName = appointment.services[0]?.service?.name || "appointment";
         await prisma.activity.create({
           data: {
@@ -123,6 +144,7 @@ export async function POST(request: NextRequest) {
             description: `${cancelledServiceName} appointment cancelled`,
             metadata: {
               appointmentId: appointment.id,
+              businessId: client!.businessId,
             },
           },
         });
@@ -143,6 +165,7 @@ export async function POST(request: NextRequest) {
           "<Say voice=\"Polly.Joanna\">Thank you for calling. Goodbye!</Say><Hangup/></Response>"
         );
         break;
+      }
 
       default:
         twiml = generateTwiML({
@@ -160,18 +183,5 @@ export async function POST(request: NextRequest) {
     return new NextResponse(twiml, {
       headers: { "Content-Type": "text/xml" },
     });
-  } catch (error) {
-    console.error("Error in appointment action:", error);
-
-    const errorTwiml = generateTwiML({
-      say: {
-        text: "I'm sorry, there was an error processing your request. Please try again.",
-      },
-      redirect: "/api/voice/menu",
-    });
-
-    return new NextResponse(errorTwiml, {
-      headers: { "Content-Type": "text/xml" },
-    });
-  }
+  });
 }

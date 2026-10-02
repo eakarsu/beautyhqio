@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -152,8 +154,15 @@ export default function SmartSchedulingPage() {
     );
   };
 
-  const handleAnalyze = async () => {
-    if (selectedServices.length === 0) {
+  const handleAnalyze = async (override?: Record<string, string>) => {
+    const preferredStaffValue = override?.preferredStaff ?? preferredStaff;
+    const preferredTimeValue = override?.preferredTime ?? preferredTime;
+    const constraintsValue = override?.constraints ?? constraints;
+    const selectedServiceIds =
+      override?.__serviceIds && override.__serviceIds !== ""
+        ? override.__serviceIds.split(",")
+        : selectedServices;
+    if (selectedServiceIds.length === 0) {
       setError("Please select at least one service");
       return;
     }
@@ -170,18 +179,18 @@ export default function SmartSchedulingPage() {
           clientName: selectedClient
             ? `${selectedClient.firstName} ${selectedClient.lastName}`
             : "New Client",
-          serviceIds: selectedServices,
-          preferredServices: selectedServices.map(
+          serviceIds: selectedServiceIds,
+          preferredServices: selectedServiceIds.map(
             (id) => services.find((s) => s.id === id)?.name || id
           ),
-          preferredStaffId: preferredStaff && preferredStaff !== "any"
-            ? preferredStaff
+          preferredStaffId: preferredStaffValue && preferredStaffValue !== "any"
+            ? preferredStaffValue
             : null,
-          preferredStaff: preferredStaff && preferredStaff !== "any"
-            ? staff.find((s) => s.id === preferredStaff)?.name
+          preferredStaff: preferredStaffValue && preferredStaffValue !== "any"
+            ? staff.find((s) => s.id === preferredStaffValue)?.name
             : null,
-          preferredTime,
-          constraints: constraints || null,
+          preferredTime: preferredTimeValue,
+          constraints: constraintsValue || null,
         }),
       });
 
@@ -296,6 +305,24 @@ export default function SmartSchedulingPage() {
               </Select>
             </div>
 
+            <FillButtons
+              fixture={AI_FIXTURES.scheduling}
+              apply={(values) => {
+                if (values.preferredStaff !== undefined) setPreferredStaff(values.preferredStaff);
+                if (values.preferredTime !== undefined) setPreferredTime(values.preferredTime);
+                if (values.constraints !== undefined) setConstraints(values.constraints);
+              }}
+              onRun={(values) => {
+                const finalValues: Record<string, string> = { ...values };
+                if (selectedServices.length === 0 && services.length > 0) {
+                  finalValues.__serviceIds = services[0].id;
+                }
+                void handleAnalyze(finalValues);
+              }}
+              onClear={() => { setPreferredStaff(""); setPreferredTime(""); setConstraints(""); }}
+              running={loading}
+            />
+
             {/* Preferred Time */}
             <div className="space-y-2">
               <Label>Preferred Time (Optional)</Label>
@@ -325,7 +352,7 @@ export default function SmartSchedulingPage() {
 
             <Button
               className="w-full"
-              onClick={handleAnalyze}
+              onClick={() => handleAnalyze()}
               disabled={loading || selectedServices.length === 0}
             >
               {loading ? (

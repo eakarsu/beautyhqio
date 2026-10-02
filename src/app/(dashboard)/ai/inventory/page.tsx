@@ -24,6 +24,8 @@ import {
   Shuffle,
   ShoppingCart,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 const sampleData = [
   {
@@ -64,7 +66,8 @@ export default function InventoryForecastPage() {
     setSeasonalFactor(sample.seasonalFactor);
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (override?: Record<string, string>) => {
+    const timeframeValue = override?.timeframe ?? timeframe;
     setLoading(true);
     setError(null);
     setResult(null);
@@ -74,7 +77,7 @@ export default function InventoryForecastPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daysAhead: parseInt(timeframe) || 30,
+          daysAhead: parseInt(timeframeValue) || 30,
         }),
       });
 
@@ -143,6 +146,17 @@ export default function InventoryForecastPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FillButtons
+              fixture={AI_FIXTURES["inventory"]}
+              apply={(values) => {
+                if (values.category !== undefined) setCategory(values.category);
+                if (values.timeframe !== undefined) setTimeframe(values.timeframe);
+                if (values.seasonalFactor !== undefined) setSeasonalFactor(values.seasonalFactor);
+              }}
+              onRun={(values) => handleAnalyze(values)}
+              onClear={() => { setCategory(""); setTimeframe(""); setSeasonalFactor(""); }}
+              running={loading}
+            />
             {/* Category */}
             <div className="space-y-2">
               <Label>Product Category</Label>
@@ -194,7 +208,7 @@ export default function InventoryForecastPage() {
               </Select>
             </div>
 
-            <Button className="w-full" onClick={handleAnalyze} disabled={loading}>
+            <Button className="w-full" onClick={() => handleAnalyze()} disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

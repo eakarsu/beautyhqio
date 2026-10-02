@@ -1,14 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
-// GET /api/reports/inventory - Inventory report
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const businessId = searchParams.get("businessId");
-
-    const where: Record<string, unknown> = {};
-    if (businessId) where.businessId = businessId;
+// GET /api/reports/inventory - Inventory report for the caller's business
+export async function GET() {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    const where: Record<string, unknown> = { businessId: ctx.businessId };
 
     // Get all products with categories
     const products = await prisma.product.findMany({
@@ -109,7 +106,7 @@ export async function GET(request: NextRequest) {
       byBrand[brand].value += item.value.totalCost;
     }
 
-    return NextResponse.json({
+    return {
       summary: {
         totalProducts: products.length,
         activeProducts: products.filter((p) => p.isActive).length,
@@ -137,12 +134,6 @@ export async function GET(request: NextRequest) {
         ...data,
       })),
       products: inventory,
-    });
-  } catch (error) {
-    console.error("Error generating inventory report:", error);
-    return NextResponse.json(
-      { error: "Failed to generate report" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

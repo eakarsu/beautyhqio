@@ -26,6 +26,8 @@ import {
   Shuffle,
   Users,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 const sampleData = [
   {
@@ -66,7 +68,8 @@ export default function ReactivationPage() {
     setCampaignType(sample.campaignType);
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (override?: Record<string, string>) => {
+    const inactiveDaysValue = override?.inactiveDays ?? inactiveDays;
     setLoading(true);
     setError(null);
     setResult(null);
@@ -76,7 +79,7 @@ export default function ReactivationPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          inactiveDays: parseInt(inactiveDays) || 30,
+          inactiveDays: parseInt(inactiveDaysValue) || 30,
           limit: 50,
         }),
       });
@@ -95,7 +98,7 @@ export default function ReactivationPage() {
       setResult({
         targetAudience: {
           count: data.summary?.totalInactiveClients || 0,
-          description: `Clients inactive for ${inactiveDays}+ days`,
+          description: `Clients inactive for ${inactiveDaysValue}+ days`,
         },
         emailContent: emailCampaign ? {
           subject: emailCampaign.subject,
@@ -146,6 +149,17 @@ export default function ReactivationPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FillButtons
+              fixture={AI_FIXTURES["reactivation"]}
+              apply={(values) => {
+                if (values.inactiveDays !== undefined) setInactiveDays(values.inactiveDays);
+                if (values.segment !== undefined) setSegment(values.segment);
+                if (values.campaignType !== undefined) setCampaignType(values.campaignType);
+              }}
+              onRun={(values) => handleGenerate(values)}
+              onClear={() => { setInactiveDays(""); setSegment(""); setCampaignType(""); }}
+              running={loading}
+            />
             {/* Inactive Days */}
             <div className="space-y-2">
               <Label>Days Since Last Visit</Label>
@@ -198,7 +212,7 @@ export default function ReactivationPage() {
               </Select>
             </div>
 
-            <Button className="w-full" onClick={handleGenerate} disabled={loading}>
+            <Button className="w-full" onClick={() => handleGenerate()} disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

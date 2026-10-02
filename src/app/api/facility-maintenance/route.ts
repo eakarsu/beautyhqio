@@ -1,88 +1,81 @@
 /**
  * Facility maintenance CRUD (apply pass 7 — backlog #3).
  *
- * Replaces the pass-5 read-only stub. Backed by a dedicated `facility_maintenance`
- * table (see `src/lib/db-pass7.ts`) with `scheduled_date`, priority, recurrence
- * and cost tracking. Pass 5's `facility_maintenance_tasks` table is left in place
- * but is no longer accessed from any route.
+ * Backed by the dedicated `facility_maintenance` table (see `src/lib/db-pass7.ts`).
+ * All reads and writes are scoped to the authenticated caller's `businessId`.
  */
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 import { ensureFacilityMaintenanceTable } from "@/lib/db-pass7";
 
+const maintenanceInput = z.object({
+  locationId: z.string().trim().max(191).optional().nullable(),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().max(2000).optional().nullable(),
+  category: z.string().trim().max(100).optional().nullable(),
+  priority: z.string().trim().max(40).optional().nullable(),
+  scheduledDate: z.coerce.date().optional().nullable(),
+  recurrence: z.string().trim().max(100).optional().nullable(),
+  assignee: z.string().trim().max(200).optional().nullable(),
+  vendor: z.string().trim().max(200).optional().nullable(),
+  estimatedCost: z.coerce.number().finite().nonnegative().max(1_000_000).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+});
+
 export async function GET(req: NextRequest) {
-  await ensureFacilityMaintenanceTable();
-  const { searchParams } = new URL(req.url);
-  const businessId = searchParams.get("businessId");
-  const status = searchParams.get("status");
-  try {
-    const clauses: string[] = [];
-    const vals: any[] = [];
-    let i = 1;
-    if (businessId) {
-      clauses.push(`business_id = $${i++}`);
-      vals.push(businessId);
-    }
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    await ensureFacilityMaintenanceTable();
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+
+    const clauses: string[] = ["business_id = $1"];
+    const vals: any[] = [ctx.businessId];
+    let i = 2;
     if (status) {
       clauses.push(`status = $${i++}`);
       vals.push(status);
     }
-    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-    const sql = `SELECT * FROM facility_maintenance ${where} ORDER BY scheduled_date ASC NULLS LAST LIMIT 500`;
+    const sql = `SELECT * FROM facility_maintenance WHERE ${clauses.join(" AND ")} ORDER BY scheduled_date ASC NULLS LAST LIMIT 500`;
     const rows: any = await prisma.$queryRawUnsafe(sql, ...vals);
-    return NextResponse.json({ count: rows.length, items: rows });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: "facility maintenance read failed", details: e.message },
-      { status: 500 }
-    );
-  }
+    return { count: rows.length, items: rows };
+  });
 }
 
 export async function POST(req: NextRequest) {
-  await ensureFacilityMaintenanceTable();
-  const body = await req.json().catch(() => ({}));
-  const {
-    businessId,
-    locationId,
-    title,
-    description,
-    category,
-    priority,
-    scheduledDate,
-    recurrence,
-    assignee,
-    vendor,
-    estimatedCost,
-    notes,
-  } = body || {};
-  if (!title) {
-    return NextResponse.json({ error: "title required" }, { status: 400 });
-  }
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    await ensureFacilityMaintenanceTable();
+    const input = maintenanceInput.parse(await req.json().catch(() => ({})));
+
+    if (input.locationId) {
+      const location = await prisma.location.findFirst({
+        where: { id: input.locationId, businessId: ctx.businessId },
+        select: { id: true },
+      });
+      if (!location) return fail(404, "Location not found");
+    }
+
     const r: any = await prisma.$queryRawUnsafe(
       `INSERT INTO facility_maintenance
        (business_id, location_id, title, description, category, priority,
         scheduled_date, recurrence, assignee, vendor, estimated_cost, notes)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      businessId || null,
-      locationId || null,
-      title,
-      description || null,
-      category || null,
-      priority || "normal",
-      scheduledDate ? new Date(scheduledDate) : null,
-      recurrence || null,
-      assignee || null,
-      vendor || null,
-      estimatedCost ?? null,
-      notes || null
+      ctx.businessId,
+      input.locationId || null,
+      input.title,
+      input.description || null,
+      input.category || null,
+      input.priority || "normal",
+      input.scheduledDate ?? null,
+      input.recurrence || null,
+      input.assignee || null,
+      input.vendor || null,
+      input.estimatedCost ?? null,
+      input.notes || null
     );
-    return NextResponse.json(r[0], { status: 201 });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: "facility maintenance create failed", details: e.message },
-      { status: 500 }
-    );
-  }
+    return r[0];
+  });
 }

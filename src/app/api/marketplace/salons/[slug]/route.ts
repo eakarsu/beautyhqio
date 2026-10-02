@@ -1,12 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { endpoint, fail } from "@/lib/operations/core";
 
-// GET /api/marketplace/salons/[slug] - Get salon public profile
+/**
+ * PUBLIC ENDPOINT — marketplace salon storefront profile.
+ *
+ * This is a public storefront, reached by anonymous shoppers, so it deliberately
+ * does not call context(). It exposes only fields a public listing is expected to
+ * show: the business's public contact/social details, bookable staff display
+ * info, published services and public reviews (first name + last initial only).
+ * Internal ids, credentials, client contact details and tenant settings are not
+ * selected. Inactive/unsubscribed businesses return 404.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  try {
+  return endpoint(async () => {
     const { slug } = await params;
 
     const profile = await prisma.publicSalonProfile.findUnique({
@@ -59,9 +69,7 @@ export async function GET(
       },
     });
 
-    if (!profile) {
-      return NextResponse.json({ error: "Salon not found" }, { status: 404 });
-    }
+    if (!profile) return fail(404, "Salon not found");
 
     // Check if the business has an active subscription
     const subscription = await prisma.businessSubscription.findUnique({
@@ -69,13 +77,10 @@ export async function GET(
     });
 
     if (!subscription || !["ACTIVE", "TRIAL"].includes(subscription.status)) {
-      return NextResponse.json(
-        { error: "This salon is not currently available" },
-        { status: 404 }
-      );
+      return fail(404, "This salon is not currently available");
     }
 
-    // Get staff for the business
+    // Get public-facing staff for the business
     const staff = await prisma.staff.findMany({
       where: {
         user: { businessId: profile.business.id },
@@ -164,7 +169,7 @@ export async function GET(
       });
     }
 
-    return NextResponse.json({
+    return {
       profile: {
         id: profile.id,
         slug: profile.slug,
@@ -208,12 +213,6 @@ export async function GET(
         response: r.response,
         clientName: `${r.client.firstName} ${r.client.lastName?.charAt(0) || ""}.`,
       })),
-    });
-  } catch (error) {
-    console.error("Error fetching salon:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch salon" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

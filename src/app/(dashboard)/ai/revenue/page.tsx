@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,7 +96,12 @@ export default function RevenuePredictorPage() {
   const [result, setResult] = useState<RevenueResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handlePredict = async () => {
+  const handlePredict = async (override?: Record<string, string>) => {
+    const timeframeValue = override?.timeframe ?? timeframe;
+    const includeSeasonalityValue =
+      override?.includeSeasonality !== undefined
+        ? override.includeSeasonality === "true"
+        : includeSeasonality;
     setLoading(true);
     setError(null);
     setResult(null);
@@ -104,8 +111,8 @@ export default function RevenuePredictorPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          timeframe,
-          includeSeasonality,
+          timeframe: timeframeValue,
+          includeSeasonality: includeSeasonalityValue,
         }),
       });
 
@@ -178,6 +185,17 @@ export default function RevenuePredictorPage() {
       {/* Controls */}
       <Card>
         <CardContent className="p-4">
+          <FillButtons
+            fixture={AI_FIXTURES.revenue}
+            apply={(values) => {
+              if (values.timeframe !== undefined) setTimeframe(values.timeframe);
+              if (values.includeSeasonality !== undefined) setIncludeSeasonality(values.includeSeasonality === "true");
+            }}
+            onRun={(values) => handlePredict(values)}
+            onClear={() => { setTimeframe("next_month"); setIncludeSeasonality(true); }}
+            running={loading}
+            compact
+          />
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Label>Forecast Period:</Label>
@@ -200,7 +218,7 @@ export default function RevenuePredictorPage() {
               />
               <Label>Include Seasonal Factors</Label>
             </div>
-            <Button onClick={handlePredict} disabled={loading} className="ml-auto">
+            <Button onClick={() => handlePredict()} disabled={loading} className="ml-auto">
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

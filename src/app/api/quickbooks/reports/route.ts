@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { context, endpoint, fail } from "@/lib/operations/core";
+import { decryptCredentials, encryptCredentials } from "@/lib/operations/connections";
 import {
   getProfitAndLossReport,
   getBalanceSheetReport,
@@ -6,111 +8,92 @@ import {
 } from "@/lib/quickbooks";
 import { prisma } from "@/lib/prisma";
 
-// Helper to get valid QuickBooks credentials
-async function getQBCredentials() {
-  const settings = await prisma.settings.findFirst({
-    where: { id: "default" },
+const ROLES = ["OWNER", "MANAGER"] as const;
+const QB_PROVIDER = "quickbooks";
+
+type QBCredentials = {
+  accessToken: string;
+  refreshToken: string;
+  realmId: string;
+  expiresAt: string | Date;
+};
+
+// Read the QuickBooks connection for the caller's business only. The legacy
+// singleton `Settings` row has no tenant column, so credentials now live in the
+// per-business IntegrationConnection record.
+async function getQBCredentials(businessId: string): Promise<QBCredentials | null> {
+  const row = await prisma.integrationConnection.findUnique({
+    where: { businessId_provider: { businessId, provider: QB_PROVIDER } },
   });
+  if (!row || row.status === "DISCONNECTED") return null;
 
-  if (!settings?.quickbooksAccessToken || !settings?.quickbooksRealmId) {
+  let credentials: QBCredentials;
+  try {
+    credentials = decryptCredentials(businessId, QB_PROVIDER, row.encryptedCredentials) as QBCredentials;
+  } catch {
     return null;
   }
+  if (!credentials?.accessToken || !credentials?.realmId) return null;
 
-  // Check if token is expired
-  if (
-    settings.quickbooksTokenExpiry &&
-    new Date(settings.quickbooksTokenExpiry) < new Date()
-  ) {
-    if (settings.quickbooksRefreshToken) {
-      try {
-        const newTokens = await refreshToken(settings.quickbooksRefreshToken);
-
-        await prisma.settings.update({
-          where: { id: "default" },
-          data: {
-            quickbooksAccessToken: newTokens.accessToken,
-            quickbooksRefreshToken: newTokens.refreshToken,
-            quickbooksTokenExpiry: newTokens.expiresAt,
-          },
-        });
-
-        return {
-          accessToken: newTokens.accessToken,
-          realmId: settings.quickbooksRealmId,
-        };
-      } catch {
-        return null;
-      }
+  const expiresAt = credentials.expiresAt ? new Date(credentials.expiresAt) : null;
+  if (expiresAt && expiresAt < new Date()) {
+    if (!credentials.refreshToken) return null;
+    try {
+      const tokens = await refreshToken(credentials.refreshToken);
+      const next: QBCredentials = {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        realmId: credentials.realmId,
+        expiresAt: tokens.expiresAt,
+      };
+      await prisma.integrationConnection.update({
+        where: { id: row.id },
+        data: { encryptedCredentials: encryptCredentials(businessId, QB_PROVIDER, next) },
+      });
+      return next;
+    } catch {
+      return null;
     }
-    return null;
   }
 
-  return {
-    accessToken: settings.quickbooksAccessToken,
-    realmId: settings.quickbooksRealmId,
-  };
+  return credentials;
 }
 
-// GET /api/quickbooks/reports - Get QuickBooks reports
+// GET /api/quickbooks/reports - Get QuickBooks reports for the caller's business.
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
     const { searchParams } = new URL(request.url);
     const reportType = searchParams.get("type") || "profit-loss";
     const startDate = searchParams.get("start");
     const endDate = searchParams.get("end");
 
-    // Get QuickBooks credentials
-    const credentials = await getQBCredentials();
+    if (!["profit-loss", "balance-sheet"].includes(reportType)) {
+      return fail(400, "Invalid report type. Use: profit-loss, balance-sheet");
+    }
+
+    const credentials = await getQBCredentials(ctx.businessId);
     if (!credentials) {
-      return NextResponse.json(
-        { error: "QuickBooks not connected or token expired" },
-        { status: 401 }
-      );
+      return fail(503, "QuickBooks not connected or token expired");
     }
 
     const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1);
     const end = endDate ? new Date(endDate) : new Date();
-
-    let report;
-
-    switch (reportType) {
-      case "profit-loss":
-        report = await getProfitAndLossReport(
-          credentials.accessToken,
-          credentials.realmId,
-          start,
-          end
-        );
-        break;
-
-      case "balance-sheet":
-        report = await getBalanceSheetReport(
-          credentials.accessToken,
-          credentials.realmId,
-          end
-        );
-        break;
-
-      default:
-        return NextResponse.json(
-          { error: "Invalid report type. Use: profit-loss, balance-sheet" },
-          { status: 400 }
-        );
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return fail(422, "start and end must be valid dates");
     }
 
-    return NextResponse.json({
+    const report = reportType === "profit-loss"
+      ? await getProfitAndLossReport(credentials.accessToken, credentials.realmId, start, end)
+      : await getBalanceSheetReport(credentials.accessToken, credentials.realmId, end);
+
+    return {
       reportType,
       dateRange: {
         start: start.toDateString(),
         end: end.toDateString(),
       },
       report,
-    });
-  } catch (error) {
-    console.error("Error fetching QuickBooks report:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch report from QuickBooks" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

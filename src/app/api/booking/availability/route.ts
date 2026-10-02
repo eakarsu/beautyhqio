@@ -1,9 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { endpoint, fail } from "@/lib/operations/core";
 
-// GET /api/booking/availability - Get available time slots
+/**
+ * PUBLIC ENDPOINT — online booking availability.
+ *
+ * Anonymous visitors must see open slots for a specific location before they sign
+ * in, so this route intentionally does not call context(). Every query is scoped
+ * to the requested location's own business, and the response exposes only slot
+ * times plus bookable staff display fields (public name/photo/colour). No client
+ * records, contact details, or tenant internals are returned. The location and
+ * service ids are validated against that business so a caller cannot probe
+ * another tenant's calendar.
+ */
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
     const { searchParams } = new URL(request.url);
     const locationId = searchParams.get("locationId");
     const serviceId = searchParams.get("serviceId");
@@ -11,55 +22,47 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get("date"); // YYYY-MM-DD
 
     if (!locationId || !date) {
-      return NextResponse.json(
-        { error: "locationId and date are required" },
-        { status: 400 }
-      );
+      return fail(400, "locationId and date are required");
     }
 
-    // Get service duration
+    const location = await prisma.location.findFirst({
+      where: { id: locationId, isActive: true },
+      select: { businessId: true, operatingHours: true },
+    });
+    if (!location) return fail(404, "Location not found");
+
+    const businessId = location.businessId;
+
+    // Get service duration (scoped to the same business)
     let duration = 60; // Default 60 minutes
     if (serviceId) {
-      const service = await prisma.service.findUnique({
-        where: { id: serviceId },
+      const service = await prisma.service.findFirst({
+        where: { id: serviceId, businessId },
         select: { duration: true },
       });
       if (service) duration = service.duration;
     }
 
-    // Get location operating hours
-    const location = await prisma.location.findUnique({
-      where: { id: locationId },
-      select: { operatingHours: true },
-    });
-
     // Parse date for day of week - use local time parsing
     const [yearForDay, monthForDay, dayForDay] = date.split("-").map(Number);
     const dateObj = new Date(yearForDay, monthForDay - 1, dayForDay);
-    const dayOfWeek = dateObj.toLocaleDateString("en-US", {
-      weekday: "long",
-    }).toLowerCase();
-    const operatingHours = location?.operatingHours as Record<string, { open: string; close: string }> | null;
+    const dayOfWeek = dateObj
+      .toLocaleDateString("en-US", { weekday: "long" })
+      .toLowerCase();
+    const operatingHours = location.operatingHours as Record<
+      string,
+      { open: string; close: string }
+    > | null;
     const hours = operatingHours?.[dayOfWeek] || {
       open: "09:00",
       close: "18:00",
     };
 
-    // Get the business for this location
-    const locationData = await prisma.location.findUnique({
-      where: { id: locationId },
-      select: { businessId: true },
-    });
-
-    if (!locationData) {
-      return NextResponse.json({ error: "Location not found" }, { status: 404 });
-    }
-
-    // Get available staff - find by business (staff can serve any location in the business)
+    // Get available staff - staff can serve any location in the business
     const staffWhere: Record<string, unknown> = {
       isActive: true,
       isBookableOnline: true,
-      user: { businessId: locationData.businessId },
+      user: { businessId },
     };
     if (staffId) staffWhere.id = staffId;
 
@@ -79,17 +82,16 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get existing appointments for the date
-    // Check ALL locations - staff can have appointments at any location in the business
-    // Parse date properly to avoid timezone issues
+    // Get existing appointments for the date across this business
     const [year, month, day] = date.split("-").map(Number);
     const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
     const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
 
-    const staffIds = availableStaff.map(s => s.id);
+    const staffIds = availableStaff.map((s) => s.id);
 
     const existingAppointments = await prisma.appointment.findMany({
       where: {
+        businessId,
         staffId: { in: staffIds },
         scheduledStart: { gte: startOfDay, lte: endOfDay },
         status: { notIn: ["CANCELLED", "NO_SHOW"] },
@@ -167,18 +169,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return {
       date,
       locationId,
       serviceId,
       duration,
       slots,
-    });
-  } catch (error) {
-    console.error("Error fetching availability:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch availability" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

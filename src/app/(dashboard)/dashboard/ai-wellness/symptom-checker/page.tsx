@@ -5,6 +5,8 @@ import { Activity, Plus, Trash2, Edit2, AlertCircle, CheckCircle, Clock, ArrowLe
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface SymptomCheck {
   id: string;
@@ -67,9 +69,16 @@ export default function SymptomCheckerPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (symptoms.length === 0) return;
+  const handleSubmit = async (e?: React.FormEvent, override?: Record<string, string>) => {
+    e?.preventDefault();
+    const symptomsValue =
+      override?.symptoms !== undefined
+        ? override.symptoms.split(",").map((s) => s.trim()).filter(Boolean)
+        : symptoms;
+    const durationValue = override?.duration ?? duration;
+    const severityValue = override?.severity ?? severity;
+    const additionalInfoValue = override?.additionalInfo ?? additionalInfo;
+    if (symptomsValue.length === 0) return;
 
     setLoading(true);
     setAnalysis(null);
@@ -79,10 +88,10 @@ export default function SymptomCheckerPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          symptoms,
-          duration,
-          severity,
-          additionalInfo,
+          symptoms: symptomsValue,
+          duration: durationValue,
+          severity: severityValue,
+          additionalInfo: additionalInfoValue,
           sessionId: `session-${Date.now()}`,
         }),
       });
@@ -180,6 +189,17 @@ export default function SymptomCheckerPage() {
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700">
                 {!analysis ? (
                   <form onSubmit={handleSubmit} className="space-y-6">
+          <FillButtons
+            fixture={AI_FIXTURES["symptom-checker"]}
+            apply={(values) => {
+                if (values.symptoms !== undefined) setSymptoms(String(values.symptoms).split(",").map((s) => s.trim()).filter(Boolean));
+                if (values.duration !== undefined) setDuration(values.duration);
+                if (values.severity !== undefined) setSeverity(values.severity);
+                if (values.additionalInfo !== undefined) setAdditionalInfo(values.additionalInfo);
+            }}
+            onRun={(values) => void handleSubmit(undefined, values)}
+            running={loading}
+          />
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Describe Your Symptoms</h2>
                       <button type="button" onClick={loadSampleData} className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border border-gray-300">Load Sample Data</button>

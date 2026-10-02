@@ -1,33 +1,31 @@
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
 // GET /api/locations/[id]/staff - Get staff for a location
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id: locationId } = await params;
     const { searchParams } = new URL(request.url);
     const serviceId = searchParams.get("serviceId");
 
-    // Verify location exists
-    const location = await prisma.location.findUnique({
-      where: { id: locationId },
+    // Verify location exists and belongs to the caller's business
+    const location = await prisma.location.findFirst({
+      where: { id: locationId, businessId: ctx.businessId },
       select: { id: true },
     });
 
-    if (!location) {
-      return NextResponse.json(
-        { error: "Location not found" },
-        { status: 404 }
-      );
-    }
+    if (!location) return fail(404, "Location not found");
 
     // Get all staff for this location
     const staff = await prisma.staff.findMany({
       where: {
         locationId: locationId,
+        location: { businessId: ctx.businessId },
       },
       include: {
         user: {
@@ -47,22 +45,14 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(
-      filteredStaff.map((s) => ({
-        id: s.id,
-        displayName:
-          s.displayName ||
-          `${s.user?.firstName || ""} ${s.user?.lastName || ""}`.trim() ||
-          "Staff",
-        photo: s.photo,
-        title: s.title,
-      }))
-    );
-  } catch (error) {
-    console.error("Error fetching location staff:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch staff" },
-      { status: 500 }
-    );
-  }
+    return filteredStaff.map((s) => ({
+      id: s.id,
+      displayName:
+        s.displayName ||
+        `${s.user?.firstName || ""} ${s.user?.lastName || ""}`.trim() ||
+        "Staff",
+      photo: s.photo,
+      title: s.title,
+    }));
+  });
 }

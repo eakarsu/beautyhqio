@@ -11,6 +11,7 @@ if (process.env.NODE_ENV === 'production' || !['localhost', '127.0.0.1', '[::1]'
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const db = new PrismaClient();
+const { seedSupplemental } = require('./demo-supplemental.cjs');
 const demoNote = 'DEMO — fictional evaluation data. No real service, approval, payment, delivery or external submission occurred.';
 const names = ['Avery','Jordan','Taylor','Casey','Riley','Morgan','Alex','Jamie','Cameron','Drew','Reese','Quinn','Skyler','Rowan','Emerson'];
 const stamp = (days = 0, hour = 10) => { const d = new Date(); d.setDate(d.getDate()+days); d.setHours(hour,0,0,0); return d; };
@@ -97,6 +98,17 @@ async function seed(tx, admin, accountPassword) {
     const [program]=await tx.$queryRaw`SELECT id FROM corporate_wellness_programs WHERE business_id=${businessId} AND name=${programName}`;
     await tx.$executeRaw`INSERT INTO corporate_wellness_enrollments (program_id,client_org_id,client_id,member_name,status,notes) SELECT ${program.id},${orgId},${clients[i].id},${`Demo participant ${i+1}`},'pending',${demoNote} WHERE NOT EXISTS (SELECT 1 FROM corporate_wellness_enrollments WHERE program_id=${program.id} AND client_id=${clients[i].id})`;
   }
+
+  // Top every remaining feature table up to at least 15 rows so each feature
+  // has a usable list in the UI. Tables that record money movement, message
+  // delivery or real events are deliberately excluded — see NOT_SEEDED.
+  const supplemental = await seedSupplemental(tx, {
+    businessId, admin, note: demoNote,
+    clients, services, products, packages, locations,
+    staff: await tx.staff.findMany({ where: { location: { businessId } }, orderBy: { id: 'asc' }, take: 15 }),
+    k, stamp, insert,
+  });
+  console.log('Supplemental rows:', JSON.stringify(supplemental));
 }
 
 main().catch(error=>{console.error(error.message);process.exitCode=1}).finally(()=>db.$disconnect());

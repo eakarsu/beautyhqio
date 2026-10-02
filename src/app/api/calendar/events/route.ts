@@ -1,35 +1,34 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { context, endpoint, fail } from "@/lib/operations/core";
 import { getCalendarEvents, getFreeBusy } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
 
-// GET /api/calendar/events - Get calendar events for a staff member
+const ROLES = ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] as const;
+const availabilitySchema = z.object({
+  staffIds: z.array(z.string().trim().min(1).max(191)).min(1).max(50),
+  start: z.string().min(1),
+  end: z.string().min(1),
+});
+
+// GET /api/calendar/events - Get calendar events for a staff member in this business.
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
     const { searchParams } = new URL(request.url);
     const staffId = searchParams.get("staffId");
     const startDate = searchParams.get("start");
     const endDate = searchParams.get("end");
 
-    if (!staffId) {
-      return NextResponse.json(
-        { error: "staffId is required" },
-        { status: 400 }
-      );
-    }
+    if (!staffId) return fail(400, "staffId is required");
 
-    const staff = await prisma.staff.findUnique({
-      where: { id: staffId },
+    const staff = await prisma.staff.findFirst({
+      where: { id: staffId, location: { businessId: ctx.businessId } },
     });
-
-    if (!staff) {
-      return NextResponse.json({ error: "Staff not found" }, { status: 404 });
-    }
+    if (!staff) return fail(404, "Staff not found");
 
     if (!staff.googleCalendarToken) {
-      return NextResponse.json(
-        { error: "Staff has not connected Google Calendar" },
-        { status: 400 }
-      );
+      return fail(400, "Staff has not connected Google Calendar");
     }
 
     const timeMin = startDate ? new Date(startDate) : new Date();
@@ -45,7 +44,7 @@ export async function GET(request: NextRequest) {
       timeMax
     );
 
-    return NextResponse.json({
+    return {
       events: events.map((event) => ({
         id: event.id,
         summary: event.summary,
@@ -55,45 +54,28 @@ export async function GET(request: NextRequest) {
         end: event.end?.dateTime || event.end?.date,
         status: event.status,
       })),
-    });
-  } catch (error) {
-    console.error("Error fetching calendar events:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch calendar events" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
-// POST /api/calendar/events - Check availability (free/busy)
+// POST /api/calendar/events - Check availability (free/busy) for this business's staff.
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { staffIds, start, end } = body;
-
-    if (!staffIds || !Array.isArray(staffIds) || staffIds.length === 0) {
-      return NextResponse.json(
-        { error: "staffIds array is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!start || !end) {
-      return NextResponse.json(
-        { error: "start and end dates are required" },
-        { status: 400 }
-      );
-    }
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
+    const { staffIds, start, end } = availabilitySchema.parse(await request.json());
 
     const timeMin = new Date(start);
     const timeMax = new Date(end);
+    if (Number.isNaN(timeMin.getTime()) || Number.isNaN(timeMax.getTime())) {
+      return fail(422, "start and end must be valid dates");
+    }
 
-    const results: Record<string, { busy: { start: string; end: string }[] }> =
-      {};
+    const results: Record<string, { busy: { start: string; end: string }[] }> = {};
 
     for (const staffId of staffIds) {
-      const staff = await prisma.staff.findUnique({
-        where: { id: staffId },
+      // findFirst keeps the tenant filter: staff in another business are invisible.
+      const staff = await prisma.staff.findFirst({
+        where: { id: staffId, location: { businessId: ctx.businessId } },
       });
 
       if (!staff || !staff.googleCalendarToken) {
@@ -124,12 +106,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ availability: results });
-  } catch (error) {
-    console.error("Error checking availability:", error);
-    return NextResponse.json(
-      { error: "Failed to check availability" },
-      { status: 500 }
-    );
-  }
+    return { availability: results };
+  });
 }

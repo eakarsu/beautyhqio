@@ -1,92 +1,74 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
-// GET /api/locations - List locations
+const locationInput = z.object({
+  name: z.string().trim().min(1).max(150),
+  address: z.string().trim().min(1).max(300),
+  address2: z.string().trim().max(300).optional().nullable(),
+  city: z.string().trim().min(1).max(120),
+  state: z.string().trim().min(1).max(120),
+  zip: z.string().trim().min(1).max(20),
+  country: z.string().trim().max(120).optional(),
+  phone: z.string().trim().max(40).optional().nullable(),
+  email: z.union([z.string().email().max(200), z.literal("")]).optional().nullable(),
+  operatingHours: z.unknown().optional().nullable(),
+  latitude: z.coerce.number().finite().min(-90).max(90).optional().nullable(),
+  longitude: z.coerce.number().finite().min(-180).max(180).optional().nullable(),
+  allowOnlineBooking: z.boolean().optional(),
+  bookingUrl: z.string().trim().max(500).optional().nullable(),
+  advanceBookingDays: z.coerce.number().int().min(1).max(365).optional(),
+  cancellationHours: z.coerce.number().int().min(0).max(720).optional(),
+});
+
+// GET /api/locations - List locations for the caller's business
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { searchParams } = new URL(request.url);
     const isActive = searchParams.get("isActive");
-    const businessId = searchParams.get("businessId");
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { businessId: ctx.businessId };
     if (isActive !== null) where.isActive = isActive === "true";
-    if (businessId) where.businessId = businessId;
 
-    const locations = await prisma.location.findMany({
+    return prisma.location.findMany({
       where,
       orderBy: { name: "asc" },
     });
-
-    return NextResponse.json(locations);
-  } catch (error) {
-    console.error("Error fetching locations:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch locations" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
-// POST /api/locations - Create location
+// POST /api/locations - Create location in the caller's business
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const {
-      name,
-      address,
-      address2,
-      city,
-      state,
-      zip,
-      country,
-      phone,
-      email,
-      operatingHours,
-      businessId,
-      latitude,
-      longitude,
-      allowOnlineBooking,
-      bookingUrl,
-      advanceBookingDays,
-      cancellationHours,
-    } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    const input = locationInput.parse(await request.json());
 
-    if (!businessId) {
-      return NextResponse.json(
-        { error: "businessId is required" },
-        { status: 400 }
-      );
-    }
-
-    const location = await prisma.location.create({
+    return prisma.location.create({
       data: {
-        name,
-        address,
-        address2,
-        city,
-        state,
-        zip,
-        country: country || "USA",
-        phone,
-        email,
-        operatingHours,
-        businessId,
-        latitude,
-        longitude,
-        allowOnlineBooking: allowOnlineBooking ?? true,
-        bookingUrl,
-        advanceBookingDays: advanceBookingDays ?? 30,
-        cancellationHours: cancellationHours ?? 24,
+        name: input.name,
+        address: input.address,
+        address2: input.address2 ?? null,
+        city: input.city,
+        state: input.state,
+        zip: input.zip,
+        country: input.country || "USA",
+        phone: input.phone ?? null,
+        email: input.email || null,
+        operatingHours: (input.operatingHours ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
+        businessId: ctx.businessId,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        allowOnlineBooking: input.allowOnlineBooking ?? true,
+        bookingUrl: input.bookingUrl ?? null,
+        advanceBookingDays: input.advanceBookingDays ?? 30,
+        cancellationHours: input.cancellationHours ?? 24,
         isActive: true,
       },
     });
-
-    return NextResponse.json(location, { status: 201 });
-  } catch (error) {
-    console.error("Error creating location:", error);
-    return NextResponse.json(
-      { error: "Failed to create location" },
-      { status: 500 }
-    );
-  }
+  });
 }

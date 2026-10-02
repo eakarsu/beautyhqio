@@ -41,6 +41,7 @@ async function main() {
   });
 
   for (const account of accounts) {
+    const isPlatformAdmin = account.role === "PLATFORM_ADMIN";
     const password = await bcrypt.hash(account.password, 12);
     const user = await prisma.user.upsert({
       where: { email: account.email },
@@ -52,7 +53,8 @@ async function main() {
         lastName: account.lastName,
         role: account.role,
         isActive: true,
-        businessId: business.id,
+        // Platform admins oversee the whole platform and have no business.
+        businessId: isPlatformAdmin ? null : business.id,
       },
     });
 

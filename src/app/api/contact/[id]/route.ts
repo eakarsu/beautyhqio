@@ -1,29 +1,26 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { endpoint, fail, platformContext } from "@/lib/operations/core";
 
 // Mark message as read/unread
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    await platformContext();
     const { id } = await params;
-    const body = await request.json();
-    const { isRead } = body;
+    const { isRead } = z.object({ isRead: z.boolean() }).parse(await request.json());
 
-    const message = await prisma.contactMessage.update({
+    const existing = await prisma.contactMessage.findFirst({ where: { id }, select: { id: true } });
+    if (!existing) fail(404, "Message not found");
+
+    return prisma.contactMessage.update({
       where: { id },
       data: { isRead },
     });
-
-    return NextResponse.json(message);
-  } catch (error) {
-    console.error("Error updating message:", error);
-    return NextResponse.json(
-      { error: "Failed to update message" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 // Delete message
@@ -31,19 +28,13 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    await platformContext();
     const { id } = await params;
 
-    await prisma.contactMessage.delete({
-      where: { id },
-    });
+    const result = await prisma.contactMessage.deleteMany({ where: { id } });
+    if (!result.count) fail(404, "Message not found");
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting message:", error);
-    return NextResponse.json(
-      { error: "Failed to delete message" },
-      { status: 500 }
-    );
-  }
+    return { success: true };
+  });
 }

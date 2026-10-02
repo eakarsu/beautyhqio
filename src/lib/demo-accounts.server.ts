@@ -1,4 +1,4 @@
-export type DemoAccountKey = "owner" | "manager" | "receptionist" | "staff";
+export type DemoAccountKey = "owner" | "platform_admin" | "manager" | "receptionist" | "staff";
 
 export type DemoAccount = {
   key: DemoAccountKey;
@@ -6,7 +6,7 @@ export type DemoAccount = {
   password: string;
   firstName: string;
   lastName: string;
-  role: "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF";
+  role: "PLATFORM_ADMIN" | "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF";
 };
 
 function requireEmail(name: string, value: string | undefined) {
@@ -40,6 +40,19 @@ export function getDemoAccounts(): DemoAccount[] {
       firstName: "Runtime",
       lastName: "Administrator",
       role: "OWNER",
+    },
+    {
+      // Platform-level executive account. Owns the Sales CRM pipeline, which is
+      // a platform-wide table with no businessId, so this user has no business.
+      key: "platform_admin",
+      email: requireEmail(
+        "DEMO_PLATFORM_ADMIN_EMAIL",
+        process.env.DEMO_PLATFORM_ADMIN_EMAIL || "executive@luxebeauty.com"
+      ),
+      password: demoPassword,
+      firstName: "Evelyn",
+      lastName: "Reed",
+      role: "PLATFORM_ADMIN",
     },
     {
       key: "manager",

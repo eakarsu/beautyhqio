@@ -20,6 +20,33 @@ export async function context(roles: UserRole[] = ['OWNER', 'MANAGER', 'RECEPTIO
   if (!user.businessId) return fail(403, 'A business account is required');
   return { user, businessId: user.businessId };
 }
+/**
+ * Gate for platform-level data that belongs to no single tenant (the platform's
+ * own sales pipeline, the marketing-site contact inbox). Tenant roles cannot
+ * reach these because there is no tenant to scope them to.
+ */
+export async function platformContext(): Promise<{ user: AuthenticatedUser }> {
+  const user = await getAuthenticatedUser();
+  if (!user) return fail(401, 'Sign in to continue');
+  if (!user.isPlatformAdmin) return fail(403, 'Platform administrator access is required');
+  return { user };
+}
+/**
+ * Guard for the Sales CRM pipeline.
+ *
+ * Lead has no businessId, so it cannot be tenant-scoped: it is normally
+ * platform-admin only. Owner-operated deployments explicitly allow an OWNER to
+ * reach it as well. Deliberately separate from `platformContext` so the broader
+ * platform-data rule stays intact.
+ */
+export async function salesPipelineContext(): Promise<{ user: AuthenticatedUser }> {
+  const user = await getAuthenticatedUser();
+  if (!user) return fail(401, 'Sign in to continue');
+  if (!user.isPlatformAdmin && user.role !== 'OWNER') {
+    return fail(403, 'Owner or platform administrator access is required');
+  }
+  return { user };
+}
 export async function endpoint(work: () => Promise<unknown>) {
   try { const result = await work(); return result instanceof Response ? result : NextResponse.json(result); }
   catch (error) {

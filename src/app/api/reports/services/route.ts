@@ -1,20 +1,37 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
 // GET /api/reports/services - Service analytics report
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-    const categoryId = searchParams.get("categoryId");
+    const startDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("startDate") || undefined);
+    const endDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("endDate") || undefined);
+    const categoryId = z
+      .string()
+      .trim()
+      .min(1)
+      .max(191)
+      .optional()
+      .parse(searchParams.get("categoryId") || undefined);
 
     const dateFilter: Record<string, Date> = {};
     if (startDate) dateFilter.gte = new Date(startDate);
     if (endDate) dateFilter.lte = new Date(endDate);
 
     // Get all services with their category
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { businessId: ctx.businessId };
     if (categoryId) where.categoryId = categoryId;
 
     const services = await prisma.service.findMany({
@@ -38,6 +55,7 @@ export async function GET(request: NextRequest) {
           where: {
             serviceId: service.id,
             appointment: {
+              businessId: ctx.businessId,
               ...(Object.keys(dateFilter).length && { scheduledStart: dateFilter }),
             },
           },
@@ -58,6 +76,7 @@ export async function GET(request: NextRequest) {
           where: {
             serviceId: service.id,
             transaction: {
+              location: { businessId: ctx.businessId },
               status: "COMPLETED",
               ...(Object.keys(dateFilter).length && { createdAt: dateFilter }),
             },
@@ -106,7 +125,7 @@ export async function GET(request: NextRequest) {
       byCategory[cat].bookings += sp.bookings.completed;
     }
 
-    return NextResponse.json({
+    return {
       services: servicePerformance,
       byCategory: Object.entries(byCategory).map(([category, data]) => ({
         category,
@@ -121,12 +140,6 @@ export async function GET(request: NextRequest) {
           0
         ),
       },
-    });
-  } catch (error) {
-    console.error("Error generating service report:", error);
-    return NextResponse.json(
-      { error: "Failed to generate report" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

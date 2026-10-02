@@ -1,34 +1,46 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
+
+const createSchema = z.object({
+  transactionId: idSchema,
+  staffId: idSchema,
+  type: z.string().trim().min(1).max(50),
+  baseAmount: z.coerce.number().finite().positive().max(1_000_000),
+  customRate: z.coerce.number().finite().min(0).max(100).optional(),
+});
 
 // GET /api/commissions - List commissions with filters
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { searchParams } = new URL(request.url);
-    const staffId = searchParams.get("staffId");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-    const type = searchParams.get("type"); // service, product
-    const limit = parseInt(searchParams.get("limit") || "100");
+    const staffId = idSchema.optional().parse(searchParams.get("staffId") || undefined);
+    const startDate = z.string().datetime().optional().parse(searchParams.get("startDate") || undefined);
+    const endDate = z.string().datetime().optional().parse(searchParams.get("endDate") || undefined);
+    const type = z.string().trim().max(50).optional().parse(searchParams.get("type") || undefined);
+    const limit = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(200)
+      .parse(searchParams.get("limit") || 100);
 
-    const where: Record<string, unknown> = {};
-
-    if (staffId) {
-      where.staffId = staffId;
-    }
-
-    if (type) {
-      where.type = type;
-    }
-
+    // Commissions have no businessId; scope through transaction -> location.
+    const transactionWhere: Record<string, unknown> = {
+      location: { businessId: ctx.businessId },
+    };
     if (startDate || endDate) {
-      where.transaction = {
-        date: {
-          ...(startDate && { gte: new Date(startDate) }),
-          ...(endDate && { lte: new Date(endDate) }),
-        },
+      transactionWhere.date = {
+        ...(startDate && { gte: new Date(startDate) }),
+        ...(endDate && { lte: new Date(endDate) }),
       };
     }
+
+    const where: Record<string, unknown> = { transaction: transactionWhere };
+    if (staffId) where.staffId = staffId;
+    if (type) where.type = type;
 
     const commissions = await prisma.commission.findMany({
       where,
@@ -76,7 +88,7 @@ export async function GET(request: NextRequest) {
       _count: true,
     });
 
-    return NextResponse.json({
+    return {
       commissions: commissions.map((c) => ({
         ...c,
         amount: Number(c.amount),
@@ -114,41 +126,34 @@ export async function GET(request: NextRequest) {
         total: Number(t._sum.amount) || 0,
         count: t._count,
       })),
-    });
-  } catch (error) {
-    console.error("Error fetching commissions:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch commissions" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 // POST /api/commissions - Calculate and record commission
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { transactionId, staffId, type, baseAmount, customRate } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    const { transactionId, staffId, type, baseAmount, customRate } =
+      createSchema.parse(await request.json());
 
-    if (!transactionId || !staffId || !type || !baseAmount) {
-      return NextResponse.json(
-        { error: "transactionId, staffId, type, and baseAmount are required" },
-        { status: 400 }
-      );
-    }
-
-    // Get staff commission rates
-    const staff = await prisma.staff.findUnique({
-      where: { id: staffId },
-      select: {
-        commissionPct: true,
-        productCommissionPct: true,
-      },
-    });
-
-    if (!staff) {
-      return NextResponse.json({ error: "Staff not found" }, { status: 404 });
-    }
+    // Both the staff member and the source transaction must belong to this tenant.
+    const [staff, transaction] = await Promise.all([
+      prisma.staff.findFirst({
+        where: { id: staffId, location: { businessId: ctx.businessId } },
+        select: {
+          id: true,
+          commissionPct: true,
+          productCommissionPct: true,
+        },
+      }),
+      prisma.transaction.findFirst({
+        where: { id: transactionId, location: { businessId: ctx.businessId } },
+        select: { id: true },
+      }),
+    ]);
+    if (!staff) fail(404, "Staff not found");
+    if (!transaction) fail(404, "Transaction not found");
 
     // Determine rate
     let rate: number;
@@ -182,20 +187,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(
-      {
-        ...commission,
-        amount: Number(commission.amount),
-        rate: Number(commission.rate),
-        baseAmount: Number(commission.baseAmount),
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Error creating commission:", error);
-    return NextResponse.json(
-      { error: "Failed to create commission" },
-      { status: 500 }
-    );
-  }
+    return {
+      ...commission,
+      amount: Number(commission.amount),
+      rate: Number(commission.rate),
+      baseAmount: Number(commission.baseAmount),
+    };
+  });
 }

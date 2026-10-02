@@ -1,23 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
 
 // GET messages for a client
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get("clientId");
 
-    if (!clientId) {
-      return NextResponse.json(
-        { error: "Client ID is required" },
-        { status: 400 }
-      );
-    }
+    if (!clientId) fail(400, "Client ID is required");
 
     const messages = await prisma.communication.findMany({
       where: {
         clientId,
         type: "sms", // Filter for SMS/chat messages only
+        client: { businessId: ctx.businessId },
       },
       orderBy: {
         sentAt: "asc",
@@ -25,58 +24,49 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform to match the frontend interface
-    const formattedMessages = messages.map((msg) => ({
+    return messages.map((msg) => ({
       id: msg.id,
       content: msg.content || "",
       direction: msg.direction as "inbound" | "outbound",
       createdAt: msg.sentAt.toISOString(),
     }));
-
-    return NextResponse.json(formattedMessages);
-  } catch (error) {
-    console.error("Error fetching messages:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch messages" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 // POST - Send a new message
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { clientId, content, direction = "outbound" } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    const body = z
+      .object({
+        clientId: idSchema,
+        content: z.string().trim().min(1).max(5000),
+        direction: z.enum(["inbound", "outbound"]).default("outbound"),
+      })
+      .parse(await request.json());
 
-    if (!clientId || !content) {
-      return NextResponse.json(
-        { error: "Client ID and content are required" },
-        { status: 400 }
-      );
-    }
+    const client = await prisma.client.findFirst({
+      where: { id: body.clientId, businessId: ctx.businessId },
+      select: { id: true },
+    });
+    if (!client) fail(404, "Client not found");
 
     const message = await prisma.communication.create({
       data: {
-        clientId,
+        clientId: body.clientId,
         type: "sms",
-        direction,
-        content,
+        direction: body.direction,
+        content: body.content,
         status: "sent",
         sentAt: new Date(),
       },
     });
 
-    return NextResponse.json({
+    return {
       id: message.id,
       content: message.content || "",
       direction: message.direction as "inbound" | "outbound",
       createdAt: message.sentAt.toISOString(),
-    });
-  } catch (error) {
-    console.error("Error sending message:", error);
-    return NextResponse.json(
-      { error: "Failed to send message" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

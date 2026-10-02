@@ -1,17 +1,55 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
+
+// FamilyGroup/FamilyMember have no businessId; membership is scoped through
+// the related Client. Always require that at least one member belongs to the
+// caller's business and that every referenced client id is in the tenant.
+const familyScope = (businessId: string) => ({
+  members: { some: { client: { businessId } } },
+});
+
+const memberSchema = z.object({
+  clientId: idSchema,
+  relationship: z.string().trim().min(1).max(100),
+});
+
+const createSchema = z.object({
+  name: z.string().trim().min(1).max(150),
+  primaryContactId: idSchema,
+  members: z.array(memberSchema).max(100).optional(),
+});
+
+const updateSchema = z.object({
+  familyId: idSchema,
+  action: z.enum(["addMember", "removeMember"]).optional(),
+  name: z.string().trim().min(1).max(150).optional(),
+  primaryContactId: idSchema.optional(),
+  clientId: idSchema.optional(),
+  relationship: z.string().trim().min(1).max(100).optional(),
+});
+
+async function assertClientsInBusiness(clientIds: string[], businessId: string) {
+  const unique = [...new Set(clientIds)];
+  const found = await prisma.client.count({
+    where: { id: { in: unique }, businessId },
+  });
+  if (found !== unique.length) fail(422, "One or more clients do not belong to this business");
+}
 
 // GET /api/clients/family - Get family groups or search family members
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
     const { searchParams } = new URL(request.url);
-    const clientId = searchParams.get("clientId");
-    const familyId = searchParams.get("familyId");
+    const clientId = idSchema.optional().parse(searchParams.get("clientId") || undefined);
+    const familyId = idSchema.optional().parse(searchParams.get("familyId") || undefined);
 
     if (familyId) {
       // Get all members of a family
-      const family = await prisma.familyGroup.findUnique({
-        where: { id: familyId },
+      const family = await prisma.familyGroup.findFirst({
+        where: { id: familyId, ...familyScope(ctx.businessId) },
         include: {
           members: {
             include: {
@@ -30,13 +68,10 @@ export async function GET(request: NextRequest) {
       });
 
       if (!family) {
-        return NextResponse.json(
-          { error: "Family not found" },
-          { status: 404 }
-        );
+        fail(404, "Family not found");
       }
 
-      return NextResponse.json({
+      return {
         id: family.id,
         name: family.name,
         primaryContactId: family.primaryContactId,
@@ -45,13 +80,13 @@ export async function GET(request: NextRequest) {
           relationship: m.relationship,
           isPrimaryContact: m.client.id === family.primaryContactId,
         })),
-      });
+      };
     }
 
     if (clientId) {
       // Get family for a specific client
       const membership = await prisma.familyMember.findFirst({
-        where: { clientId },
+        where: { clientId, client: { businessId: ctx.businessId } },
         include: {
           family: {
             include: {
@@ -74,10 +109,10 @@ export async function GET(request: NextRequest) {
       });
 
       if (!membership) {
-        return NextResponse.json({ family: null });
+        return { family: null };
       }
 
-      return NextResponse.json({
+      return {
         family: {
           id: membership.family.id,
           name: membership.family.name,
@@ -89,11 +124,12 @@ export async function GET(request: NextRequest) {
             isPrimaryContact: m.client.id === membership.family.primaryContactId,
           })),
         },
-      });
+      };
     }
 
     // List all family groups
     const families = await prisma.familyGroup.findMany({
+      where: familyScope(ctx.businessId),
       include: {
         members: {
           include: {
@@ -117,7 +153,7 @@ export async function GET(request: NextRequest) {
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({
+    return {
       families: families.map((f) => ({
         id: f.id,
         name: f.name,
@@ -129,28 +165,22 @@ export async function GET(request: NextRequest) {
           (m) => `${m.client.firstName} ${m.client.lastName}`
         ),
       })),
-    });
-  } catch (error) {
-    console.error("Error fetching family:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch family" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 // POST /api/clients/family - Create a new family group
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { name, primaryContactId, members } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
+    const { name, primaryContactId, members } = createSchema.parse(
+      await request.json()
+    );
 
-    if (!name || !primaryContactId) {
-      return NextResponse.json(
-        { error: "name and primaryContactId are required" },
-        { status: 400 }
-      );
-    }
+    await assertClientsInBusiness(
+      [primaryContactId, ...(members || []).map((m) => m.clientId)],
+      ctx.businessId
+    );
 
     // Create family group
     const family = await prisma.familyGroup.create({
@@ -163,12 +193,10 @@ export async function POST(request: NextRequest) {
               clientId: primaryContactId,
               relationship: "Primary",
             },
-            ...(members || []).map(
-              (m: { clientId: string; relationship: string }) => ({
-                clientId: m.clientId,
-                relationship: m.relationship,
-              })
-            ),
+            ...(members || []).map((m) => ({
+              clientId: m.clientId,
+              relationship: m.relationship,
+            })),
           ],
         },
       },
@@ -187,7 +215,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    return {
       success: true,
       family: {
         id: family.id,
@@ -197,47 +225,36 @@ export async function POST(request: NextRequest) {
           relationship: m.relationship,
         })),
       },
-    });
-  } catch (error) {
-    console.error("Error creating family:", error);
-    return NextResponse.json(
-      { error: "Failed to create family" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 // PUT /api/clients/family - Update family or add/remove members
 export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { familyId, action, name, primaryContactId, clientId, relationship } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
+    const { familyId, action, name, primaryContactId, clientId, relationship } =
+      updateSchema.parse(await request.json());
 
-    if (!familyId) {
-      return NextResponse.json(
-        { error: "familyId is required" },
-        { status: 400 }
-      );
-    }
+    const family = await prisma.familyGroup.findFirst({
+      where: { id: familyId, ...familyScope(ctx.businessId) },
+      select: { id: true, primaryContactId: true },
+    });
+    if (!family) fail(404, "Family not found");
 
     if (action === "addMember") {
       if (!clientId || !relationship) {
-        return NextResponse.json(
-          { error: "clientId and relationship are required" },
-          { status: 400 }
-        );
+        fail(422, "clientId and relationship are required");
       }
+      await assertClientsInBusiness([clientId], ctx.businessId);
 
       // Check if client is already in a family
       const existingMembership = await prisma.familyMember.findFirst({
-        where: { clientId },
+        where: { clientId, client: { businessId: ctx.businessId } },
       });
 
       if (existingMembership) {
-        return NextResponse.json(
-          { error: "Client is already in a family group" },
-          { status: 400 }
-        );
+        fail(400, "Client is already in a family group");
       }
 
       await prisma.familyMember.create({
@@ -248,27 +265,17 @@ export async function PUT(request: NextRequest) {
         },
       });
 
-      return NextResponse.json({ success: true, message: "Member added" });
+      return { success: true, message: "Member added" };
     }
 
     if (action === "removeMember") {
       if (!clientId) {
-        return NextResponse.json(
-          { error: "clientId is required" },
-          { status: 400 }
-        );
+        fail(422, "clientId is required");
       }
 
       // Check if this is the primary contact
-      const family = await prisma.familyGroup.findUnique({
-        where: { id: familyId },
-      });
-
-      if (family?.primaryContactId === clientId) {
-        return NextResponse.json(
-          { error: "Cannot remove primary contact. Update primary contact first." },
-          { status: 400 }
-        );
+      if (family.primaryContactId === clientId) {
+        fail(400, "Cannot remove primary contact. Update primary contact first.");
       }
 
       await prisma.familyMember.deleteMany({
@@ -278,15 +285,18 @@ export async function PUT(request: NextRequest) {
         },
       });
 
-      return NextResponse.json({ success: true, message: "Member removed" });
+      return { success: true, message: "Member removed" };
     }
 
     // Update family details
     const updateData: Record<string, unknown> = {};
     if (name) updateData.name = name;
-    if (primaryContactId) updateData.primaryContactId = primaryContactId;
+    if (primaryContactId) {
+      await assertClientsInBusiness([primaryContactId], ctx.businessId);
+      updateData.primaryContactId = primaryContactId;
+    }
 
-    const family = await prisma.familyGroup.update({
+    const updated = await prisma.familyGroup.update({
       where: { id: familyId },
       data: updateData,
       include: {
@@ -304,39 +314,38 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    return {
       success: true,
       family: {
-        id: family.id,
-        name: family.name,
-        primaryContactId: family.primaryContactId,
-        members: family.members.map((m) => ({
+        id: updated.id,
+        name: updated.name,
+        primaryContactId: updated.primaryContactId,
+        members: updated.members.map((m) => ({
           ...m.client,
           relationship: m.relationship,
         })),
       },
-    });
-  } catch (error) {
-    console.error("Error updating family:", error);
-    return NextResponse.json(
-      { error: "Failed to update family" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 // DELETE /api/clients/family - Delete a family group
 export async function DELETE(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
     const { searchParams } = new URL(request.url);
-    const familyId = searchParams.get("familyId");
+    const familyId = z
+      .string()
+      .trim()
+      .min(1)
+      .max(191)
+      .parse(searchParams.get("familyId") || undefined);
 
-    if (!familyId) {
-      return NextResponse.json(
-        { error: "familyId is required" },
-        { status: 400 }
-      );
-    }
+    const family = await prisma.familyGroup.findFirst({
+      where: { id: familyId, ...familyScope(ctx.businessId) },
+      select: { id: true },
+    });
+    if (!family) fail(404, "Family not found");
 
     // Delete all members first
     await prisma.familyMember.deleteMany({
@@ -348,12 +357,6 @@ export async function DELETE(request: NextRequest) {
       where: { id: familyId },
     });
 
-    return NextResponse.json({ success: true, message: "Family group deleted" });
-  } catch (error) {
-    console.error("Error deleting family:", error);
-    return NextResponse.json(
-      { error: "Failed to delete family" },
-      { status: 500 }
-    );
-  }
+    return { success: true, message: "Family group deleted" };
+  });
 }

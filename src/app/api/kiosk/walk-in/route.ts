@@ -1,103 +1,87 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { endpoint } from "@/lib/operations/core";
+import { resolveKioskLocation } from "@/lib/operations/kiosk-token";
 
-// POST /api/kiosk/walk-in
-// Public unauthenticated endpoint to add a walk-in to the waitlist.
-// Body: { firstName, lastName?, phone, serviceIds?: string[], notes?, locationId? }
+/**
+ * PUBLIC (kiosk-token) ENDPOINT — waitlist walk-in check-in.
+ *
+ * A kiosk is a public browser with no signed-in user, so context() does not
+ * apply. Instead the device presents an `x-kiosk-token`, an HMAC bound to exactly
+ * one location (see `src/lib/operations/kiosk-token.ts`). Every read and write
+ * below is scoped to that location's business, and any caller-supplied
+ * locationId is ignored. The response exposes only the waitlist position the
+ * kiosk needs to display.
+ *
+ * Body: { firstName, lastName?, phone, serviceIds?: string[], notes? }
+ */
+const walkInInput = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().max(100).optional().default(""),
+  phone: z.string().trim().min(7).max(30),
+  serviceIds: z.array(z.string().trim().min(1).max(191)).max(20).optional().default([]),
+  notes: z.string().trim().max(500).optional(),
+});
+
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const {
-      firstName,
-      lastName = "",
-      phone: rawPhone,
-      serviceIds = [],
-      notes,
-      locationId: bodyLocationId,
-    } = body;
+  return endpoint(async () => {
+    const location = await resolveKioskLocation(
+      prisma,
+      request.headers.get("x-kiosk-token")
+    );
 
-    const phone = (rawPhone || "").trim();
+    const input = walkInInput.parse(await request.json().catch(() => ({})));
+    const phone = input.phone.replace(/\s+/g, " ");
 
-    if (!firstName || !phone) {
-      return NextResponse.json(
-        { error: "firstName and phone are required" },
-        { status: 400 }
-      );
-    }
-
-    // Resolve location
-    let locationId = bodyLocationId;
-    if (!locationId) {
-      const loc = await prisma.location.findFirst({
-        where: { isActive: true },
-        orderBy: { createdAt: "asc" },
-        select: { id: true, businessId: true },
-      });
-      if (!loc) {
-        return NextResponse.json(
-          { error: "No active location configured" },
-          { status: 400 }
-        );
-      }
-      locationId = loc.id;
-    }
-
-    const location = await prisma.location.findUnique({
-      where: { id: locationId },
-      select: { businessId: true },
-    });
-    if (!location) {
-      return NextResponse.json(
-        { error: "Invalid location" },
-        { status: 400 }
-      );
-    }
-
-    // Find or create client (within the business)
+    // Find or create the client within the kiosk's business.
     let client = await prisma.client.findFirst({
       where: {
         businessId: location.businessId,
         OR: [{ phone }, { mobile: phone }],
       },
+      select: { id: true },
     });
     if (!client) {
       client = await prisma.client.create({
         data: {
           businessId: location.businessId,
-          firstName,
-          lastName,
+          firstName: input.firstName,
+          lastName: input.lastName,
           phone,
           referralSource: "walk_in",
         },
+        select: { id: true },
       });
     }
 
-    // Resolve service durations
-    const services = serviceIds.length
+    // Resolve service durations within the kiosk's business.
+    const services = input.serviceIds.length
       ? await prisma.service.findMany({
-          where: { id: { in: serviceIds }, businessId: location.businessId },
+          where: { id: { in: input.serviceIds }, businessId: location.businessId },
           select: { id: true, name: true, duration: true },
         })
       : [];
     const totalDuration = services.reduce((s, sv) => s + sv.duration, 0) || 30;
     const serviceNotes =
       services.map((s) => s.name).join(", ") +
-      (notes ? ` - ${notes}` : "");
+      (input.notes ? ` - ${input.notes}` : "");
 
-    // Next position
+    // Next position within this location.
     const lastEntry = await prisma.waitlistEntry.findFirst({
       where: {
-        locationId,
+        locationId: location.id,
         status: { in: ["WAITING", "NOTIFIED"] },
       },
       orderBy: { position: "desc" },
+      select: { position: true },
     });
     const position = lastEntry ? lastEntry.position + 1 : 1;
     const estimatedWait = (position - 1) * 15;
 
     const entry = await prisma.waitlistEntry.create({
       data: {
-        locationId,
+        locationId: location.id,
         clientId: client.id,
         position,
         estimatedWait,
@@ -105,18 +89,9 @@ export async function POST(request: NextRequest) {
         estimatedDuration: totalDuration,
         phone,
       },
-      include: { client: true, location: true },
+      select: { id: true, status: true },
     });
 
-    return NextResponse.json(
-      { ...entry, position, estimatedWait },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Kiosk walk-in error:", error);
-    return NextResponse.json(
-      { error: "Failed to add to waitlist" },
-      { status: 500 }
-    );
-  }
+    return { ...entry, position, estimatedWait };
+  });
 }

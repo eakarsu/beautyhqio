@@ -5,6 +5,8 @@ import { Moon, ArrowLeft, Loader2, Sun, Coffee, Smartphone, Dumbbell, Thermomete
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface Coaching {
   sleepScore: number;
@@ -62,8 +64,20 @@ export default function SleepCoachPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, override?: Record<string, string>) => {
+    e?.preventDefault();
+    const v = {
+      bedtime: override?.bedtime ?? bedtime,
+      wakeTime: override?.wakeTime ?? wakeTime,
+      sleepQuality: override?.sleepQuality ? Number(override.sleepQuality) : sleepQuality,
+      caffeineIntake:
+        override?.caffeineIntake !== undefined ? override.caffeineIntake === "true" : caffeineIntake,
+      screenTime: override?.screenTime ? Number(override.screenTime) : screenTime,
+      exercise: override?.exercise !== undefined ? override.exercise === "true" : exercise,
+      stress: override?.stress ? Number(override.stress) : stress,
+      roomTemp: override?.roomTemp ?? roomTemp,
+      noiseLevel: override?.noiseLevel ?? noiseLevel,
+    };
     setLoading(true);
 
     try {
@@ -71,8 +85,7 @@ export default function SleepCoachPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          bedtime, wakeTime, sleepQuality, caffeineIntake,
-          screenTime, exercise, stress, roomTemp, noiseLevel, lightLevel,
+          ...v, lightLevel,
         }),
       });
 
@@ -160,6 +173,22 @@ export default function SleepCoachPage() {
           /* Sleep Log Form */
           <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700">
             <form onSubmit={handleSubmit} className="space-y-6">
+          <FillButtons
+            fixture={AI_FIXTURES["sleep-coach"]}
+            apply={(values) => {
+                if (values.bedtime !== undefined) setBedtime(values.bedtime);
+                if (values.wakeTime !== undefined) setWakeTime(values.wakeTime);
+                if (values.sleepQuality !== undefined) setSleepQuality(Number(values.sleepQuality));
+                if (values.caffeineIntake !== undefined) setCaffeineIntake(values.caffeineIntake === "true");
+                if (values.screenTime !== undefined) setScreenTime(Number(values.screenTime));
+                if (values.exercise !== undefined) setExercise(values.exercise === "true");
+                if (values.stress !== undefined) setStress(Number(values.stress));
+                if (values.roomTemp !== undefined) setRoomTemp(values.roomTemp);
+                if (values.noiseLevel !== undefined) setNoiseLevel(values.noiseLevel);
+            }}
+            onRun={(values) => void handleSubmit(undefined, values)}
+            running={loading}
+          />
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Log Your Sleep</h2>
                 <button type="button" onClick={loadSampleData} className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border border-gray-300">Load Sample Data</button>

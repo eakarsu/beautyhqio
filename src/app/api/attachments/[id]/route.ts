@@ -1,105 +1,90 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
+
+const attachmentInclude = {
+  client: {
+    select: { firstName: true, lastName: true },
+  },
+} as const;
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id } = await params;
 
-    const attachment = await prisma.attachment.findUnique({
-      where: { id },
-      include: {
-        client: {
-          select: { firstName: true, lastName: true },
-        },
-      },
+    const attachment = await prisma.attachment.findFirst({
+      where: { id, client: { businessId: ctx.businessId } },
+      include: attachmentInclude,
     });
 
-    if (!attachment) {
-      return NextResponse.json(
-        { error: "Attachment not found" },
-        { status: 404 }
-      );
-    }
+    if (!attachment) fail(404, "Attachment not found");
 
-    return NextResponse.json(attachment);
-  } catch (error) {
-    console.error("Error fetching attachment:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch attachment" },
-      { status: 500 }
-    );
-  }
+    return attachment;
+  });
 }
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id } = await params;
-    const body = await request.json();
-    const { fileName, description } = body;
+    const body = z
+      .object({
+        fileName: z.string().trim().min(1).max(300).optional(),
+        description: z.string().max(2000).optional().nullable(),
+      })
+      .parse(await request.json());
 
-    const attachment = await prisma.attachment.update({
+    const existing = await prisma.attachment.findFirst({
+      where: { id, client: { businessId: ctx.businessId } },
+      select: { id: true },
+    });
+    if (!existing) fail(404, "Attachment not found");
+
+    return prisma.attachment.update({
       where: { id },
       data: {
-        ...(fileName && { fileName }),
-        ...(description !== undefined && { description }),
+        ...(body.fileName !== undefined && { fileName: body.fileName }),
+        ...(body.description !== undefined && { description: body.description }),
       },
     });
-
-    return NextResponse.json(attachment);
-  } catch (error) {
-    console.error("Error updating attachment:", error);
-    return NextResponse.json(
-      { error: "Failed to update attachment" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id } = await params;
 
     // Get attachment first for activity logging
-    const attachment = await prisma.attachment.findUnique({
-      where: { id },
+    const attachment = await prisma.attachment.findFirst({
+      where: { id, client: { businessId: ctx.businessId } },
     });
+    if (!attachment) fail(404, "Attachment not found");
 
-    if (!attachment) {
-      return NextResponse.json(
-        { error: "Attachment not found" },
-        { status: 404 }
-      );
-    }
-
-    await prisma.attachment.delete({
-      where: { id },
-    });
+    await prisma.attachment.delete({ where: { id } });
 
     // Log activity
     await prisma.activity.create({
       data: {
         clientId: attachment.clientId,
+        userId: ctx.user.id,
         type: "NOTE_ADDED",
         title: "File deleted",
         description: attachment.fileName,
       },
     });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting attachment:", error);
-    return NextResponse.json(
-      { error: "Failed to delete attachment" },
-      { status: 500 }
-    );
-  }
+    return { success: true };
+  });
 }

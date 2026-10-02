@@ -5,6 +5,8 @@ import { Users, ArrowLeft, Loader2, Plus, Trash2, CheckCircle, AlertTriangle, Ta
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface Assessment {
   postureScore: number;
@@ -70,9 +72,20 @@ export default function PostureCorrectorPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!occupation) return;
+  const handleSubmit = async (e?: React.FormEvent, override?: Record<string, string>) => {
+    e?.preventDefault();
+    const occupationValue = override?.occupation ?? occupation;
+    const hoursSeatedValue = override?.hoursSeated ? Number(override.hoursSeated) : hoursSeated;
+    const painAreasValue =
+      override?.selectedPainAreas !== undefined
+        ? override.selectedPainAreas.split(",").map((s) => s.trim()).filter(Boolean)
+        : selectedPainAreas;
+    const issuesValue =
+      override?.selectedIssues !== undefined
+        ? override.selectedIssues.split(",").map((s) => s.trim()).filter(Boolean)
+        : selectedIssues;
+    const activityLevelValue = override?.activityLevel ?? activityLevel;
+    if (!occupationValue) return;
 
     setLoading(true);
     try {
@@ -80,10 +93,10 @@ export default function PostureCorrectorPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          occupation, hoursSeated,
-          painAreas: selectedPainAreas,
-          currentIssues: selectedIssues,
-          activityLevel,
+          occupation: occupationValue, hoursSeated: hoursSeatedValue,
+          painAreas: painAreasValue,
+          currentIssues: issuesValue,
+          activityLevel: activityLevelValue,
         }),
       });
 
@@ -170,6 +183,18 @@ export default function PostureCorrectorPage() {
           /* Form */
           <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700">
             <form onSubmit={handleSubmit} className="space-y-6">
+          <FillButtons
+            fixture={AI_FIXTURES["posture-corrector"]}
+            apply={(values) => {
+                if (values.occupation !== undefined) setOccupation(values.occupation);
+                if (values.hoursSeated !== undefined) setHoursSeated(Number(values.hoursSeated));
+                if (values.selectedPainAreas !== undefined) setSelectedPainAreas(String(values.selectedPainAreas).split(",").map((s) => s.trim()).filter(Boolean));
+                if (values.selectedIssues !== undefined) setSelectedIssues(String(values.selectedIssues).split(",").map((s) => s.trim()).filter(Boolean));
+                if (values.activityLevel !== undefined) setActivityLevel(values.activityLevel);
+            }}
+            onRun={(values) => void handleSubmit(undefined, values)}
+            running={loading}
+          />
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Posture Assessment</h2>
                 <button type="button" onClick={loadSampleData} className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border border-gray-300">Load Sample Data</button>

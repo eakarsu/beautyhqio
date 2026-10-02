@@ -1,20 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { endpoint, fail } from "@/lib/operations/core";
+import { resolveKioskLocation } from "@/lib/operations/kiosk-token";
 import { prisma } from "@/lib/prisma";
 
 // POST /api/kiosk/lookup
-// Public, unauthenticated endpoint for kiosks to find a client's appointments today.
-// Body: { phone: string, locationId?: string }
+// Kiosk check-in lookup. Previously public with an optional location and no
+// throttle, so any caller could enumerate clients by phone number across every
+// business. Now requires a kiosk token bound to a single location, and all
+// queries are scoped to that location's business.
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const phone = (body.phone || "").replace(/\D/g, "");
-    const locationId: string | undefined = body.locationId;
+  return endpoint(async () => {
+    const token = request.headers.get("x-kiosk-token");
+    const location = await resolveKioskLocation(prisma, token);
 
-    if (!phone || phone.length < 7) {
-      return NextResponse.json(
-        { error: "A valid phone number is required" },
-        { status: 400 }
-      );
+    const body = await request.json().catch(() => ({}));
+    const phone = String(body?.phone || "").replace(/\D/g, "");
+
+    // Require a full 10-digit US number: short prefixes made enumeration cheap.
+    if (phone.length !== 10 && phone.length !== 11) {
+      return fail(400, "A valid 10-digit phone number is required");
     }
 
     const startOfDay = new Date();
@@ -22,7 +26,6 @@ export async function POST(request: NextRequest) {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Match phone in either client.phone OR appointment.clientPhone (walk-in)
     const phoneVariants = [
       phone,
       `(${phone.slice(0, 3)}) ${phone.slice(3, 6)}-${phone.slice(6, 10)}`,
@@ -31,23 +34,21 @@ export async function POST(request: NextRequest) {
       `1${phone}`,
     ];
 
-    const where: Record<string, unknown> = {
-      scheduledStart: { gte: startOfDay, lte: endOfDay },
-      status: { notIn: ["CANCELLED", "NO_SHOW"] },
-      OR: [
-        { client: { phone: { in: phoneVariants } } },
-        { client: { mobile: { in: phoneVariants } } },
-        { clientPhone: { in: phoneVariants } },
-      ],
-    };
-    if (locationId) where.locationId = locationId;
-
     const appointments = await prisma.appointment.findMany({
-      where,
+      where: {
+        // Scope to this kiosk's own business and location.
+        businessId: location.businessId,
+        locationId: location.id,
+        scheduledStart: { gte: startOfDay, lte: endOfDay },
+        status: { notIn: ["CANCELLED", "NO_SHOW"] },
+        OR: [
+          { client: { phone: { in: phoneVariants } } },
+          { client: { mobile: { in: phoneVariants } } },
+          { clientPhone: { in: phoneVariants } },
+        ],
+      },
       include: {
-        client: {
-          select: { id: true, firstName: true, lastName: true, phone: true },
-        },
+        client: { select: { id: true, firstName: true, lastName: true, phone: true } },
         staff: {
           select: {
             id: true,
@@ -56,20 +57,12 @@ export async function POST(request: NextRequest) {
           },
         },
         services: {
-          include: {
-            service: { select: { id: true, name: true, duration: true } },
-          },
+          include: { service: { select: { id: true, name: true, duration: true } } },
         },
       },
       orderBy: { scheduledStart: "asc" },
     });
 
-    return NextResponse.json(appointments);
-  } catch (error) {
-    console.error("Kiosk lookup error:", error);
-    return NextResponse.json(
-      { error: "Failed to look up appointments" },
-      { status: 500 }
-    );
-  }
+    return appointments;
+  });
 }

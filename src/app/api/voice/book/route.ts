@@ -1,15 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
+import twilio from "twilio";
+import { context, endpoint } from "@/lib/operations/core";
 import { generateTwiML } from "@/lib/twilio";
 import { prisma } from "@/lib/prisma";
 
-// POST /api/voice/book - Handle booking request
+// POST /api/voice/book - Handle the Twilio booking flow.
+//
+// Primarily provider-initiated, so it is authenticated with the Twilio request
+// signature. A non-Twilio caller must instead present an authenticated staff
+// session (context()); the legacy direct path is retired in production unless
+// ENABLE_LEGACY_APPOINTMENT_WRITES is set (see src/middleware.ts).
 export async function POST(request: NextRequest) {
-  try {
+  return endpoint(async () => {
     const formData = await request.formData();
+
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!authToken) {
+      return NextResponse.json({ error: "Twilio integration is not configured" }, { status: 503 });
+    }
+    const signature = request.headers.get("x-twilio-signature") || "";
+    const params: Record<string, string> = {};
+    formData.forEach((value, key) => {
+      if (typeof value === "string") params[key] = value;
+    });
+    // Sign the public URL Twilio was configured with, falling back to the request URL.
+    const signingUrl = process.env.NEXT_PUBLIC_APP_URL
+      ? new URL(request.nextUrl.pathname + request.nextUrl.search, process.env.NEXT_PUBLIC_APP_URL).toString()
+      : request.url;
+    if (!signature || !twilio.validateRequest(authToken, signature, signingUrl, params)) {
+      await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    }
+
     const digits = formData.get("Digits") as string;
     const speechResult = formData.get("SpeechResult") as string;
     const from = formData.get("From") as string;
-    const callSid = formData.get("CallSid") as string;
 
     const input = digits || speechResult?.toLowerCase();
 
@@ -46,7 +70,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Find the service
+    // Resolve the caller's business from their client record where possible, so
+    // a service from another tenant can never be selected.
+    const client = from
+      ? await prisma.client.findFirst({
+          where: { phone: { contains: from.replace(/\D/g, "").slice(-10) } },
+          select: { id: true, businessId: true },
+        })
+      : null;
+
     const service = await prisma.service.findFirst({
       where: {
         name: {
@@ -54,6 +86,7 @@ export async function POST(request: NextRequest) {
           mode: "insensitive",
         },
         isActive: true,
+        ...(client ? { businessId: client.businessId } : {}),
       },
     });
 
@@ -74,14 +107,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Find next available slot
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(9, 0, 0, 0);
 
-    // Store booking intent in session (using call metadata)
-    // In a real implementation, you'd use a session store
     const twiml = generateTwiML({
       say: {
         text: `Great! I can book a ${serviceName} for you. The next available time is tomorrow at 9 AM. Press 1 to confirm this time, or press 2 to hear other options.`,
@@ -96,18 +126,5 @@ export async function POST(request: NextRequest) {
     return new NextResponse(twiml, {
       headers: { "Content-Type": "text/xml" },
     });
-  } catch (error) {
-    console.error("Error in booking flow:", error);
-
-    const errorTwiml = generateTwiML({
-      say: {
-        text: "I'm sorry, I'm having trouble processing your request. Let me connect you with someone who can help.",
-      },
-      redirect: "/api/voice/transfer",
-    });
-
-    return new NextResponse(errorTwiml, {
-      headers: { "Content-Type": "text/xml" },
-    });
-  }
+  });
 }

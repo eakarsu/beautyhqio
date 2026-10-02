@@ -1,16 +1,28 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
+
+const updateGiftCardSchema = z.object({
+  status: z.enum(["active", "redeemed", "expired", "cancelled"]).optional(),
+  currentBalance: z.coerce.number().finite().nonnegative().max(1_000_000).optional(),
+  recipientEmail: z.union([z.string().email().max(200), z.literal("")]).nullable().optional(),
+  recipientName: z.string().trim().max(150).nullable().optional(),
+  message: z.string().max(1000).nullable().optional(),
+  expiresAt: z.coerce.date().nullable().optional(),
+});
 
 // GET /api/gift-cards/[id] - Get gift card
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id } = await params;
 
-    const giftCard = await prisma.giftCard.findUnique({
-      where: { id },
+    const giftCard = await prisma.giftCard.findFirst({
+      where: { id, businessId: ctx.businessId },
       include: {
         purchasedBy: true,
         owner: true,
@@ -20,21 +32,8 @@ export async function GET(
       },
     });
 
-    if (!giftCard) {
-      return NextResponse.json(
-        { error: "Gift card not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(giftCard);
-  } catch (error) {
-    console.error("Error fetching gift card:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch gift card" },
-      { status: 500 }
-    );
-  }
+    return giftCard || fail(404, "Gift card not found");
+  });
 }
 
 // PUT /api/gift-cards/[id] - Update gift card
@@ -42,23 +41,16 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
     const { id } = await params;
-    const body = await request.json();
+    const input = updateGiftCardSchema.parse(await request.json());
 
-    const giftCard = await prisma.giftCard.update({
-      where: { id },
-      data: body,
-    });
+    const existing = await prisma.giftCard.findFirst({ where: { id, businessId: ctx.businessId } });
+    if (!existing) return fail(404, "Gift card not found");
 
-    return NextResponse.json(giftCard);
-  } catch (error) {
-    console.error("Error updating gift card:", error);
-    return NextResponse.json(
-      { error: "Failed to update gift card" },
-      { status: 500 }
-    );
-  }
+    return prisma.giftCard.update({ where: { id }, data: input });
+  });
 }
 
 // DELETE /api/gift-cards/[id] - Delete gift card
@@ -66,23 +58,18 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { id } = await params;
 
-    // Delete usage history first
-    await prisma.giftCardUsage.deleteMany({ where: { giftCardId: id } });
+    const existing = await prisma.giftCard.findFirst({ where: { id, businessId: ctx.businessId } });
+    if (!existing) return fail(404, "Gift card not found");
 
-    // Delete the gift card
-    await prisma.giftCard.delete({
-      where: { id },
-    });
+    await prisma.$transaction([
+      prisma.giftCardUsage.deleteMany({ where: { giftCardId: id } }),
+      prisma.giftCard.delete({ where: { id } }),
+    ]);
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting gift card:", error);
-    return NextResponse.json(
-      { error: "Failed to delete gift card" },
-      { status: 500 }
-    );
-  }
+    return { success: true };
+  });
 }

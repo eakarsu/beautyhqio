@@ -1,16 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
 // GET /api/loyalty/account/[clientId] - Get loyalty account
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "CLIENT"]);
     const { clientId } = await params;
 
-    const account = await prisma.loyaltyAccount.findUnique({
-      where: { clientId },
+    // A signed-in client may only read their own loyalty account.
+    if (ctx.user.role === "CLIENT" && clientId !== ctx.user.clientId) {
+      return fail(403, "You can only view your own loyalty account");
+    }
+
+    const account = await prisma.loyaltyAccount.findFirst({
+      where: { clientId, client: { businessId: ctx.businessId } },
       include: {
         client: true,
         program: {
@@ -27,19 +34,6 @@ export async function GET(
       },
     });
 
-    if (!account) {
-      return NextResponse.json(
-        { error: "Loyalty account not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(account);
-  } catch (error) {
-    console.error("Error fetching loyalty account:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch loyalty account" },
-      { status: 500 }
-    );
-  }
+    return account || fail(404, "Loyalty account not found");
+  });
 }

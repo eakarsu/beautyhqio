@@ -87,12 +87,18 @@ class OpenRouterClient {
       throw new Error("OpenRouter API key is not configured");
     }
 
+    // The timeout must scale with the requested output size: a 10k-token reply
+    // was taking ~60s and aborting at 30s, so any route asking for a long
+    // response failed deterministically. Allow generous headroom, floored at
+    // 60s so short calls are never cut off either.
+    const timeoutMs = Math.max(60_000, Math.round(Math.min(maxTokens, 10_000) * 12) + 30_000);
+
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.apiKey}`, "HTTP-Referer": process.env.NEXTAUTH_URL || "http://localhost:3000", "X-Title": "Beauty & Wellness AI" },
         body: JSON.stringify({ model: options.model || this.model, messages, max_tokens: Math.min(maxTokens, 10_000), temperature }),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (response.ok) {
         const data: OpenRouterResponse = await response.json();

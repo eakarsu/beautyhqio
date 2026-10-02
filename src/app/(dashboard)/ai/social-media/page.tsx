@@ -24,6 +24,8 @@ import {
   Check,
   Shuffle,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 const sampleData = [
   {
@@ -77,8 +79,12 @@ export default function SocialMediaPage() {
     setTone(sample.tone);
   };
 
-  const handleGenerate = async () => {
-    if (!platform || !topic) {
+  const handleGenerate = async (override?: Record<string, string>) => {
+    const platformValue = override?.platform ?? platform;
+    const postTypeValue = override?.postType ?? postType;
+    const topicValue = override?.topic ?? topic;
+    const toneValue = override?.tone ?? tone;
+    if (!platformValue || !topicValue) {
       setError("Please select a platform and enter a topic");
       return;
     }
@@ -92,10 +98,10 @@ export default function SocialMediaPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          platform,
-          postType,
-          topic,
-          tone,
+          platform: platformValue,
+          postType: postTypeValue,
+          topic: topicValue,
+          tone: toneValue,
         }),
       });
 
@@ -156,6 +162,18 @@ export default function SocialMediaPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FillButtons
+              fixture={AI_FIXTURES["social-media"]}
+              apply={(values) => {
+                if (values.platform !== undefined) setPlatform(values.platform);
+                if (values.postType !== undefined) setPostType(values.postType);
+                if (values.topic !== undefined) setTopic(values.topic);
+                if (values.tone !== undefined) setTone(values.tone);
+              }}
+              onRun={(values) => handleGenerate(values)}
+              onClear={() => { setPlatform(""); setPostType(""); setTopic(""); setTone(""); }}
+              running={loading}
+            />
             {/* Platform */}
             <div className="space-y-2">
               <Label>Platform *</Label>
@@ -230,7 +248,7 @@ export default function SocialMediaPage() {
 
             <Button
               className="w-full"
-              onClick={handleGenerate}
+              onClick={() => handleGenerate()}
               disabled={loading || !platform || !topic}
             >
               {loading ? (

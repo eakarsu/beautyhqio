@@ -1,62 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { endpoint, platformContext } from "@/lib/operations/core";
 
+// POST /api/contact - Public website contact form. Intentionally unauthenticated:
+// it is called by anonymous visitors on the marketing site and only creates a
+// global ContactMessage row (the model has no businessId). It is still wrapped in
+// endpoint() so malformed JSON and validation errors are handled safely.
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { firstName, lastName, email, phone, subject, message } = body;
+  return endpoint(async () => {
+    const body = z
+      .object({
+        firstName: z.string().trim().min(1).max(100),
+        lastName: z.string().trim().min(1).max(100),
+        email: z.string().trim().email().max(200),
+        phone: z.string().trim().max(50).optional().nullable(),
+        subject: z.string().trim().min(1).max(200),
+        message: z.string().trim().min(1).max(5000),
+      })
+      .parse(await request.json());
 
-    // Validate required fields
-    if (!firstName || !lastName || !email || !subject || !message) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Invalid email format" },
-        { status: 400 }
-      );
-    }
-
-    // Save to database
     await prisma.contactMessage.create({
       data: {
-        firstName,
-        lastName,
-        email,
-        phone: phone || null,
-        subject,
-        message,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        email: body.email,
+        phone: body.phone || null,
+        subject: body.subject,
+        message: body.message,
       },
     });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Contact form error:", error);
-    return NextResponse.json(
-      { error: "Failed to send message" },
-      { status: 500 }
-    );
-  }
+    return { success: true };
+  });
 }
 
-// Get all contact messages (for admin)
+// GET /api/contact - Admin inbox.
+// ContactMessage has no businessId, so this cannot be tenant-scoped; access is
+// restricted to management roles and the gap is noted for a schema follow-up.
 export async function GET() {
-  try {
+  return endpoint(async () => {
+    await platformContext();
     const messages = await prisma.contactMessage.findMany({
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
-    return NextResponse.json(messages);
-  } catch (error) {
-    console.error("Error fetching messages:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch messages" },
-      { status: 500 }
-    );
-  }
+    return messages;
+  });
 }

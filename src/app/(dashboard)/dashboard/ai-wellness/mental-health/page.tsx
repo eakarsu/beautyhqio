@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Brain, Send, ArrowLeft, Loader2, Smile, Frown, Meh, Heart, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface Message {
   role: "user" | "assistant";
@@ -35,11 +37,14 @@ export default function MentalHealthPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const handleSubmit = async (e?: React.FormEvent, override?: Record<string, string>) => {
+    e?.preventDefault();
+    const message = override?.message ?? input;
+    const mood = override?.moodScore !== undefined ? Number(override.moodScore) : moodScore;
+    const stress = override?.stressLevel !== undefined ? Number(override.stressLevel) : stressLevel;
+    if (!message.trim() || loading) return;
 
-    const userMessage = input.trim();
+    const userMessage = message.trim();
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setLoading(true);
@@ -51,8 +56,8 @@ export default function MentalHealthPage() {
         body: JSON.stringify({
           message: userMessage,
           sessionId,
-          moodScore,
-          stressLevel,
+          moodScore: mood,
+          stressLevel: stress,
           previousMessages: messages,
         }),
       });
@@ -131,6 +136,21 @@ export default function MentalHealthPage() {
       </div>
 
       <div className="flex-1 max-w-4xl mx-auto w-full flex flex-col">
+          <FillButtons
+            fixture={AI_FIXTURES["mental-health"]}
+            apply={(values) => {
+              if (values.moodScore !== undefined) setMoodScore(Number(values.moodScore));
+              if (values.stressLevel !== undefined) setStressLevel(Number(values.stressLevel));
+              if (values.message !== undefined) setInput(values.message);
+            }}
+            onRun={(values) => void handleSubmit(undefined, values)}
+            onClear={() => {
+              setMoodScore(5);
+              setStressLevel(5);
+              setInput("");
+            }}
+            running={loading}
+          />
         {/* Mood Tracker */}
         {showMoodTracker && messages.length === 0 && (
           <div className="p-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">

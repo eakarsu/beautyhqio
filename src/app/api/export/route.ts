@@ -1,26 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
+
+const typeSchema = z.enum([
+  "clients",
+  "appointments",
+  "transactions",
+  "services",
+  "staff",
+]);
 
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type");
-    const format = searchParams.get("format") || "json";
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
+    const typeParam = searchParams.get("type");
+    if (!typeParam) fail(400, "type is required");
+    const type = typeSchema.parse(typeParam);
+    const format = z
+      .enum(["json", "csv"])
+      .default("json")
+      .parse(searchParams.get("format") || "json");
+    const startDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("startDate") || undefined);
+    const endDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("endDate") || undefined);
 
-    if (!type) {
-      return NextResponse.json(
-        { error: "type is required" },
-        { status: 400 }
-      );
-    }
-
+    // Every export is restricted to the caller's own business.
     let data: unknown[] = [];
 
     switch (type) {
       case "clients":
         data = await prisma.client.findMany({
+          where: { businessId: ctx.businessId },
           orderBy: { lastName: "asc" },
         });
         break;
@@ -28,6 +47,7 @@ export async function GET(request: NextRequest) {
       case "appointments":
         data = await prisma.appointment.findMany({
           where: {
+            businessId: ctx.businessId,
             ...(startDate && { scheduledStart: { gte: new Date(startDate) } }),
             ...(endDate && { scheduledStart: { lte: new Date(endDate) } }),
           },
@@ -43,6 +63,7 @@ export async function GET(request: NextRequest) {
       case "transactions":
         data = await prisma.transaction.findMany({
           where: {
+            location: { businessId: ctx.businessId },
             ...(startDate && { createdAt: { gte: new Date(startDate) } }),
             ...(endDate && { createdAt: { lte: new Date(endDate) } }),
           },
@@ -56,12 +77,14 @@ export async function GET(request: NextRequest) {
 
       case "services":
         data = await prisma.service.findMany({
+          where: { businessId: ctx.businessId },
           orderBy: { name: "asc" },
         });
         break;
 
       case "staff":
         data = await prisma.staff.findMany({
+          where: { location: { businessId: ctx.businessId } },
           include: {
             user: { select: { firstName: true, lastName: true, email: true } },
           },
@@ -69,10 +92,7 @@ export async function GET(request: NextRequest) {
         break;
 
       default:
-        return NextResponse.json(
-          { error: "Invalid export type" },
-          { status: 400 }
-        );
+        return fail(400, "Invalid export type");
     }
 
     if (format === "csv") {
@@ -86,19 +106,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return {
       type,
       count: data.length,
       data,
       exportedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Export error:", error);
-    return NextResponse.json(
-      { error: "Export failed" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 function convertToCSV(data: unknown[]): string {

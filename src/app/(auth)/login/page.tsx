@@ -11,10 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 type DemoAccount = {
-  key: "owner" | "manager" | "receptionist" | "staff";
+  key: "owner" | "platform_admin" | "manager" | "receptionist" | "staff";
   email: string;
   password: string;
-  role: "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF";
+  role: "PLATFORM_ADMIN" | "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF";
 };
 
 const demoRoleDetails: Record<DemoAccount["key"], { label: string; description: string; classes: string }> = {
@@ -22,6 +22,11 @@ const demoRoleDetails: Record<DemoAccount["key"], { label: string; description: 
     label: "Owner",
     description: "Full dashboard with all features",
     classes: "bg-blue-50 hover:bg-blue-100 text-blue-700",
+  },
+  platform_admin: {
+    label: "Platform Admin (Executive)",
+    description: "Platform overview, all salons and the Sales CRM pipeline",
+    classes: "bg-rose-50 hover:bg-rose-100 text-rose-700",
   },
   manager: {
     label: "Manager",
@@ -153,8 +158,14 @@ export default function LoginPage() {
       const loaded = await loadDemoAccounts();
       const account = loaded.accounts.find(({ key }) => key === accountKey);
       if (!account?.password && !loaded.password) throw new Error('Local autofill is unavailable.');
-      setEmail(account?.email || loaded.email);
-      setPassword(account?.password || loaded.password);
+      const demoEmail = account?.email || loaded.email;
+      const demoPassword = account?.password || loaded.password;
+      setEmail(demoEmail);
+      setPassword(demoPassword);
+      const result = await signIn("credentials", { email: demoEmail, password: demoPassword, redirect: false });
+      if (result?.error) throw new Error("Demo sign-in failed.");
+      router.push("/");
+      router.refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Demo credentials are unavailable");
     } finally {

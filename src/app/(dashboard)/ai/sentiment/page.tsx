@@ -20,6 +20,8 @@ import {
   Star,
   TrendingUp,
 } from "lucide-react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 const sampleReviews = [
   {
@@ -58,8 +60,10 @@ export default function SentimentPage() {
     setSource(sample.source);
   };
 
-  const handleAnalyze = async () => {
-    if (!review) {
+  const handleAnalyze = async (override?: Record<string, string>) => {
+    const reviewText = override?.review ?? review;
+    const sourceValue = override?.source ?? source;
+    if (!reviewText) {
       setError("Please enter a review to analyze");
       return;
     }
@@ -73,8 +77,8 @@ export default function SentimentPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reviewText: review,
-          source: source || null,
+          reviewText,
+          source: sourceValue || null,
         }),
       });
 
@@ -135,6 +139,16 @@ export default function SentimentPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FillButtons
+              fixture={AI_FIXTURES["sentiment"]}
+              apply={(values) => {
+                if (values.review !== undefined) setReview(values.review);
+                if (values.source !== undefined) setSource(values.source);
+              }}
+              onRun={(values) => handleAnalyze(values)}
+              onClear={() => { setReview(""); setSource(""); }}
+              running={loading}
+            />
             {/* Review Text */}
             <div className="space-y-2">
               <Label>Review Text *</Label>
@@ -165,7 +179,7 @@ export default function SentimentPage() {
 
             <Button
               className="w-full"
-              onClick={handleAnalyze}
+              onClick={() => handleAnalyze()}
               disabled={loading || !review}
             >
               {loading ? (

@@ -1,57 +1,55 @@
-import { NextResponse } from "next/server";
+import { context, endpoint } from "@/lib/operations/core";
+import { decryptCredentials } from "@/lib/operations/connections";
 import { prisma } from "@/lib/prisma";
 
-// GET /api/quickbooks/status - Connection status for the UI
-export async function GET() {
-  try {
-    const settings = await prisma.settings.findFirst({
-      where: { id: "default" },
-    });
+const ROLES = ["OWNER", "MANAGER"] as const;
+const QB_PROVIDER = "quickbooks";
 
-    if (!settings?.quickbooksAccessToken || !settings?.quickbooksRealmId) {
-      return NextResponse.json({
-        connected: false,
-        expired: false,
-      });
+// GET /api/quickbooks/status - Connection status for the caller's business.
+export async function GET() {
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
+
+    const row = await prisma.integrationConnection.findUnique({
+      where: { businessId_provider: { businessId: ctx.businessId, provider: QB_PROVIDER } },
+    });
+    if (!row || row.status === "DISCONNECTED") {
+      return { connected: false, expired: false };
     }
 
-    const expired =
-      !!settings.quickbooksTokenExpiry &&
-      new Date(settings.quickbooksTokenExpiry) < new Date();
+    let tokenExpiry: Date | null = null;
+    let realmId: string | null = null;
+    try {
+      const credentials = decryptCredentials(ctx.businessId, QB_PROVIDER, row.encryptedCredentials) as {
+        realmId?: string;
+        expiresAt?: string | Date;
+      };
+      realmId = credentials.realmId || null;
+      tokenExpiry = credentials.expiresAt ? new Date(credentials.expiresAt) : null;
+    } catch {
+      return { connected: false, expired: false };
+    }
 
-    return NextResponse.json({
+    if (!realmId) return { connected: false, expired: false };
+
+    return {
       connected: true,
-      expired,
-      realmId: settings.quickbooksRealmId,
-      tokenExpiry: settings.quickbooksTokenExpiry,
-    });
-  } catch (error) {
-    console.error("Error reading QuickBooks status:", error);
-    return NextResponse.json(
-      { error: "Failed to read QuickBooks status" },
-      { status: 500 }
-    );
-  }
+      expired: !!tokenExpiry && tokenExpiry < new Date(),
+      realmId,
+      tokenExpiry,
+    };
+  });
 }
 
-// DELETE /api/quickbooks/status - Disconnect
+// DELETE /api/quickbooks/status - Disconnect the caller's business.
 export async function DELETE() {
-  try {
-    await prisma.settings.update({
-      where: { id: "default" },
-      data: {
-        quickbooksAccessToken: null,
-        quickbooksRefreshToken: null,
-        quickbooksRealmId: null,
-        quickbooksTokenExpiry: null,
-      },
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
+
+    await prisma.integrationConnection.deleteMany({
+      where: { businessId: ctx.businessId, provider: QB_PROVIDER },
     });
-    return NextResponse.json({ disconnected: true });
-  } catch (error) {
-    console.error("Error disconnecting QuickBooks:", error);
-    return NextResponse.json(
-      { error: "Failed to disconnect" },
-      { status: 500 }
-    );
-  }
+
+    return { disconnected: true };
+  });
 }

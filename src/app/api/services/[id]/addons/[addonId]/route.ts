@@ -1,32 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
+
+const addOnSchema = z.object({
+  name: z.string().trim().min(1).max(150),
+  price: z.coerce.number().finite().nonnegative().max(1_000_000),
+  duration: z.coerce.number().int().min(0).max(1440).default(0),
+});
 
 // PUT /api/services/[id]/addons/[addonId] - Update an add-on
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; addonId: string }> }
 ) {
-  try {
-    const { addonId } = await params;
-    const body = await request.json();
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
+    const { id, addonId } = await params;
+    const input = addOnSchema.parse(await request.json());
 
-    const addOn = await prisma.serviceAddOn.update({
+    const existing = await prisma.serviceAddOn.findFirst({
+      where: { id: addonId, serviceId: id, service: { businessId: ctx.businessId } },
+      select: { id: true },
+    });
+    if (!existing) return fail(404, "Add-on not found");
+
+    return prisma.serviceAddOn.update({
       where: { id: addonId },
       data: {
-        name: body.name,
-        price: body.price,
-        duration: body.duration || 0,
+        name: input.name,
+        price: input.price,
+        duration: input.duration,
       },
     });
-
-    return NextResponse.json(addOn);
-  } catch (error) {
-    console.error("Error updating add-on:", error);
-    return NextResponse.json(
-      { error: "Failed to update add-on" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 // DELETE /api/services/[id]/addons/[addonId] - Delete an add-on
@@ -34,19 +41,18 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; addonId: string }> }
 ) {
-  try {
-    const { addonId } = await params;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
+    const { id, addonId } = await params;
 
-    await prisma.serviceAddOn.delete({
-      where: { id: addonId },
+    const existing = await prisma.serviceAddOn.findFirst({
+      where: { id: addonId, serviceId: id, service: { businessId: ctx.businessId } },
+      select: { id: true },
     });
+    if (!existing) return fail(404, "Add-on not found");
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting add-on:", error);
-    return NextResponse.json(
-      { error: "Failed to delete add-on" },
-      { status: 500 }
-    );
-  }
+    await prisma.serviceAddOn.delete({ where: { id: addonId } });
+
+    return { success: true };
+  });
 }

@@ -1,26 +1,51 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
 // GET /api/reports/revenue - Revenue report
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-    const locationId = searchParams.get("locationId");
-    const groupBy = searchParams.get("groupBy") || "day"; // day, week, month
+    const startDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("startDate") || undefined);
+    const endDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("endDate") || undefined);
+    const locationId = z
+      .string()
+      .trim()
+      .min(1)
+      .max(191)
+      .optional()
+      .parse(searchParams.get("locationId") || undefined);
+    const groupBy = z
+      .enum(["day", "week", "month"])
+      .default("day")
+      .parse(searchParams.get("groupBy") || "day");
 
+    // Transactions have no businessId; scope through their location. The
+    // locationId filter is nested inside the tenant scope so it cannot escape it.
     const where: Record<string, unknown> = {
       status: "COMPLETED",
+      location: {
+        businessId: ctx.businessId,
+        ...(locationId && { id: locationId }),
+      },
     };
 
     if (startDate || endDate) {
-      where.date = {};
-      if (startDate) (where.date as Record<string, unknown>).gte = new Date(startDate);
-      if (endDate) (where.date as Record<string, unknown>).lte = new Date(endDate);
+      where.date = {
+        ...(startDate && { gte: new Date(startDate) }),
+        ...(endDate && { lte: new Date(endDate) }),
+      };
     }
-
-    if (locationId) where.locationId = locationId;
 
     // Get transactions data
     const transactions = await prisma.transaction.findMany({
@@ -107,7 +132,7 @@ export async function GET(request: NextRequest) {
       .map(([date, data]) => ({ date, ...data }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    return NextResponse.json({
+    return {
       summary: {
         totalRevenue,
         totalTax,
@@ -124,12 +149,6 @@ export async function GET(request: NextRequest) {
         percentage: totalRevenue ? (amount / totalRevenue) * 100 : 0,
       })),
       timeSeries,
-    });
-  } catch (error) {
-    console.error("Error generating revenue report:", error);
-    return NextResponse.json(
-      { error: "Failed to generate report" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

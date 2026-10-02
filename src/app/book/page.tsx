@@ -22,7 +22,7 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/locations?isActive=true")
+    fetch("/api/public/locations")
       .then((res) => res.json())
       .then((data) => {
         setLocations(data);

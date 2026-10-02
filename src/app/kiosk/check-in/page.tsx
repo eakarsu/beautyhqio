@@ -1,5 +1,6 @@
 "use client";
 
+import { kioskHeaders } from '@/lib/kiosk-client';
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ export default function KioskCheckInPage() {
       const cleaned = phoneNumber.replace(/\D/g, "");
       const response = await fetch(`/api/kiosk/lookup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: kioskHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ phone: cleaned }),
       });
       if (response.ok) {

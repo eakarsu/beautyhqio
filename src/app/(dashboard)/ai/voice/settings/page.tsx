@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Phone, Globe, Clock, MessageSquare, Volume2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 export default function VoiceReceptionistSettingsPage() {
   const router = useRouter();
@@ -65,6 +67,17 @@ export default function VoiceReceptionistSettingsPage() {
             <CardDescription>Basic configuration for the voice receptionist</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <FillButtons
+              fixture={AI_FIXTURES["voice-settings"]}
+              apply={(values) => {
+                setSettings((prev) => ({ ...prev, ...values }));
+              }}
+              onRun={() => void handleSave()}
+              onClear={() => {
+                setSettings((prev) => ({ ...prev, customGreeting: "", transferNumber: "" }));
+              }}
+              running={isSaving}
+            />
             <div className="flex items-center justify-between">
               <div>
                 <Label>Enable Voice Receptionist</Label>

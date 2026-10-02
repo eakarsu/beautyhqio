@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
 
-// GET /api/reviews - List reviews
+// GET /api/reviews - List reviews. Client-facing: a CLIENT only sees their own
+// reviews; staff see every review for the business.
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF", "CLIENT"]);
     const { searchParams } = new URL(request.url);
-    const minRating = searchParams.get("minRating");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const minRatingParam = searchParams.get("minRating");
+    const limit = z.coerce.number().int().min(1).max(200).parse(searchParams.get("limit") || 50);
+    const minRating = minRatingParam
+      ? z.coerce.number().int().min(1).max(5).parse(minRatingParam)
+      : undefined;
 
-    const where: Record<string, unknown> = {};
-    if (minRating) where.rating = { gte: parseInt(minRating) };
+    const where: Prisma.ReviewWhereInput = {
+      ...(minRating && { rating: { gte: minRating } }),
+      ...(ctx.user.role === "CLIENT"
+        ? { clientId: ctx.user.clientId || "__none__" }
+        : { client: { businessId: ctx.businessId } }),
+    };
 
     const reviews = await prisma.review.findMany({
       where,
@@ -22,42 +34,37 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
-    return NextResponse.json(reviews);
-  } catch (error) {
-    console.error("Error fetching reviews:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch reviews" },
-      { status: 500 }
-    );
-  }
+    return reviews;
+  });
 }
 
-// POST /api/reviews - Create review
+// POST /api/reviews - Create review (recorded by front-desk / management staff)
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const {
-      clientId,
-      rating,
-      comment,
-      source,
-      isPublic = true,
-    } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
+    const body = z
+      .object({
+        clientId: idSchema,
+        rating: z.coerce.number().int().min(1).max(5),
+        comment: z.string().max(5000).optional().nullable(),
+        source: z.string().trim().max(100).optional(),
+        isPublic: z.boolean().optional(),
+      })
+      .parse(await request.json());
 
-    if (!clientId) {
-      return NextResponse.json(
-        { error: "clientId is required" },
-        { status: 400 }
-      );
-    }
+    const client = await prisma.client.findFirst({
+      where: { id: body.clientId, businessId: ctx.businessId },
+      select: { id: true },
+    });
+    if (!client) fail(404, "Client not found");
 
     const review = await prisma.review.create({
       data: {
-        clientId,
-        rating,
-        comment,
-        source: source || "website",
-        isPublic,
+        clientId: body.clientId,
+        rating: body.rating,
+        comment: body.comment ?? null,
+        source: body.source || "website",
+        isPublic: body.isPublic ?? true,
       },
       include: {
         client: {
@@ -69,20 +76,15 @@ export async function POST(request: NextRequest) {
     // Create activity for client
     await prisma.activity.create({
       data: {
-        clientId,
+        clientId: body.clientId,
+        userId: ctx.user.id,
         type: "REVIEW_RECEIVED",
-        title: `Left a ${rating}-star review`,
-        description: comment?.substring(0, 100) || "No comment",
-        metadata: { reviewId: review.id, rating },
+        title: `Left a ${body.rating}-star review`,
+        description: body.comment?.substring(0, 100) || "No comment",
+        metadata: { reviewId: review.id, rating: body.rating },
       },
     });
 
     return NextResponse.json(review, { status: 201 });
-  } catch (error) {
-    console.error("Error creating review:", error);
-    return NextResponse.json(
-      { error: "Failed to create review" },
-      { status: 500 }
-    );
-  }
+  });
 }

@@ -1,15 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
 // GET /api/clients/duplicates - Find potential duplicate clients
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST"]);
     const { searchParams } = new URL(request.url);
-    const threshold = parseFloat(searchParams.get("threshold") || "0.8");
+    const threshold = z.coerce
+      .number()
+      .min(0)
+      .max(1)
+      .parse(searchParams.get("threshold") || "0.8");
 
-    // Get all active clients
+    // Get all active clients in this business
     const clients = await prisma.client.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", businessId: ctx.businessId },
       select: {
         id: true,
         firstName: true,
@@ -92,17 +99,11 @@ export async function GET(request: NextRequest) {
     // Sort by match score
     duplicates.sort((a, b) => b.matchScore - a.matchScore);
 
-    return NextResponse.json({
+    return {
       count: duplicates.length,
       duplicates,
-    });
-  } catch (error) {
-    console.error("Error finding duplicates:", error);
-    return NextResponse.json(
-      { error: "Failed to find duplicates" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 // Simple string similarity calculation (Levenshtein-based)

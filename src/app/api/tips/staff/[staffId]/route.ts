@@ -1,15 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
 // GET /api/tips/staff/[staffId] - Get tips summary for specific staff member
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ staffId: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { staffId } = await params;
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get("period") || "month"; // day, week, month, year
+    const period = z
+      .enum(["day", "week", "month", "year"])
+      .default("month")
+      .parse(searchParams.get("period") || "month");
 
     // Calculate date range
     const now = new Date();
@@ -33,13 +39,23 @@ export async function GET(
         startDate.setMonth(startDate.getMonth() - 1);
     }
 
+    // Staff has no businessId; verify membership through their location.
+    const staff = await prisma.staff.findFirst({
+      where: { id: staffId, location: { businessId: ctx.businessId } },
+      select: { id: true },
+    });
+    if (!staff) fail(404, "Staff not found");
+
+    const tenantTransaction = {
+      location: { businessId: ctx.businessId },
+      date: { gte: startDate },
+    };
+
     // Get tips for the period
     const tips = await prisma.tip.findMany({
       where: {
         staffId,
-        transaction: {
-          date: { gte: startDate },
-        },
+        transaction: tenantTransaction,
       },
       include: {
         transaction: {
@@ -60,9 +76,7 @@ export async function GET(
       by: ["method"],
       where: {
         staffId,
-        transaction: {
-          date: { gte: startDate },
-        },
+        transaction: tenantTransaction,
       },
       _sum: { amount: true },
       _count: true,
@@ -79,7 +93,7 @@ export async function GET(
       dailyTips[date] = (dailyTips[date] || 0) + Number(tip.amount);
     });
 
-    return NextResponse.json({
+    return {
       staffId,
       period,
       summary: {
@@ -106,12 +120,6 @@ export async function GET(
           : "Walk-in",
         transactionTotal: Number(t.transaction.totalAmount),
       })),
-    });
-  } catch (error) {
-    console.error("Error fetching staff tips:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch staff tips" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

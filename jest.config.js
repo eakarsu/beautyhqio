@@ -19,6 +19,10 @@ const config = {
     '/node_modules/',
     '/e2e/',
     '/.next/',
+    // tests/unit/*.test.ts are written for node:test (`node --test tests/*.test.ts`),
+    // not Jest. Without this, jest's `**/*.test.ts` glob picks them up, runs them on
+    // the wrong runner and reports a false failure in `npm run test:unit`.
+    '<rootDir>/tests/',
   ],
   modulePathIgnorePatterns: ['<rootDir>/.next/'],
 };

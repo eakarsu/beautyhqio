@@ -1,82 +1,75 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { randomUUID } from "crypto";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
-// POST /api/upload - Upload file
+const ALLOWED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+]);
+
+// `type` is a fixed allow-list so a caller cannot choose an arbitrary directory.
+const ALLOWED_CATEGORIES = new Set([
+  "general",
+  "clients",
+  "staff",
+  "services",
+  "products",
+  "documents",
+  "receipts",
+]);
+
+const EXTENSION_BY_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "application/pdf": "pdf",
+};
+
+// POST /api/upload - Upload a file for the caller's own business.
+//
+// Previously anonymous, with a caller-controlled directory and filename. Now:
+//   - requires an authenticated user with a business
+//   - restricts the subdirectory to a fixed allow-list
+//   - stores files under a per-business prefix so tenants cannot collide
+//   - derives the extension from the validated MIME type, not the filename
 export async function POST(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+
     const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const type = formData.get("type") as string || "general";
-    const entityId = formData.get("entityId") as string;
+    const file = formData.get("file");
+    const category = (formData.get("type") as string) || "general";
 
-    if (!file) {
-      return NextResponse.json(
-        { error: "No file provided" },
-        { status: 400 }
-      );
-    }
+    if (!(file instanceof File)) return fail(400, "No file provided");
 
-    // Validate file type
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "application/pdf",
-    ];
+    const safeCategory = ALLOWED_CATEGORIES.has(category) ? category : "general";
 
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Invalid file type" },
-        { status: 400 }
-      );
-    }
+    if (!ALLOWED_TYPES.has(file.type)) return fail(400, "Invalid file type");
+    if (file.size > 10 * 1024 * 1024) return fail(400, "File too large (max 10MB)");
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: "File too large (max 10MB)" },
-        { status: 400 }
-      );
-    }
+    const extension = EXTENSION_BY_TYPE[file.type] ?? "bin";
 
-    // Create upload directory
-    const uploadDir = join(process.cwd(), "public", "uploads", type);
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    // Tenant-scoped directory; randomised filename so a caller cannot choose it.
+    const uploadDir = join(process.cwd(), "public", "uploads", ctx.businessId, safeCategory);
+    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true });
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const extension = file.name.split(".").pop();
-    const filename = entityId
-      ? `${entityId}-${timestamp}.${extension}`
-      : `${timestamp}-${Math.random().toString(36).slice(2)}.${extension}`;
+    const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.${extension}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await writeFile(join(uploadDir, filename), buffer);
 
-    // Write file
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filePath = join(uploadDir, filename);
-    await writeFile(filePath, buffer);
-
-    // Return public URL
-    const publicUrl = `/uploads/${type}/${filename}`;
-
-    return NextResponse.json({
+    return {
       success: true,
-      url: publicUrl,
+      url: `/uploads/${ctx.businessId}/${safeCategory}/${filename}`,
       filename,
       type: file.type,
       size: file.size,
-    });
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    return NextResponse.json(
-      { error: "Failed to upload file" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

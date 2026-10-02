@@ -1,5 +1,6 @@
 "use client";
 
+import { kioskHeaders } from '@/lib/kiosk-client';
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
@@ -35,7 +36,7 @@ export default function KioskWalkInPage() {
   });
 
   useEffect(() => {
-    fetch("/api/kiosk/services")
+    fetch("/api/kiosk/services", { headers: kioskHeaders() })
       .then((res) => res.json())
       .then((data) => setServices(Array.isArray(data) ? data : []))
       .catch(console.error);

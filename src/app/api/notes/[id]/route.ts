@@ -1,15 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id } = await params;
 
-    const note = await prisma.clientNote.findUnique({
-      where: { id },
+    const note = await prisma.clientNote.findFirst({
+      where: { id, client: { businessId: ctx.businessId } },
       include: {
         client: {
           select: { firstName: true, lastName: true },
@@ -17,68 +20,57 @@ export async function GET(
       },
     });
 
-    if (!note) {
-      return NextResponse.json(
-        { error: "Note not found" },
-        { status: 404 }
-      );
-    }
+    if (!note) fail(404, "Note not found");
 
-    return NextResponse.json(note);
-  } catch (error) {
-    console.error("Error fetching note:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch note" },
-      { status: 500 }
-    );
-  }
+    return note;
+  });
 }
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id } = await params;
-    const body = await request.json();
-    const { content, isPrivate, isPinned } = body;
+    const body = z
+      .object({
+        content: z.string().trim().min(1).max(10000).optional(),
+        isPrivate: z.boolean().optional(),
+        isPinned: z.boolean().optional(),
+      })
+      .parse(await request.json());
 
-    const note = await prisma.clientNote.update({
+    const existing = await prisma.clientNote.findFirst({
+      where: { id, client: { businessId: ctx.businessId } },
+      select: { id: true },
+    });
+    if (!existing) fail(404, "Note not found");
+
+    return prisma.clientNote.update({
       where: { id },
       data: {
-        ...(content !== undefined && { content }),
-        ...(isPrivate !== undefined && { isPrivate }),
-        ...(isPinned !== undefined && { isPinned }),
+        ...(body.content !== undefined && { content: body.content }),
+        ...(body.isPrivate !== undefined && { isPrivate: body.isPrivate }),
+        ...(body.isPinned !== undefined && { isPinned: body.isPinned }),
       },
     });
-
-    return NextResponse.json(note);
-  } catch (error) {
-    console.error("Error updating note:", error);
-    return NextResponse.json(
-      { error: "Failed to update note" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id } = await params;
 
-    await prisma.clientNote.delete({
-      where: { id },
+    const result = await prisma.clientNote.deleteMany({
+      where: { id, client: { businessId: ctx.businessId } },
     });
+    if (!result.count) fail(404, "Note not found");
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting note:", error);
-    return NextResponse.json(
-      { error: "Failed to delete note" },
-      { status: 500 }
-    );
-  }
+    return { success: true };
+  });
 }

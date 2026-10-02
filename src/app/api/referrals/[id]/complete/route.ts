@@ -1,19 +1,33 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { context, endpoint, fail } from "@/lib/operations/core";
 import { prisma } from "@/lib/prisma";
 
-// POST /api/referrals/[id]/complete - Complete a referral and award rewards
+const ROLES = ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] as const;
+const bodySchema = z.object({
+  rewardReferrer: z.boolean().default(true),
+  rewardReferred: z.boolean().default(true),
+});
+
+// POST /api/referrals/[id]/complete - Complete a referral and award rewards.
+//
+// Staff action scoped to the caller's business. There is no public referral
+// token on the model, so completion requires an authenticated staff session and
+// the referral's referrer must belong to that business.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
     const { id } = await params;
-    const body = await request.json();
-    const { rewardReferrer = true, rewardReferred = true } = body;
+    const { rewardReferrer, rewardReferred } = bodySchema.parse(
+      await request.json().catch(() => ({}))
+    );
 
-    // Get the referral
-    const referral = await prisma.referral.findUnique({
-      where: { id },
+    // Scope through the referrer: a referral in another business is not found.
+    const referral = await prisma.referral.findFirst({
+      where: { id, referrer: { businessId: ctx.businessId } },
       include: {
         referrer: {
           include: {
@@ -28,41 +42,28 @@ export async function POST(
       },
     });
 
-    if (!referral) {
-      return NextResponse.json(
-        { error: "Referral not found" },
-        { status: 404 }
-      );
-    }
+    if (!referral) return fail(404, "Referral not found");
 
     if (referral.status === "completed") {
-      return NextResponse.json(
-        { error: "Referral has already been completed" },
-        { status: 400 }
-      );
+      return fail(400, "Referral has already been completed");
     }
 
-    // Get loyalty program for bonus points
+    // Loyalty program is unique per business.
     const loyaltyProgram = await prisma.loyaltyProgram.findFirst({
-      where: { isActive: true },
+      where: { isActive: true, businessId: ctx.businessId },
     });
 
     const updates: Promise<unknown>[] = [];
 
     // Award referrer
     if (rewardReferrer && !referral.referrerRewarded) {
-      // Add loyalty points if program exists
       if (loyaltyProgram && referral.referrer.loyaltyAccount) {
         updates.push(
           prisma.loyaltyAccount.update({
             where: { id: referral.referrer.loyaltyAccount.id },
             data: {
-              pointsBalance: {
-                increment: loyaltyProgram.bonusOnReferral,
-              },
-              lifetimePoints: {
-                increment: loyaltyProgram.bonusOnReferral,
-              },
+              pointsBalance: { increment: loyaltyProgram.bonusOnReferral },
+              lifetimePoints: { increment: loyaltyProgram.bonusOnReferral },
             },
           })
         );
@@ -79,7 +80,6 @@ export async function POST(
         );
       }
 
-      // Create activity
       updates.push(
         prisma.activity.create({
           data: {
@@ -95,24 +95,18 @@ export async function POST(
 
     // Award referred
     if (rewardReferred && !referral.referredRewarded) {
-      // Add loyalty points if program exists
       if (loyaltyProgram && referral.referred.loyaltyAccount) {
         updates.push(
           prisma.loyaltyAccount.update({
             where: { id: referral.referred.loyaltyAccount.id },
             data: {
-              pointsBalance: {
-                increment: Math.floor(loyaltyProgram.bonusOnReferral / 2),
-              },
-              lifetimePoints: {
-                increment: Math.floor(loyaltyProgram.bonusOnReferral / 2),
-              },
+              pointsBalance: { increment: Math.floor(loyaltyProgram.bonusOnReferral / 2) },
+              lifetimePoints: { increment: Math.floor(loyaltyProgram.bonusOnReferral / 2) },
             },
           })
         );
       }
 
-      // Create activity
       updates.push(
         prisma.activity.create({
           data: {
@@ -129,7 +123,7 @@ export async function POST(
     // Update referral status
     updates.push(
       prisma.referral.update({
-        where: { id },
+        where: { id: referral.id },
         data: {
           status: "completed",
           completedAt: new Date(),
@@ -141,20 +135,15 @@ export async function POST(
 
     await Promise.all(updates);
 
-    // Get updated referral
     const updatedReferral = await prisma.referral.findUnique({
-      where: { id },
+      where: { id: referral.id },
       include: {
-        referrer: {
-          select: { firstName: true, lastName: true },
-        },
-        referred: {
-          select: { firstName: true, lastName: true },
-        },
+        referrer: { select: { firstName: true, lastName: true } },
+        referred: { select: { firstName: true, lastName: true } },
       },
     });
 
-    return NextResponse.json({
+    return {
       success: true,
       referral: updatedReferral,
       rewards: {
@@ -162,12 +151,6 @@ export async function POST(
         referredRewarded: rewardReferred,
         bonusPoints: loyaltyProgram?.bonusOnReferral || 0,
       },
-    });
-  } catch (error) {
-    console.error("Error completing referral:", error);
-    return NextResponse.json(
-      { error: "Failed to complete referral" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

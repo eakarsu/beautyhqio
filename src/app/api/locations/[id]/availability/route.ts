@@ -1,12 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
 // GET /api/locations/[id]/availability - Get available time slots
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const staffId = searchParams.get("staffId");
@@ -14,29 +17,33 @@ export async function GET(
     const date = searchParams.get("date");
 
     if (!staffId || !serviceId || !date) {
-      return NextResponse.json(
-        { error: "staffId, serviceId, and date are required" },
-        { status: 400 }
-      );
+      return fail(400, "staffId, serviceId, and date are required");
     }
 
+    const location = await prisma.location.findFirst({
+      where: { id, businessId: ctx.businessId },
+      select: { id: true },
+    });
+    if (!location) return fail(404, "Location not found");
+
+    const staff = await prisma.staff.findFirst({
+      where: { id: staffId, locationId: id, location: { businessId: ctx.businessId } },
+      select: { id: true },
+    });
+    if (!staff) return fail(404, "Staff not found");
+
     // Get the service to know the duration
-    const service = await prisma.service.findUnique({
-      where: { id: serviceId },
+    const service = await prisma.service.findFirst({
+      where: { id: serviceId, businessId: ctx.businessId },
       select: { duration: true },
     });
 
-    if (!service) {
-      return NextResponse.json(
-        { error: "Service not found" },
-        { status: 404 }
-      );
-    }
+    if (!service) return fail(404, "Service not found");
 
     const serviceDuration = service.duration;
 
     // Parse the date
-    const selectedDate = new Date(date);
+    const selectedDate = z.coerce.date().parse(date);
     const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
     // Get staff schedule for this day
@@ -45,6 +52,7 @@ export async function GET(
         staffId: staffId,
         dayOfWeek: dayOfWeek,
         isWorking: true,
+        staff: { location: { businessId: ctx.businessId } },
       },
     });
 
@@ -65,6 +73,7 @@ export async function GET(
     const existingAppointments = await prisma.appointment.findMany({
       where: {
         staffId: staffId,
+        location: { businessId: ctx.businessId },
         scheduledStart: {
           gte: startOfDay,
           lte: endOfDay,
@@ -121,15 +130,9 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({
+    return {
       date: date,
       slots: slots,
-    });
-  } catch (error) {
-    console.error("Error fetching availability:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch availability" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

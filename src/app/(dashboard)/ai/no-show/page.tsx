@@ -28,6 +28,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface RiskyAppointment {
   id: string;
@@ -160,8 +162,9 @@ export default function NoShowPredictorPage() {
   };
 
   // AI-powered analysis using OpenRouter
-  const analyzeWithAI = async () => {
-    if (!selectedClientId) {
+  const analyzeWithAI = async (override?: Record<string, string>) => {
+    const clientId = override?.clientId ?? selectedClientId;
+    if (!clientId) {
       setError("Please select a client to analyze");
       return;
     }
@@ -174,7 +177,7 @@ export default function NoShowPredictorPage() {
       const response = await fetch("/api/ai/no-show-prediction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId: selectedClientId }),
+        body: JSON.stringify({ clientId }),
       });
 
       const data = await response.json();
@@ -264,6 +267,32 @@ export default function NoShowPredictorPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Client Selector */}
             <div className="space-y-4">
+              {clients.length > 0 && (
+                <FillButtons
+                  fixture={AI_FIXTURES["no-show"]}
+                  apply={(values) => {
+                    // Scenarios name a client; match that name to a real client id.
+                    const named = clients.find(
+                      (c) =>
+                        values.clientName &&
+                        c.firstName.toLowerCase() === values.clientName.toLowerCase(),
+                    );
+                    const pick = named ?? clients[0];
+                    if (pick) setSelectedClientId(pick.id);
+                  }}
+                  onRun={(values) => {
+                    const named = clients.find(
+                      (c) =>
+                        values.clientName &&
+                        c.firstName.toLowerCase() === values.clientName.toLowerCase(),
+                    );
+                    const pick = named ?? clients[0];
+                    if (pick) void analyzeWithAI({ clientId: pick.id });
+                  }}
+                  onClear={() => setSelectedClientId("")}
+                  running={isAnalyzing}
+                />
+              )}
               <div className="space-y-2">
                 <Label>Select Client</Label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
@@ -282,7 +311,7 @@ export default function NoShowPredictorPage() {
 
               <Button
                 className="w-full"
-                onClick={analyzeWithAI}
+                onClick={() => analyzeWithAI()}
                 disabled={isAnalyzing || !selectedClientId}
               >
                 {isAnalyzing ? (
@@ -551,7 +580,7 @@ export default function NoShowPredictorPage() {
                           variant="outline"
                           onClick={() => {
                             setSelectedClientId(apt.client.id);
-                            analyzeWithAI();
+                            void analyzeWithAI({ clientId: apt.client.id });
                           }}
                         >
                           <Sparkles className="h-4 w-4 mr-1" />

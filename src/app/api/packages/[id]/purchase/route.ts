@@ -1,84 +1,82 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
+
+const purchaseSchema = z.object({
+  clientId: idSchema,
+  pricePaid: z.coerce.number().finite().nonnegative().max(1_000_000).optional().nullable(),
+});
 
 // POST /api/packages/[id]/purchase - Purchase a package for a client
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "CLIENT"]);
     const { id } = await params;
-    const body = await request.json();
-    const { clientId, pricePaid } = body;
+    const input = purchaseSchema.parse(await request.json());
 
-    if (!clientId) {
-      return NextResponse.json(
-        { error: "clientId is required" },
-        { status: 400 }
-      );
+    // A signed-in client may only purchase a package for their own profile.
+    if (ctx.user.role === "CLIENT" && input.clientId !== ctx.user.clientId) {
+      return fail(403, "You can only buy a package for your own profile");
     }
 
-    // Get the package
-    const pkg = await prisma.package.findUnique({
-      where: { id },
-      include: {
-        services: true,
-      },
-    });
-
-    if (!pkg) {
-      return NextResponse.json({ error: "Package not found" }, { status: 404 });
-    }
-
-    if (!pkg.isActive) {
-      return NextResponse.json(
-        { error: "Package is no longer available" },
-        { status: 400 }
-      );
-    }
-
-    // Calculate total services
-    const totalServices = pkg.services.reduce(
-      (sum, s) => sum + s.quantity,
-      0
-    );
-
-    // Calculate expiration date
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + pkg.validityDays);
-
-    // Create the purchase
-    const purchase = await prisma.packagePurchase.create({
-      data: {
-        packageId: id,
-        clientId,
-        pricePaid: pricePaid ?? pkg.price,
-        totalServices,
-        remainingServices: totalServices,
-        expiresAt,
-      },
-      include: {
-        package: true,
-      },
-    });
-
-    // Create activity for client
-    await prisma.activity.create({
-      data: {
-        clientId,
-        type: "PURCHASE",
-        title: `Purchased ${pkg.name} package`,
-        description: `${totalServices} services, expires ${expiresAt.toLocaleDateString()}`,
-        metadata: {
-          purchaseId: purchase.id,
-          packageId: id,
-          packageName: pkg.name,
+    return prisma.$transaction(async (tx) => {
+      // Get the package
+      const pkg = await tx.package.findFirst({
+        where: { id, businessId: ctx.businessId },
+        include: {
+          services: true,
         },
-      },
-    });
+      });
 
-    return NextResponse.json(
-      {
+      if (!pkg) return fail(404, "Package not found");
+      if (!pkg.isActive) return fail(400, "Package is no longer available");
+
+      const client = await tx.client.findFirst({ where: { id: input.clientId, businessId: ctx.businessId }, select: { id: true } });
+      if (!client) return fail(404, "Client not found");
+
+      // Calculate total services
+      const totalServices = pkg.services.reduce((sum, s) => sum + s.quantity, 0);
+
+      // Calculate expiration date
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + pkg.validityDays);
+
+      // Create the purchase
+      const purchase = await tx.packagePurchase.create({
+        data: {
+          packageId: id,
+          clientId: input.clientId,
+          pricePaid: input.pricePaid ?? pkg.price,
+          totalServices,
+          remainingServices: totalServices,
+          expiresAt,
+        },
+        include: {
+          package: true,
+        },
+      });
+
+      // Create activity for client
+      await tx.activity.create({
+        data: {
+          clientId: input.clientId,
+          userId: ctx.user.id,
+          type: "PURCHASE",
+          title: `Purchased ${pkg.name} package`,
+          description: `${totalServices} services, expires ${expiresAt.toLocaleDateString()}`,
+          metadata: {
+            purchaseId: purchase.id,
+            packageId: id,
+            packageName: pkg.name,
+          },
+        },
+      });
+
+      return {
         ...purchase,
         pricePaid: Number(purchase.pricePaid),
         package: {
@@ -88,14 +86,7 @@ export async function POST(
           savingsAmount: Number(purchase.package.savingsAmount),
           savingsPercent: Number(purchase.package.savingsPercent),
         },
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Error purchasing package:", error);
-    return NextResponse.json(
-      { error: "Failed to purchase package" },
-      { status: 500 }
-    );
-  }
+      };
+    });
+  });
 }

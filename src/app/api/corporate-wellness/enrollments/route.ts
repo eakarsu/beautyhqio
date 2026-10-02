@@ -1,86 +1,91 @@
 /**
  * Corporate wellness enrollments CRUD (apply pass 7 — backlog #5).
  *
- * PRODUCT-DECISION: tenant scoping is enforced by `client_org_id`. Callers MUST
- * supply `clientOrgId` on POST so a misconfigured caller cannot accidentally
- * mix tenants. List queries also require `clientOrgId` OR `programId` to
- * prevent cross-tenant reads.
+ * SECURITY: the backing table has no `business_id` column, so tenancy is
+ * resolved through the parent program (`corporate_wellness_programs.business_id`)
+ * rather than trusting the caller-supplied `clientOrgId`. Every read joins the
+ * program and filters on the authenticated business; every write verifies the
+ * program (and any referenced client) belongs to that business first.
  */
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { context, endpoint, fail } from "@/lib/operations/core";
 import { prisma } from "@/lib/prisma";
 import { ensureCorporateWellnessEnrollmentsTable } from "@/lib/db-pass7";
 
+const ROLES = ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] as const;
+const programIdSchema = z.coerce.number().int().positive();
+
 export async function GET(req: NextRequest) {
   await ensureCorporateWellnessEnrollmentsTable();
-  const { searchParams } = new URL(req.url);
-  const programId = searchParams.get("programId");
-  const clientOrgId = searchParams.get("clientOrgId");
-  if (!programId && !clientOrgId) {
-    return NextResponse.json(
-      {
-        error:
-          "clientOrgId or programId required to prevent cross-tenant reads",
-      },
-      { status: 400 }
-    );
-  }
-  try {
-    const clauses: string[] = [];
-    const vals: any[] = [];
-    let i = 1;
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
+    const { searchParams } = new URL(req.url);
+    const programId = searchParams.get("programId");
+    const clientOrgId = searchParams.get("clientOrgId");
+    if (!programId && !clientOrgId) {
+      return fail(400, "clientOrgId or programId required");
+    }
+
+    const clauses: string[] = ["p.business_id = $1"];
+    const vals: unknown[] = [ctx.businessId];
     if (programId) {
-      clauses.push(`program_id = $${i++}`);
-      vals.push(parseInt(programId, 10));
+      clauses.push(`e.program_id = $${vals.length + 1}`);
+      vals.push(programIdSchema.parse(programId));
     }
     if (clientOrgId) {
-      clauses.push(`client_org_id = $${i++}`);
+      clauses.push(`e.client_org_id = $${vals.length + 1}`);
       vals.push(clientOrgId);
     }
-    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-    const rows: any = await prisma.$queryRawUnsafe(
-      `SELECT * FROM corporate_wellness_enrollments ${where} ORDER BY enrolled_at DESC LIMIT 1000`,
+
+    const rows = await prisma.$queryRawUnsafe<unknown[]>(
+      `SELECT e.* FROM corporate_wellness_enrollments e
+       JOIN corporate_wellness_programs p ON p.id = e.program_id
+       WHERE ${clauses.join(" AND ")}
+       ORDER BY e.enrolled_at DESC LIMIT 1000`,
       ...vals
     );
-    return NextResponse.json({ count: rows.length, items: rows });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: "enrollments read failed", details: e.message },
-      { status: 500 }
-    );
-  }
+    return { count: rows.length, items: rows };
+  });
 }
 
 export async function POST(req: NextRequest) {
   await ensureCorporateWellnessEnrollmentsTable();
-  const body = await req.json().catch(() => ({}));
-  const { programId, clientOrgId, clientId, memberEmail, memberName, notes } =
-    body || {};
-  if (!programId) {
-    return NextResponse.json({ error: "programId required" }, { status: 400 });
-  }
-  if (!clientOrgId) {
-    return NextResponse.json(
-      { error: "clientOrgId required for tenant isolation" },
-      { status: 400 }
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
+    const body = await req.json().catch(() => ({}));
+    const { programId, clientOrgId, clientId, memberEmail, memberName, notes } = body || {};
+
+    const parsedProgramId = programIdSchema.safeParse(programId);
+    if (!parsedProgramId.success) return fail(400, "programId required");
+    if (!clientOrgId) return fail(400, "clientOrgId required");
+
+    const program = await prisma.$queryRawUnsafe<{ id: number }[]>(
+      `SELECT id FROM corporate_wellness_programs WHERE id = $1 AND business_id = $2`,
+      parsedProgramId.data,
+      ctx.businessId
     );
-  }
-  try {
-    const r: any = await prisma.$queryRawUnsafe(
+    if (!program.length) return fail(404, "Program not found");
+
+    if (clientId) {
+      const client = await prisma.client.findFirst({
+        where: { id: String(clientId), businessId: ctx.businessId },
+        select: { id: true },
+      });
+      if (!client) return fail(404, "Client not found");
+    }
+
+    const r = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
       `INSERT INTO corporate_wellness_enrollments
        (program_id, client_org_id, client_id, member_email, member_name, notes)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      parseInt(programId, 10),
+      parsedProgramId.data,
       clientOrgId,
       clientId || null,
       memberEmail || null,
       memberName || null,
       notes || null
     );
-    return NextResponse.json(r[0], { status: 201 });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: "enrollment create failed", details: e.message },
-      { status: 500 }
-    );
-  }
+    return r[0];
+  });
 }

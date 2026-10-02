@@ -1,41 +1,34 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { context, endpoint, fail } from "@/lib/operations/core";
 import { sendAppointmentReminder } from "@/lib/twilio";
 import { prisma } from "@/lib/prisma";
 
-// POST /api/sms/reminder - Send appointment reminder
+const ROLES = ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] as const;
+const bodySchema = z.object({
+  appointmentId: z.string().trim().min(1).max(191),
+  language: z.string().trim().min(2).max(10).default("en"),
+});
+
+// POST /api/sms/reminder - Send a reminder for an appointment in this business.
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { appointmentId, language = "en" } = body;
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
+    const { appointmentId, language } = bodySchema.parse(await request.json());
 
-    if (!appointmentId) {
-      return NextResponse.json(
-        { error: "appointmentId is required" },
-        { status: 400 }
-      );
-    }
-
-    // Get appointment details
-    const appointment = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    // Tenant-scoped: we never send on behalf of another business.
+    const appointment = await prisma.appointment.findFirst({
+      where: { id: appointmentId, businessId: ctx.businessId },
       include: {
         client: true,
         services: { include: { service: true } },
       },
     });
 
-    if (!appointment) {
-      return NextResponse.json(
-        { error: "Appointment not found" },
-        { status: 404 }
-      );
-    }
+    if (!appointment) return fail(404, "Appointment not found");
 
     if (!appointment.client?.phone) {
-      return NextResponse.json(
-        { error: "Client does not have a phone number" },
-        { status: 400 }
-      );
+      return fail(400, "Client does not have a phone number");
     }
 
     const date = new Date(appointment.scheduledStart).toLocaleDateString();
@@ -55,48 +48,38 @@ export async function POST(request: NextRequest) {
       language
     );
 
-    // Update appointment to mark reminder sent
     await prisma.appointment.update({
-      where: { id: appointmentId },
+      where: { id: appointment.id },
       data: { reminderSent: true },
     });
 
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error("Error sending reminder:", error);
-    return NextResponse.json(
-      { error: "Failed to send reminder" },
-      { status: 500 }
-    );
-  }
+    return result;
+  });
 }
 
-// GET /api/sms/reminder - Send reminders for upcoming appointments
+// GET /api/sms/reminder - Send reminders for upcoming appointments in this business.
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
     const { searchParams } = new URL(request.url);
-    const hoursAhead = parseInt(searchParams.get("hours") || "24");
-    const language = searchParams.get("language") || "en";
+    const hoursAhead = z.coerce.number().int().min(1).max(168).catch(24).parse(searchParams.get("hours") || 24);
+    const language = z.string().trim().min(2).max(10).catch("en").parse(searchParams.get("language") || "en");
 
     const now = new Date();
     const future = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
 
-    // Get appointments that need reminders
     const appointments = await prisma.appointment.findMany({
       where: {
-        scheduledStart: {
-          gte: now,
-          lte: future,
-        },
+        businessId: ctx.businessId,
+        scheduledStart: { gte: now, lte: future },
         reminderSent: false,
-        status: {
-          in: ["CONFIRMED", "BOOKED"],
-        },
+        status: { in: ["CONFIRMED", "BOOKED"] },
       },
       include: {
         client: true,
         services: { include: { service: true } },
       },
+      take: 200,
     });
 
     const results = [];
@@ -135,17 +118,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return {
       total: appointments.length,
       sent: results.filter((r) => r.success).length,
       failed: results.filter((r) => !r.success).length,
       results,
-    });
-  } catch (error) {
-    console.error("Error sending reminders:", error);
-    return NextResponse.json(
-      { error: "Failed to send reminders" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

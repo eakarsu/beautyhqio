@@ -1,10 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BusinessType } from "@prisma/client";
+import { endpoint } from "@/lib/operations/core";
 
-// GET /api/marketplace/salons - Search/browse salons
+/**
+ * PUBLIC ENDPOINT — marketplace salon search.
+ *
+ * Anonymous shoppers browse the marketplace without a session, so this route
+ * deliberately does not call context(). Only listed salons with an active/trial
+ * subscription are returned, and the projection contains public listing fields
+ * plus a single public location and featured services. No PII, credentials or
+ * tenant-internal settings are selected.
+ */
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
     const searchParams = request.nextUrl.searchParams;
 
     // Search & filter params
@@ -16,9 +25,12 @@ export async function GET(request: NextRequest) {
     const minRating = searchParams.get("minRating");
     const priceRange = searchParams.get("priceRange");
 
-    // Pagination
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    // Pagination (capped)
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(searchParams.get("limit") || "20", 10) || 20)
+    );
 
     // Sorting
     const sortBy = searchParams.get("sortBy") || "rating"; // rating, reviews, name
@@ -177,7 +189,7 @@ export async function GET(request: NextRequest) {
       })),
     }));
 
-    return NextResponse.json({
+    return {
       salons: formattedSalons,
       total,
       page,
@@ -192,12 +204,6 @@ export async function GET(request: NextRequest) {
         priceRange,
         sortBy,
       },
-    });
-  } catch (error) {
-    console.error("Error searching salons:", error);
-    return NextResponse.json(
-      { error: "Failed to search salons" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

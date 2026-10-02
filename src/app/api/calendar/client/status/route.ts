@@ -1,21 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { context, endpoint, fail } from "@/lib/operations/core";
 import { prisma } from "@/lib/prisma";
 
-// GET /api/calendar/client/status - Get client's calendar connection status
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const clientId = searchParams.get("clientId");
+const ROLES = ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF", "CLIENT"] as const;
 
-    if (!clientId) {
-      return NextResponse.json(
-        { error: "clientId is required" },
-        { status: 400 }
-      );
+// GET /api/calendar/client/status - Get a client's calendar connection status.
+export async function GET(request: NextRequest) {
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
+    const { searchParams } = new URL(request.url);
+    const requested = searchParams.get("clientId");
+    // A client user may only read their own connection; staff pass an explicit id.
+    const clientId = ctx.user.clientId || requested;
+    if (!clientId) return fail(400, "clientId is required");
+    if (ctx.user.clientId && requested && requested !== ctx.user.clientId) {
+      return fail(403, "You cannot view another client's calendar");
     }
 
-    const client = await prisma.client.findUnique({
-      where: { id: clientId },
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, businessId: ctx.businessId },
       select: {
         googleCalendarToken: true,
         googleCalendarId: true,
@@ -25,14 +28,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!client) {
-      return NextResponse.json(
-        { error: "Client not found" },
-        { status: 404 }
-      );
-    }
+    if (!client) return fail(404, "Client not found");
 
-    return NextResponse.json({
+    return {
       google: {
         connected: !!client.googleCalendarToken,
         calendarId: client.googleCalendarId,
@@ -42,36 +40,32 @@ export async function GET(request: NextRequest) {
         calendarId: client.outlookCalendarId,
         tokenExpiry: client.outlookTokenExpiry,
       },
-    });
-  } catch (error) {
-    console.error("Error getting calendar status:", error);
-    return NextResponse.json(
-      { error: "Failed to get calendar status" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
-// DELETE /api/calendar/client/status - Disconnect a calendar
+// DELETE /api/calendar/client/status - Disconnect a client's calendar.
 export async function DELETE(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context([...ROLES]);
     const { searchParams } = new URL(request.url);
-    const clientId = searchParams.get("clientId");
+    const requested = searchParams.get("clientId");
+    const clientId = ctx.user.clientId || requested;
     const provider = searchParams.get("provider"); // "google" or "outlook"
 
-    if (!clientId) {
-      return NextResponse.json(
-        { error: "clientId is required" },
-        { status: 400 }
-      );
+    if (!clientId) return fail(400, "clientId is required");
+    if (ctx.user.clientId && requested && requested !== ctx.user.clientId) {
+      return fail(403, "You cannot modify another client's calendar");
+    }
+    if (!provider || !["google", "outlook"].includes(provider)) {
+      return fail(400, "provider must be 'google' or 'outlook'");
     }
 
-    if (!provider || !["google", "outlook"].includes(provider)) {
-      return NextResponse.json(
-        { error: "provider must be 'google' or 'outlook'" },
-        { status: 400 }
-      );
-    }
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, businessId: ctx.businessId },
+      select: { id: true },
+    });
+    if (!client) return fail(404, "Client not found");
 
     const updateData = provider === "google"
       ? {
@@ -87,16 +81,10 @@ export async function DELETE(request: NextRequest) {
         };
 
     await prisma.client.update({
-      where: { id: clientId },
+      where: { id: client.id },
       data: updateData,
     });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error disconnecting calendar:", error);
-    return NextResponse.json(
-      { error: "Failed to disconnect calendar" },
-      { status: 500 }
-    );
-  }
+    return { success: true };
+  });
 }

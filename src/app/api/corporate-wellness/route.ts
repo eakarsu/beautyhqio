@@ -1,16 +1,16 @@
 /**
- * Corporate wellness programs (apply pass 5 — PRODUCT-DECISION).
+ * Corporate wellness programs.
  *
  * PRODUCT-DECISION: a corporate wellness "program" is modelled as a parent record
- * with N member clients. Members reuse the existing `Client` table via `client_id`.
- * No multi-tenant Business hierarchy is introduced; the program is scoped to a
- * single business via `business_id`.
+ * with N member clients. It is scoped to the caller's business via `business_id`.
  *
  * Schema: `corporate_wellness_programs`, `corporate_wellness_members`. Both via
  * raw `CREATE TABLE IF NOT EXISTS`.
  */
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
 let ensured = false;
 async function ensure() {
@@ -38,34 +38,41 @@ async function ensure() {
   ensured = true;
 }
 
-export async function GET(req: NextRequest) {
-  await ensure();
-  const { searchParams } = new URL(req.url);
-  const businessId = searchParams.get("businessId");
-  try {
-    const rows: any = businessId
-      ? await prisma.$queryRawUnsafe(`SELECT * FROM corporate_wellness_programs WHERE business_id = $1 ORDER BY created_at DESC`, businessId)
-      : await prisma.$queryRawUnsafe(`SELECT * FROM corporate_wellness_programs ORDER BY created_at DESC LIMIT 200`);
-    return NextResponse.json(rows);
-  } catch (e: any) {
-    return NextResponse.json({ error: "Read failed", details: e.message }, { status: 500 });
-  }
+const programInput = z.object({
+  name: z.string().trim().min(1).max(200),
+  sponsorCompany: z.string().trim().max(200).optional().nullable(),
+  startsAt: z.coerce.date().optional().nullable(),
+  endsAt: z.coerce.date().optional().nullable(),
+});
+
+// GET /api/corporate-wellness - List programs for the caller's business
+export async function GET() {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    await ensure();
+    const rows: any = await prisma.$queryRawUnsafe(
+      `SELECT * FROM corporate_wellness_programs WHERE business_id = $1 ORDER BY created_at DESC LIMIT 200`,
+      ctx.businessId
+    );
+    return rows;
+  });
 }
 
+// POST /api/corporate-wellness - Create a program in the caller's business
 export async function POST(req: NextRequest) {
-  await ensure();
-  const body = await req.json().catch(() => ({}));
-  const { businessId, name, sponsorCompany, startsAt, endsAt } = body || {};
-  if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    await ensure();
+    const input = programInput.parse(await req.json().catch(() => ({})));
     const r: any = await prisma.$queryRawUnsafe(
       `INSERT INTO corporate_wellness_programs (business_id, name, sponsor_company, starts_at, ends_at)
        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      businessId || null, name, sponsorCompany || null,
-      startsAt ? new Date(startsAt) : null, endsAt ? new Date(endsAt) : null
+      ctx.businessId,
+      input.name,
+      input.sponsorCompany || null,
+      input.startsAt ?? null,
+      input.endsAt ?? null
     );
-    return NextResponse.json(r[0], { status: 201 });
-  } catch (e: any) {
-    return NextResponse.json({ error: "Create failed", details: e.message }, { status: 500 });
-  }
+    return r[0];
+  });
 }

@@ -13,6 +13,10 @@ interface DetailSheetProps {
   children: React.ReactNode;
   onEdit?: () => void;
   onDelete?: () => void;
+  /** Optional: renders a labelled Cancel button that dismisses the sheet. */
+  onCancel?: () => void;
+  /** Label for the cancel button (defaults to "Cancel"). */
+  cancelLabel?: string;
 }
 
 export function DetailSheet({
@@ -22,6 +26,8 @@ export function DetailSheet({
   children,
   onEdit,
   onDelete,
+  onCancel,
+  cancelLabel = "Cancel",
 }: DetailSheetProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
@@ -64,6 +70,11 @@ export function DetailSheet({
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
                     Delete
+                  </Button>
+                )}
+                {onCancel && (
+                  <Button variant="ghost" size="sm" onClick={onCancel}>
+                    {cancelLabel}
                   </Button>
                 )}
                 <DialogPrimitive.Close asChild>

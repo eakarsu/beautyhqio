@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -221,6 +223,11 @@ export default function StyleRecommenderPage() {
             <CardDescription>Help us find your perfect style</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FillButtons
+              fixture={AI_FIXTURES.style}
+              apply={(values) => setPreferences((prev) => ({ ...prev, ...values }))}
+              onClear={() => setPreferences({ hairLength: "", hairType: "", lifestyle: "", maintenance: "", notes: "" })}
+            />
             <div className="space-y-2">
               <Label>Preferred Length</Label>
               <Select

@@ -1,19 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { context, endpoint, fail } from "@/lib/operations/core";
 import { prisma } from "@/lib/prisma";
 
-// GET /api/business - List businesses
+// GET /api/business - the authenticated user's own business.
+// Previously returned every tenant's row to anonymous callers; now scoped by
+// the caller's businessId, and a platform admin must enter through a business.
 export async function GET() {
-  try {
-    const businesses = await prisma.business.findMany({
-      orderBy: { name: "asc" },
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+    const business = await prisma.business.findFirst({
+      where: { id: ctx.businessId },
     });
-
-    return NextResponse.json(businesses);
-  } catch (error) {
-    console.error("Error fetching businesses:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch businesses" },
-      { status: 500 }
-    );
-  }
+    return business || fail(404, "Business not found");
+  });
 }

@@ -1,83 +1,67 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
-// GET /api/loyalty - Get loyalty program
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const businessId = searchParams.get("businessId");
+const loyaltyUpdate = z.object({
+  name: z.string().trim().min(1).max(150).optional(),
+  isActive: z.boolean().optional(),
+  pointsPerDollar: z.coerce.number().finite().min(0).max(1000).optional(),
+  bonusOnSignup: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  bonusOnBirthday: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  bonusOnReferral: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  tiers: z.unknown().optional().nullable(),
+  pointsExpireMonths: z.coerce.number().int().min(0).max(1200).optional().nullable(),
+});
 
-    let program;
-    if (businessId) {
-      program = await prisma.loyaltyProgram.findUnique({
-        where: { businessId },
-        include: {
-          rewards: {
-            where: { isActive: true },
-            orderBy: { pointsCost: "asc" },
-          },
-          accounts: {
-            include: {
-              client: true,
-            },
-            orderBy: {
-              lifetimePoints: "desc",
-            },
-            take: 100,
-          },
+// GET /api/loyalty - Get the caller's business loyalty program
+export async function GET() {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
+
+    return prisma.loyaltyProgram.findUnique({
+      where: { businessId: ctx.businessId },
+      include: {
+        rewards: {
+          where: { isActive: true },
+          orderBy: { pointsCost: "asc" },
         },
-      });
-    } else {
-      // If no businessId, return the first loyalty program
-      program = await prisma.loyaltyProgram.findFirst({
-        include: {
-          rewards: {
-            where: { isActive: true },
-            orderBy: { pointsCost: "asc" },
+        accounts: {
+          include: {
+            client: true,
           },
-          accounts: {
-            include: {
-              client: true,
-            },
-            orderBy: {
-              lifetimePoints: "desc",
-            },
-            take: 100,
+          orderBy: {
+            lifetimePoints: "desc",
           },
+          take: 100,
         },
-      });
-    }
-
-    return NextResponse.json(program);
-  } catch (error) {
-    console.error("Error fetching loyalty program:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch loyalty program" },
-      { status: 500 }
-    );
-  }
+      },
+    });
+  });
 }
 
-// PUT /api/loyalty - Update loyalty program
+// PUT /api/loyalty - Update the caller's business loyalty program
 export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { businessId, ...data } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    const input = loyaltyUpdate.parse(await request.json());
 
-    const program = await prisma.loyaltyProgram.update({
-      where: { businessId },
-      data,
+    const existing = await prisma.loyaltyProgram.findUnique({
+      where: { businessId: ctx.businessId },
+      select: { id: true },
+    });
+    if (!existing) return fail(404, "Loyalty program not found");
+
+    return prisma.loyaltyProgram.update({
+      where: { businessId: ctx.businessId },
+      data: {
+        ...input,
+        tiers: (input.tiers ?? undefined) as Prisma.InputJsonValue | undefined,
+      },
       include: {
         rewards: true,
       },
     });
-
-    return NextResponse.json(program);
-  } catch (error) {
-    console.error("Error updating loyalty program:", error);
-    return NextResponse.json(
-      { error: "Failed to update loyalty program" },
-      { status: 500 }
-    );
-  }
+  });
 }

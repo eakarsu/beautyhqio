@@ -6,15 +6,14 @@
  * this pass — output is a draft envelope the operator reviews/approves through the
  * already-existing /api/purchase-orders flow.
  */
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint } from "@/lib/operations/core";
 
-export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const { businessId } = body || {};
-  if (!businessId) return NextResponse.json({ error: "businessId required" }, { status: 400 });
+export async function POST() {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    const businessId = ctx.businessId;
 
-  try {
     // PRODUCT-DECISION: trigger products = quantityOnHand <= reorderLevel.
     const triggers = await prisma.product.findMany({
       where: {
@@ -36,7 +35,7 @@ export async function POST(req: NextRequest) {
         vendor_id: null,
       }));
 
-    return NextResponse.json({
+    return {
       success: true,
       business_id: businessId,
       drafts: [{
@@ -45,8 +44,6 @@ export async function POST(req: NextRequest) {
         estimated_total: items.reduce((s, i) => s + (i.qty * (i.unit_cost || 0)), 0),
         note: "PRODUCT-DECISION: review before submitting via /api/purchase-orders. No PO created automatically.",
       }],
-    });
-  } catch (e: any) {
-    return NextResponse.json({ error: "Predictive supply failed", details: e.message }, { status: 500 });
-  }
+    };
+  });
 }

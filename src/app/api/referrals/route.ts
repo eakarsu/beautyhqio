@@ -1,23 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
 
-// GET /api/referrals - List referrals
+const referralInput = z.object({
+  referrerId: z.string().trim().min(1).max(191),
+  referredFirstName: z.string().trim().max(100).optional(),
+  referredLastName: z.string().trim().max(100).optional(),
+  referredEmail: z
+    .union([z.string().email().max(200), z.literal("")])
+    .optional()
+    .nullable(),
+  referredPhone: z.string().trim().min(7).max(30),
+  referrerReward: z.string().trim().max(200).optional(),
+  referredReward: z.string().trim().max(200).optional(),
+});
+
+// GET /api/referrals - List referrals for the caller's business
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"]);
     const { searchParams } = new URL(request.url);
     const referrerId = searchParams.get("referrerId");
     const status = searchParams.get("status");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const limit = Math.min(
+      200,
+      Math.max(1, parseInt(searchParams.get("limit") || "50", 10) || 50)
+    );
 
-    const where: Record<string, unknown> = {};
-
-    if (referrerId) {
-      where.referrerId = referrerId;
-    }
-
-    if (status) {
-      where.status = status;
-    }
+    const where: Record<string, unknown> = {
+      referrer: { businessId: ctx.businessId },
+    };
+    if (referrerId) where.referrerId = referrerId;
+    if (status) where.status = status;
 
     const referrals = await prisma.referral.findMany({
       where,
@@ -36,10 +51,11 @@ export async function GET(request: NextRequest) {
     // Get stats
     const stats = await prisma.referral.groupBy({
       by: ["status"],
+      where: { referrer: { businessId: ctx.businessId } },
       _count: true,
     });
 
-    return NextResponse.json({
+    return {
       referrals,
       stats: {
         total: referrals.length,
@@ -48,56 +64,40 @@ export async function GET(request: NextRequest) {
           {}
         ),
       },
-    });
-  } catch (error) {
-    console.error("Error fetching referrals:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch referrals" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 // POST /api/referrals - Create a new referral
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const {
-      referrerId,
-      referredFirstName,
-      referredLastName,
-      referredEmail,
-      referredPhone,
-      referrerReward,
-      referredReward,
-    } = body;
+  return endpoint(async () => {
+    const ctx = await context([
+      "OWNER",
+      "MANAGER",
+      "RECEPTIONIST",
+      "STAFF",
+      "CLIENT",
+    ]);
+    const input = referralInput.parse(await request.json());
 
-    if (!referrerId || !referredPhone) {
-      return NextResponse.json(
-        { error: "referrerId and referredPhone are required" },
-        { status: 400 }
-      );
+    // A signed-in client may only refer on their own behalf.
+    if (ctx.user.role === "CLIENT" && input.referrerId !== ctx.user.clientId) {
+      return fail(403, "You can only create referrals for your own account");
     }
 
-    // Check if referrer exists
-    const referrer = await prisma.client.findUnique({
-      where: { id: referrerId },
+    // Check the referrer exists in the caller's business.
+    const referrer = await prisma.client.findFirst({
+      where: { id: input.referrerId, businessId: ctx.businessId },
     });
+    if (!referrer) return fail(404, "Referrer not found");
 
-    if (!referrer) {
-      return NextResponse.json(
-        { error: "Referrer not found" },
-        { status: 404 }
-      );
-    }
-
-    // Check if referred person is already a client in the same business
+    // Check if the referred person is already a client in the same business.
     const existingClient = await prisma.client.findFirst({
       where: {
         businessId: referrer.businessId,
         OR: [
-          { phone: referredPhone },
-          ...(referredEmail ? [{ email: referredEmail }] : []),
+          { phone: input.referredPhone },
+          ...(input.referredEmail ? [{ email: input.referredEmail }] : []),
         ],
       },
     });
@@ -109,10 +109,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (existingReferral) {
-        return NextResponse.json(
-          { error: "This person has already been referred" },
-          { status: 400 }
-        );
+        return fail(400, "This person has already been referred");
       }
     }
 
@@ -121,12 +118,12 @@ export async function POST(request: NextRequest) {
     if (!referredClient) {
       referredClient = await prisma.client.create({
         data: {
-          firstName: referredFirstName || "Referred",
-          lastName: referredLastName || "Client",
-          email: referredEmail,
-          phone: referredPhone,
+          firstName: input.referredFirstName || "Referred",
+          lastName: input.referredLastName || "Client",
+          email: input.referredEmail || null,
+          phone: input.referredPhone,
           referralSource: "referral",
-          referredById: referrerId,
+          referredById: input.referrerId,
           businessId: referrer.businessId,
         },
       });
@@ -135,10 +132,10 @@ export async function POST(request: NextRequest) {
     // Create the referral
     const referral = await prisma.referral.create({
       data: {
-        referrerId,
+        referrerId: input.referrerId,
         referredId: referredClient.id,
-        referrerReward: referrerReward || "10% off next service",
-        referredReward: referredReward || "15% off first visit",
+        referrerReward: input.referrerReward || "10% off next service",
+        referredReward: input.referredReward || "15% off first visit",
         status: "pending",
       },
       include: {
@@ -154,7 +151,7 @@ export async function POST(request: NextRequest) {
     // Create activity for referrer
     await prisma.activity.create({
       data: {
-        clientId: referrerId,
+        clientId: input.referrerId,
         type: "REFERRAL_MADE",
         title: "Made a referral",
         description: `Referred ${referredClient.firstName} ${referredClient.lastName}`,
@@ -165,12 +162,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(referral, { status: 201 });
-  } catch (error) {
-    console.error("Error creating referral:", error);
-    return NextResponse.json(
-      { error: "Failed to create referral" },
-      { status: 500 }
-    );
-  }
+    return referral;
+  });
 }

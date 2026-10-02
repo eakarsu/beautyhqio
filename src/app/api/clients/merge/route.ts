@@ -1,30 +1,44 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
 
-// POST /api/clients/merge - Merge duplicate clients
+const mergeSchema = z.object({
+  primaryId: idSchema,
+  secondaryId: idSchema,
+  keepFields: z.array(z.string().trim().min(1).max(64)).max(50).optional(),
+});
+
+// Profile fields that may be copied from the duplicate record. Identity,
+// tenant and integration-credential fields are deliberately excluded.
+const MERGEABLE_FIELDS = new Set([
+  "firstName", "lastName", "email", "phone", "mobile",
+  "preferredLanguage", "preferredStaffId", "preferredContactMethod",
+  "birthday", "birthdayMonth", "birthdayDay",
+  "allowSms", "allowEmail", "referralSource", "referredById",
+  "notes", "internalNotes", "tags", "status",
+]);
+
+// POST /api/clients/merge - Merge duplicate clients (destructive)
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { primaryId, secondaryId, keepFields } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    const { primaryId, secondaryId, keepFields } = mergeSchema.parse(
+      await request.json()
+    );
 
-    if (!primaryId || !secondaryId) {
-      return NextResponse.json(
-        { error: "Primary and secondary client IDs are required" },
-        { status: 400 }
-      );
+    if (primaryId === secondaryId) {
+      fail(422, "Select two different clients to merge");
     }
 
-    // Get both clients
+    // Both clients must belong to the caller's business before anything changes.
     const [primary, secondary] = await Promise.all([
-      prisma.client.findUnique({ where: { id: primaryId } }),
-      prisma.client.findUnique({ where: { id: secondaryId } }),
+      prisma.client.findFirst({ where: { id: primaryId, businessId: ctx.businessId } }),
+      prisma.client.findFirst({ where: { id: secondaryId, businessId: ctx.businessId } }),
     ]);
 
     if (!primary || !secondary) {
-      return NextResponse.json(
-        { error: "One or both clients not found" },
-        { status: 404 }
-      );
+      fail(404, "One or both clients not found");
     }
 
     // Start transaction
@@ -35,7 +49,10 @@ export async function POST(request: NextRequest) {
       // If keepFields specified, use those from secondary
       if (keepFields) {
         for (const field of keepFields) {
-          if ((secondary as Record<string, unknown>)[field]) {
+          if (
+            MERGEABLE_FIELDS.has(field) &&
+            (secondary as Record<string, unknown>)[field]
+          ) {
             updateData[field] = (secondary as Record<string, unknown>)[field];
           }
         }
@@ -155,16 +172,10 @@ export async function POST(request: NextRequest) {
       return updatedPrimary;
     });
 
-    return NextResponse.json({
+    return {
       success: true,
       client: result,
       message: `Successfully merged client records. Secondary client ${secondaryId} has been archived.`,
-    });
-  } catch (error) {
-    console.error("Error merging clients:", error);
-    return NextResponse.json(
-      { error: "Failed to merge clients" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }

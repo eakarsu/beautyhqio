@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -125,7 +124,6 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function CRMPage() {
-  const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -767,12 +765,15 @@ export default function CRMPage() {
         title={selectedLead?.salonName || "Lead Details"}
         onEdit={() => {
           if (selectedLead) {
-            router.push(`/crm/${selectedLead.id}`);
+            openEditDialog(selectedLead);
+            setSelectedLead(null);
           }
         }}
         onDelete={() => {
           setDeleteDialogOpen(true);
         }}
+        onCancel={() => setSelectedLead(null)}
+        cancelLabel="Cancel"
       >
         {selectedLead && (
           <dl className="space-y-1">

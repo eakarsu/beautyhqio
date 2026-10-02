@@ -1,29 +1,63 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail, idSchema } from "@/lib/operations/core";
+
+const createSchema = z.object({
+  transactionId: idSchema,
+  staffId: idSchema,
+  amount: z.coerce.number().finite().positive().max(1_000_000),
+  method: z
+    .enum([
+      "CASH",
+      "CREDIT_CARD",
+      "DEBIT_CARD",
+      "GIFT_CARD",
+      "PREPAID_PACKAGE",
+      "POINTS",
+      "APPLE_PAY",
+      "GOOGLE_PAY",
+      "OTHER",
+    ])
+    .default("CREDIT_CARD"),
+});
 
 // GET /api/tips - List tips with filters
 export async function GET(request: NextRequest) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { searchParams } = new URL(request.url);
-    const staffId = searchParams.get("staffId");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-    const limit = parseInt(searchParams.get("limit") || "100");
+    const staffId = idSchema.optional().parse(searchParams.get("staffId") || undefined);
+    const startDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("startDate") || undefined);
+    const endDate = z
+      .string()
+      .datetime()
+      .optional()
+      .parse(searchParams.get("endDate") || undefined);
+    const limit = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(200)
+      .parse(searchParams.get("limit") || 100);
 
-    const where: Record<string, unknown> = {};
-
-    if (staffId) {
-      where.staffId = staffId;
-    }
-
+    // Tips have no businessId; scope through transaction -> location.
+    const transactionWhere: Record<string, unknown> = {
+      location: { businessId: ctx.businessId },
+    };
     if (startDate || endDate) {
-      where.transaction = {
-        date: {
-          ...(startDate && { gte: new Date(startDate) }),
-          ...(endDate && { lte: new Date(endDate) }),
-        },
+      transactionWhere.date = {
+        ...(startDate && { gte: new Date(startDate) }),
+        ...(endDate && { lte: new Date(endDate) }),
       };
     }
+
+    const where: Record<string, unknown> = { transaction: transactionWhere };
+    if (staffId) where.staffId = staffId;
 
     const tips = await prisma.tip.findMany({
       where,
@@ -62,7 +96,7 @@ export async function GET(request: NextRequest) {
       _avg: { amount: true },
     });
 
-    return NextResponse.json({
+    return {
       tips: tips.map((t) => ({
         ...t,
         amount: Number(t.amount),
@@ -78,28 +112,31 @@ export async function GET(request: NextRequest) {
         tipCount: summary._count,
         averageTip: Number(summary._avg.amount) || 0,
       },
-    });
-  } catch (error) {
-    console.error("Error fetching tips:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch tips" },
-      { status: 500 }
-    );
-  }
+    };
+  });
 }
 
 // POST /api/tips - Add tip to transaction
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { transactionId, staffId, amount, method } = body;
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
+    const { transactionId, staffId, amount, method } = createSchema.parse(
+      await request.json()
+    );
 
-    if (!transactionId || !staffId || !amount) {
-      return NextResponse.json(
-        { error: "transactionId, staffId, and amount are required" },
-        { status: 400 }
-      );
-    }
+    // Both the staff member and the source transaction must belong to this tenant.
+    const [staff, transaction] = await Promise.all([
+      prisma.staff.findFirst({
+        where: { id: staffId, location: { businessId: ctx.businessId } },
+        select: { id: true },
+      }),
+      prisma.transaction.findFirst({
+        where: { id: transactionId, location: { businessId: ctx.businessId } },
+        select: { id: true },
+      }),
+    ]);
+    if (!staff) fail(404, "Staff not found");
+    if (!transaction) fail(404, "Transaction not found");
 
     // Create the tip
     const tip = await prisma.tip.create({
@@ -107,7 +144,7 @@ export async function POST(request: NextRequest) {
         transactionId,
         staffId,
         amount,
-        method: method || "CREDIT_CARD",
+        method,
       },
       include: {
         staff: {
@@ -126,18 +163,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(
-      {
-        ...tip,
-        amount: Number(tip.amount),
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Error creating tip:", error);
-    return NextResponse.json(
-      { error: "Failed to create tip" },
-      { status: 500 }
-    );
-  }
+    return {
+      ...tip,
+      amount: Number(tip.amount),
+    };
+  });
 }

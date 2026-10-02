@@ -5,6 +5,8 @@ import { ShoppingBag, ArrowLeft, Loader2, Plus, Trash2, Sparkles, Clock, DollarS
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface Recommendations {
   clientProfile: { summary: string; primaryFocus: string };
@@ -67,9 +69,20 @@ export default function ProductRecommenderPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedConcerns.length === 0) return;
+  const handleSubmit = async (e?: React.FormEvent, override?: Record<string, string>) => {
+    e?.preventDefault();
+    const skinTypeValue = override?.skinType ?? skinType;
+    const hairTypeValue = override?.hairType ?? hairType;
+    const concernsValue =
+      override?.selectedConcerns !== undefined
+        ? override.selectedConcerns.split(",").map((s) => s.trim()).filter(Boolean)
+        : selectedConcerns;
+    const allergiesValue =
+      override?.selectedAllergies !== undefined
+        ? override.selectedAllergies.split(",").map((s) => s.trim()).filter(Boolean)
+        : selectedAllergies;
+    const budgetValue = override?.budget ?? budget;
+    if (concernsValue.length === 0) return;
 
     setLoading(true);
     try {
@@ -77,8 +90,8 @@ export default function ProductRecommenderPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          skinType, hairType, concerns: selectedConcerns,
-          allergies: selectedAllergies, budget,
+          skinType: skinTypeValue, hairType: hairTypeValue, concerns: concernsValue,
+          allergies: allergiesValue, budget: budgetValue,
         }),
       });
 
@@ -151,6 +164,18 @@ export default function ProductRecommenderPage() {
           /* Form */
           <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700">
             <form onSubmit={handleSubmit} className="space-y-6">
+          <FillButtons
+            fixture={AI_FIXTURES["product-recommender"]}
+            apply={(values) => {
+                if (values.skinType !== undefined) setSkinType(values.skinType);
+                if (values.hairType !== undefined) setHairType(values.hairType);
+                if (values.selectedConcerns !== undefined) setSelectedConcerns(String(values.selectedConcerns).split(",").map((s) => s.trim()).filter(Boolean));
+                if (values.selectedAllergies !== undefined) setSelectedAllergies(String(values.selectedAllergies).split(",").map((s) => s.trim()).filter(Boolean));
+                if (values.budget !== undefined) setBudget(values.budget);
+            }}
+            onRun={(values) => void handleSubmit(undefined, values)}
+            running={loading}
+          />
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Tell us about yourself</h2>
                 <button type="button" onClick={loadSampleData} className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border border-gray-300">Load Sample Data</button>

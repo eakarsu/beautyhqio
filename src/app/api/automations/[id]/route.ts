@@ -1,33 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { context, endpoint, fail } from "@/lib/operations/core";
+
+const automationInput = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    description: z.string().max(2000).nullable(),
+    isActive: z.boolean(),
+    triggerType: z.string().trim().min(1).max(100),
+    triggerConfig: z.unknown().nullable(),
+    actions: z.unknown(),
+    timesTriggered: z.number().int().nonnegative(),
+    lastTriggered: z.coerce.date().nullable(),
+  })
+  .partial();
 
 // GET /api/automations/[id] - Get automation details
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { id } = await params;
 
-    const automation = await prisma.automation.findUnique({
-      where: { id },
+    const automation = await prisma.automation.findFirst({
+      where: { id, businessId: ctx.businessId },
     });
 
-    if (!automation) {
-      return NextResponse.json(
-        { error: "Automation not found" },
-        { status: 404 }
-      );
-    }
+    if (!automation) fail(404, "Automation not found");
 
-    return NextResponse.json(automation);
-  } catch (error) {
-    console.error("Error fetching automation:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch automation" },
-      { status: 500 }
-    );
-  }
+    return automation;
+  });
 }
 
 // PUT /api/automations/[id] - Update automation
@@ -35,23 +41,22 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { id } = await params;
-    const body = await request.json();
+    const input = automationInput.parse(await request.json());
 
-    const automation = await prisma.automation.update({
-      where: { id },
-      data: body,
+    const existing = await prisma.automation.findFirst({
+      where: { id, businessId: ctx.businessId },
+      select: { id: true },
     });
+    if (!existing) fail(404, "Automation not found");
 
-    return NextResponse.json(automation);
-  } catch (error) {
-    console.error("Error updating automation:", error);
-    return NextResponse.json(
-      { error: "Failed to update automation" },
-      { status: 500 }
-    );
-  }
+    return prisma.automation.update({
+      where: { id },
+      data: input as Prisma.AutomationUpdateInput,
+    });
+  });
 }
 
 // DELETE /api/automations/[id] - Delete automation
@@ -59,19 +64,15 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return endpoint(async () => {
+    const ctx = await context(["OWNER", "MANAGER"]);
     const { id } = await params;
 
-    await prisma.automation.delete({
-      where: { id },
+    const result = await prisma.automation.deleteMany({
+      where: { id, businessId: ctx.businessId },
     });
+    if (!result.count) fail(404, "Automation not found");
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting automation:", error);
-    return NextResponse.json(
-      { error: "Failed to delete automation" },
-      { status: 500 }
-    );
-  }
+    return { success: true };
+  });
 }

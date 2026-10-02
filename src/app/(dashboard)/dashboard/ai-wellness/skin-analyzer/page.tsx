@@ -5,6 +5,8 @@ import { Sparkles, ArrowLeft, Loader2, Droplets, Sun, Clock, CheckCircle, Trash2
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FillButtons } from "@/components/ai/FillButtons";
+import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 interface Analysis {
   skinCondition: {
@@ -70,16 +72,23 @@ export default function SkinAnalyzerPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!skinType || concerns.length === 0) return;
+  const handleSubmit = async (e?: React.FormEvent, override?: Record<string, string>) => {
+    e?.preventDefault();
+    const skinTypeValue = override?.skinType ?? skinType;
+    const concernsValue =
+      override?.concerns !== undefined
+        ? override.concerns.split(",").map((s) => s.trim()).filter(Boolean)
+        : concerns;
+    const ageValue = override?.age ?? age;
+    const lifestyleValue = override?.lifestyle ?? lifestyle;
+    if (!skinTypeValue || concernsValue.length === 0) return;
 
     setLoading(true);
     try {
       const res = await fetch("/api/ai/skin-analyzer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skinType, concerns, age: age ? parseInt(age) : null, lifestyle }),
+        body: JSON.stringify({ skinType: skinTypeValue, concerns: concernsValue, age: ageValue ? parseInt(ageValue) : null, lifestyle: lifestyleValue }),
       });
 
       const data = await res.json();
@@ -191,6 +200,17 @@ export default function SkinAnalyzerPage() {
           /* Form */
           <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700">
             <form onSubmit={handleSubmit} className="space-y-6">
+          <FillButtons
+            fixture={AI_FIXTURES["skin-analyzer"]}
+            apply={(values) => {
+                if (values.skinType !== undefined) setSkinType(values.skinType);
+                if (values.concerns !== undefined) setConcerns(String(values.concerns).split(",").map((s) => s.trim()).filter(Boolean));
+                if (values.age !== undefined) setAge(values.age);
+                if (values.lifestyle !== undefined) setLifestyle(values.lifestyle);
+            }}
+            onRun={(values) => void handleSubmit(undefined, values)}
+            running={loading}
+          />
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Tell us about your skin</h2>
                 <button type="button" onClick={loadSampleData} className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border border-gray-300">Load Sample Data</button>
