@@ -1,0 +1,170 @@
+API response-to-list audit — 2026-10-03
+Scope: 160 flagged source files across 62 project folders; source and API contract review, not a runtime test of every project.
+Status update: all 28 confirmed mismatches have been fixed. Finding descriptions below describe the original defect.
+Verification: production builds passed for all 12 newly fixed frontends and AIAmbulanceEMSDispatch; AIAmbulanceEMSDispatch tests passed (10/10). No live browser/API check was performed for every project.
+FIXED: confirmed mismatch corrected in AIAmbulanceEMSDispatch or one of the other affected projects.
+CONFIRMED_OPEN: frontend/API response mismatch verified; code not yet changed in this project.
+CONTRACT_REVIEWED: API wrapper/route checked for this assignment; no matching mismatch confirmed.
+SHAPE_HANDLING_PRESENT: nearby code normalizes response; no matching mismatch confirmed.
+Counts: CONFIRMED_OPEN=0, CONTRACT_REVIEWED=103, FIXED=28, SHAPE_HANDLING_PRESENT=29
+
+FIXED	AICarbonCreditMarketplaceVerifier/client/src/pages/CrudPage.js:20	Credits, projects, and verifications routes return {data,pagination}; generic page stores object.
+FIXED	AICareerPathAgentForStudents/frontend/src/components/FeaturePage.jsx:40	Seven configured routes, including career-paths, return {data,pagination}; generic page stores object.
+FIXED	AIDigitalIdentityVerifiableCredentials/client/src/components/FeaturePage.jsx:17	Three configured resources use paginated CRUD responses; generic page stores object.
+FIXED	AIExportControlSanctionsScreener/client/src/pages/CrudPage.js:43	Screening-results route returns {data,pagination}; generic page stores object.
+FIXED	AIHomeRenovationProjectManager/client/src/pages/Designs.js:28	GET /designs returns {data,pagination}; page stores object.
+FIXED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Customers.js:52	GET /customers returns {customers,total,page,totalPages}; page stores object.
+FIXED	AISlideDeckGenerator/frontend/src/components/CrudPage.js:18	Presentations and collaborators routes return {data,pagination}; generic page stores object.
+FIXED	AISyntheticDataGenerator/frontend/src/pages/FeaturePage.jsx:28	GET /datasets returns {data,pagination}; page stores object.
+FIXED	AIVeterinaryClinicManager/client/src/pages/Diagnostics.jsx:37	GET /diagnostics returns {data,pagination}; page stores object.
+FIXED	AIVirtualShowroomBuilder/client/src/pages/FeaturePage.jsx:243	Configured analytics route returns {data,pagination}; generic page stores object.
+FIXED	AIWaterUtilityManagement/frontend/src/pages/AnomalyDetectionPage.jsx:31	GET /anomaly-detection returns {data,pagination}; page stores object.
+FIXED	AIWaterUtilityManagement/frontend/src/pages/InfrastructureAgingPage.jsx:32	GET /infrastructure-aging returns {data,pagination}; page stores object.
+FIXED	AIWildfirePredictionResponse/frontend/src/pages/FeaturePage.js:246	Configured risk-assessments and other routes return {data,pagination}; generic page stores object.
+CONTRACT_REVIEWED	AIAutomatedatagovernance/frontend/src/components/AuditLogs.jsx:24	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIBloodBankDonationCenter/frontend/src/pages/DriveList.jsx:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIBloodBankDonationCenter/frontend/src/pages/EquipmentList.jsx:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIBloodBankDonationCenter/frontend/src/pages/ReactionList.jsx:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIBloodBankDonationCenter/frontend/src/pages/RewardList.jsx:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIBloodBankDonationCenter/frontend/src/pages/StaffList.jsx:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIBloodBankDonationCenter/frontend/src/pages/TransportationList.jsx:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/ApiKeys.jsx:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/AuditLogs.jsx:15	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Broadcasts.jsx:19	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Channels.jsx:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Chatbots.jsx:17	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Contacts.jsx:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Conversations.jsx:19	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Deployments.jsx:19	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Entities.jsx:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Forms.jsx:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Intents.jsx:20	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/KnowledgeBase.jsx:20	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/MediaLibrary.jsx:25	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Plugins.jsx:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/QuickReplies.jsx:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Responses.jsx:19	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Settings.jsx:14	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Tags.jsx:15	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Templates.jsx:15	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/TrainingData.jsx:21	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Users.jsx:15	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIChatbotBuilder/frontend/src/pages/Webhooks.jsx:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIClimateFinanceCarbonRegistry/frontend/src/components/CrudPage.js:53	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AICommercialKitchenEquipmentMaintenance/frontend/src/pages/CompliancePage.jsx:114	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AICommercialKitchenEquipmentMaintenance/frontend/src/pages/DiagnosticsPage.jsx:108	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AICommercialKitchenEquipmentMaintenance/frontend/src/pages/EnergyPage.jsx:61	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AICommercialLeaseAnalyzer/frontend/src/pages/AuditTrail.js:64	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AICyberSOCCopilot/frontend/src/components/CrudPage.js:138	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIEducationSuite/client/src/pages/Feedback.js:18	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIHIPAATrainingComplianceAuditor/frontend/src/pages/CodexOperationsFeature.jsx:25	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIHomeRenovationProjectManager/client/src/pages/ChangeOrders.js:21	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIHomeRenovationProjectManager/client/src/pages/Documents.js:19	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIIdentifymonetizeunderutilized/frontend/src/pages/FeaturePage.jsx:75	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AILearningDevelopmentPath/frontend/src/components/CrudPage.js:16	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/ABTests.js:27	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/AIHistory.js:19	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/Analytics.js:27	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/Campaigns.js:26	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/DripCampaigns.js:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/Newsletters.js:26	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/Schedules.js:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/Segments.js:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/Subscribers.js:28	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/Templates.js:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AINewsletterGenerator/client/src/pages/Themes.js:22	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIOilGasWellProductionForecaster/frontend/src/pages/FeaturePage.js:31	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/CodeCompliance.js:26	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Equipment.js:24	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Expenses.js:58	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Invoices.js:53	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/JobQuotes.js:140	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Materials.js:70	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Permits.js:26	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Projects.js:36	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Schedules.js:56	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/ServiceContracts.js:25	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Suppliers.js:24	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Technicians.js:23	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPlumbingElectricalHVACEstimator/frontend/src/pages/Warranties.js:25	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIPromptEngineeringStudio/frontend/src/pages/Trash.jsx:20	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AITelecomNetworkCapacityPlanner/frontend/src/components/FeaturePage.jsx:42	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AITradeShowConferenceROIOptimizer/frontend/src/pages/ResourcePage.jsx:314	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIVeterinaryClinicManager/client/src/pages/Appointments.jsx:54	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIVeterinaryClinicManager/client/src/pages/Billing.jsx:36	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIVeterinaryClinicManager/client/src/pages/Communications.jsx:50	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIVeterinaryClinicManager/client/src/pages/Inventory.jsx:48	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIVeterinaryClinicManager/client/src/pages/Labs.jsx:54	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIVeterinaryClinicManager/client/src/pages/Patients.jsx:37	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIVeterinaryClinicManager/client/src/pages/Vaccinations.jsx:78	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIVeterinaryClinicManager/client/src/pages/Visits.jsx:71	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIWaterUtilityManagement/frontend/src/pages/TreatmentOptimizationPage.jsx:32	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIWealthManagementRoboAdvisor/client/src/pages/Alerts.jsx:51	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIWealthManagementRoboAdvisor/client/src/pages/Documents.jsx:65	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIWealthManagementRoboAdvisor/client/src/pages/Fees.jsx:52	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIWealthManagementRoboAdvisor/client/src/pages/Goals.jsx:67	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIWealthManagementRoboAdvisor/client/src/pages/Performance.jsx:80	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	AIondistributedcloud/frontend/src/pages/FeaturePage.js:255	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	aIVoiceAgent/src/app/(dashboard)/ai/accent-adapter/page.tsx:212	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	aIVoiceAgent/src/app/(dashboard)/ai/emotion-detector/page.tsx:175	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	aIVoiceAgent/src/app/(dashboard)/ai/hearing-test/page.tsx:223	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	aIVoiceAgent/src/app/(dashboard)/ai/intent-classifier/page.tsx:191	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	aIVoiceAgent/src/app/(dashboard)/ai/multi-language/page.tsx:175	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	aIVoiceAgent/src/app/(dashboard)/ai/speech-enhancer/page.tsx:196	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	aIVoiceAgent/src/app/(dashboard)/ai/translator/page.tsx:209	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	ai-commercial-insurance-premium-audit/frontend/src/App.jsx:152	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	ai-operating-system-for-companies/frontend/src/pages/ActivityPage.tsx:34	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	company-brain/frontend/src/pages/DecisionsPage.tsx:20	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	company-brain/frontend/src/pages/DocumentsPage.tsx:18	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	company-brain/frontend/src/pages/KnowledgePage.tsx:31	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	company-brain/frontend/src/pages/PoliciesPage.tsx:20	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	company-brain/frontend/src/pages/ProceduresPage.tsx:18	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	company-brain/frontend/src/pages/QueriesPage.tsx:18	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	fethi/frontend/src/pages/Browse.jsx:102	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	luranAI/src/app/(dashboard)/knowledge-base/page.tsx:25	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	mcpServer/frontend/src/components/CrudPage.js:18	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+CONTRACT_REVIEWED	oracle/frontend/src/pages/ModulePage.jsx:1447	Checked API wrapper/route for this assignment; no matching whole-object-to-list mismatch confirmed.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/BillingPage.jsx:38	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/CallsPage.jsx:98	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/CertificationsPage.jsx:36	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/CommLogsPage.jsx:35	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/CrewPage.jsx:73	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/EquipmentPage.jsx:0	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/HospitalsPage.jsx:72	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/IncidentsPage.jsx:38	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/MaintenancePage.jsx:36	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/MedicationsPage.jsx:36	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/MetricsPage.jsx:35	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/PCRPage.jsx:69	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/ProtocolsPage.jsx:72	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/SchedulesPage.jsx:68	GET list returns {data,pagination}; page now validates and stores data.
+FIXED	AIAmbulanceEMSDispatch/client/src/pages/UnitsPage.jsx:73	GET list returns {data,pagination}; page now validates and stores data.
+SHAPE_HANDLING_PRESENT	AI3DSpatial/client/src/pages/FeaturePage.js:100	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIADAWebsiteAccessibilityRemediator/client/src/components/FeaturePage.jsx:40	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIChurnPredictionSystem/frontend/src/components/GenericList.js:41	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AICodeInterpreter/frontend/src/components/CrudPage.js:21	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AICourtReportingLegalTranscription/client/src/pages/FeaturePage.js:96	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIDAOGovernanceAssistant/frontend/src/pages/AIFeaturePage.js:46	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIDebtCollectionOptimizer/client/src/pages/FeaturePage.jsx:98	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIEnergyGridOptimizer/frontend/src/pages/FeaturePage.jsx:470	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIFactoryFloorSafetyMonitor/frontend/src/pages/FeaturePage.jsx:33	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIFashionDesigner/frontend/src/pages/FeaturePage.js:356	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIForensicAccountingInvestigator/frontend/src/pages/AuditLog.js:22	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIIndustrialIoTAnomalyDetector/frontend/src/pages/Alerts.jsx:41	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIIndustrialIoTAnomalyDetector/frontend/src/pages/Anomalies.jsx:106	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIIndustrialIoTAnomalyDetector/frontend/src/pages/Sensors.jsx:47	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AILast-MileDeliveryOptimizer/frontend/src/pages/EntityPage.js:46	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AILivestockHealthMonitoring/frontend/src/pages/FeaturePage.js:326	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIMentalHealthCompanion/client/src/pages/AffirmationsPage.jsx:25	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIPatientTriageforER/frontend/src/components/CrudPage.js:26	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIPatientTriageforER/frontend/src/components/EhrModule.js:134	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIPatientTriageforER/frontend/src/pages/PatientsPage.js:23	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIPawnShopSecondhandDealer/client/src/pages/Inventory.jsx:131	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIPressureWashingExteriorCleaning/client/src/pages/GenericFeature.js:20	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIPressureWashingExteriorCleaning/client/src/pages/features/Jobs.js:54	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIPublicHealthEpidemiologyTracker/frontend/src/pages/FeaturePage.jsx:87	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIPublicHealthEpidemiologyTracker/frontend/src/pages/surveillance/SurveillanceFeaturePage.jsx:182	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AIQuantumComputingAssistant/client/src/pages/FeaturePage.js:444	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	AISportsAgentContractAnalyzer/frontend/src/components/FeaturePage.jsx:79	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	footTruck/frontend/src/pages/Inventory.jsx:96	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
+SHAPE_HANDLING_PRESENT	independentRestaurant/src/app/(dashboard)/menu/page.tsx:167	Source normalizes arrays or extracts list data near assignment; no mismatch confirmed.
