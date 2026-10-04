@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { audit, fail, idSchema, type Context, json } from "./core";
 import { redeemGift } from "./balances";
+import { cashDepositLiabilityCents } from '@/lib/appointments/deposit-ledger';
 const amount = z
   .number()
   .finite()
@@ -101,6 +102,7 @@ export async function createSale(
 ) {
   const input = saleSchema.parse(raw),
     { business, policyId } = await taxPolicy(tx, ctx);
+  let deposit: { id: string; amountCents: number; reference: string; settledAt: Date; settledById: string; method: 'CASH' | 'CREDIT_CARD'; paymentIntentId: string | null } | null = null;
   if (
     !(await tx.location.count({
       where: {
@@ -145,12 +147,30 @@ export async function createSale(
         locationId: input.locationId,
         status: "COMPLETED",
       },
+      include: { depositIntent: { include: { ledgerEntries: true, cardCheckouts: true, cardRefunds: true } } },
     });
     if (!input.clientId || !appt)
       fail(
         409,
         "Checkout requires this client’s completed appointment at the selected location",
       );
+    const intent = appt.depositIntent;
+    if (intent && intent.businessId !== ctx.businessId) fail(409, "Appointment deposit requires business reconciliation");
+    if (intent?.cardCheckouts.some(row => ['PENDING', 'OPEN', 'UNKNOWN'].includes(row.status))) fail(409, 'Reconcile or expire the card deposit checkout before POS checkout');
+    if (intent?.cardRefunds.some(row => ['PENDING', 'UNKNOWN', 'PROCESSING'].includes(row.status))) fail(409, 'Reconcile the card deposit refund before POS checkout');
+    if (intent?.status === "PAID") {
+      if (!['CASH', 'CARD'].includes(intent.collectionMethod || '') || !intent.reference || !intent.settledAt || !intent.settledById || !Number.isSafeInteger(intent.amountCents) || intent.amountCents <= 0)
+        fail(409, "Appointment deposit requires payment reconciliation before checkout");
+      if (intent.currency !== 'USD' || intent.ledgerEntries.some(entry => entry.businessId !== ctx.businessId || entry.locationId !== input.locationId || entry.currency !== 'USD'))
+        fail(409, 'Appointment deposit ledger requires business reconciliation');
+      let liabilityCents: number;
+      try { liabilityCents = cashDepositLiabilityCents(intent.amountCents, intent.ledgerEntries); }
+      catch { fail(409, 'Appointment deposit liability requires reconciliation'); }
+      if (liabilityCents !== intent.amountCents) fail(409, 'Appointment deposit has already been applied or refunded');
+      const capture = intent.collectionMethod === 'CARD' ? intent.cardCheckouts.find(row => row.status === 'PAID' && row.providerRef === intent.reference && row.paymentIntentId && row.amountCents === intent.amountCents && row.currency === 'USD') : null;
+      if (intent.collectionMethod === 'CARD' && !capture?.paymentIntentId) fail(409, 'Verified card deposit capture requires reconciliation');
+      deposit = { id: intent.id, amountCents: intent.amountCents, reference: intent.reference!, settledAt: intent.settledAt!, settledById: intent.settledById!, method: intent.collectionMethod === 'CARD' ? 'CREDIT_CARD' : 'CASH', paymentIntentId: capture?.paymentIntentId || null };
+    }
   }
   if (input.discount) {
     manager(ctx);
@@ -239,6 +259,8 @@ export async function createSale(
     total = subtotal - discount + tax + cents(input.tip);
   if (total <= 0 || total > 100000000)
     fail(422, "Sale total must be between $0.01 and $1,000,000");
+  if (deposit && deposit.amountCents > total)
+    fail(409, "Recorded appointment deposit exceeds the sale total; reconcile the deposit before checkout");
   const sale = await tx.transaction.create({
     data: {
       transactionNumber: "SALE-" + randomUUID(),
@@ -258,6 +280,20 @@ export async function createSale(
       lineItems: { create: lines },
     },
   });
+  if (deposit) {
+    const payment = await tx.transactionPayment.create({
+      data: { transactionId: sale.id, method: deposit.method, amount: deposit.amountCents / 100, reference: deposit.reference, stripePaymentId: deposit.paymentIntentId, source: "APPOINTMENT_DEPOSIT", verifiedAt: deposit.settledAt, actorId: deposit.settledById },
+    });
+    const application = await tx.appointmentDepositLedgerEntry.create({ data: {
+      businessId: ctx.businessId, locationId: input.locationId, depositIntentId: deposit.id,
+      kind: 'APPLIED', amountCents: -deposit.amountCents, currency: 'USD', transactionPaymentId: payment.id,
+      actorId: ctx.user.id, reason: 'Applied to linked POS sale',
+    } });
+    await tx.appointmentDepositIntent.update({ where: { id: deposit.id }, data: { status: 'APPLIED', version: { increment: 1 } } });
+    await audit(tx, ctx, "SALE_APPOINTMENT_DEPOSIT_CREDITED", "Transaction", sale.id, {
+      appointmentId: input.appointmentId, depositIntentId: deposit.id, ledgerEntryId: application.id, paymentId: payment.id, amountCents: deposit.amountCents, reference: deposit.reference, method: deposit.method,
+    });
+  }
   await audit(tx, ctx, "SALE_DRAFT_CREATED", "Transaction", sale.id, {
     totalCents: total,
     taxCents: tax,
@@ -389,17 +425,21 @@ export async function saleAction(
         409,
         "Tax policy changed. Void and recreate the draft before payment",
       );
+    const creditedBalance = await saleBalance(tx, sale.id);
+    if (creditedBalance.balanceCents < 0) fail(409, "Sale payments exceed the reviewed total");
     const saved = await tx.transaction.update({
       where: { id: sale.id },
       data: {
         reviewedAt: new Date(),
         reviewedById: ctx.user.id,
+        status: creditedBalance.balanceCents === 0 ? "COMPLETED" : "PENDING",
         version: { increment: 1 },
       },
     });
     await audit(tx, ctx, "SALE_REVIEWED", "Transaction", sale.id, {
       version: saved.version,
       total: sale.totalAmount.toString(),
+      balanceCents: creditedBalance.balanceCents,
     });
     return saved;
   }

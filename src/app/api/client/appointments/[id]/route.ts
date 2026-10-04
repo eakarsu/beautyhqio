@@ -14,6 +14,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const appointment = await prisma.appointment.findFirst({
     where: { id: (await params).id, clientId: user.clientId! },
     include: {
+      depositIntent: { select: { amountCents: true, currency: true, status: true } },
       location: { include: { business: { select: { name: true, phone: true } } } },
       services: { include: { service: { select: { id: true, name: true, duration: true, price: true } } } },
       staff: { select: { id: true, displayName: true, photo: true, user: { select: { firstName: true, lastName: true } } } },
@@ -26,6 +27,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       scheduledStart: appointment.scheduledStart.toISOString(),
       scheduledEnd: appointment.scheduledEnd.toISOString(),
       status: appointment.status,
+      version: appointment.version,
       notes: appointment.notes,
       salon: {
         name: appointment.location.business.name,
@@ -41,6 +43,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         photo: appointment.staff.photo,
       },
       locationId: appointment.locationId,
+      cancellationHours: appointment.location.cancellationHours,
+      depositPaid: appointment.depositPaid === null ? null : Number(appointment.depositPaid),
+      depositIntent: appointment.depositIntent,
     },
   });
 }

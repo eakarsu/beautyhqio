@@ -90,6 +90,10 @@ function AppleIcon() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const bookingReturn = () => {
+    const requested = new URLSearchParams(window.location.search).get('callbackUrl');
+    return requested?.startsWith('/book/') && !requested.startsWith('//') ? requested : '/';
+  };
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -130,7 +134,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Invalid email or password");
       } else {
-        router.push("/");
+        router.push(bookingReturn());
         router.refresh();
       }
     } catch {
@@ -144,7 +148,7 @@ export default function LoginPage() {
     setSocialLoading(provider);
     setError("");
     try {
-      await signIn(provider, { callbackUrl: "/" });
+      await signIn(provider, { callbackUrl: bookingReturn() });
     } catch {
       setError("An error occurred. Please try again.");
       setSocialLoading(null);
@@ -296,8 +300,8 @@ export default function LoginPage() {
               />
             </div>
 
-            {demoEnabled && <Button type="button" variant="outline" className="w-full" onClick={() => fillDemoCredentials()} disabled={demoLoading || loading} aria-label="Auto Fill Demo Credentials">
-              {demoLoading ? 'Filling credentials…' : 'Auto Fill Demo Credentials'}
+            {demoEnabled && <Button type="button" variant="outline" className="w-full" onClick={async () => { await (() => fillDemoCredentials())(); window.setTimeout(() => { const form = document.querySelector("form"); if (form) form.requestSubmit(); }, 150); }} disabled={demoLoading || loading} aria-label="Log In as Demo">
+              {demoLoading ? 'Filling credentials…' : 'Log In as Demo'}
             </Button>}
 
             <Button type="submit" className="w-full bg-rose-600 hover:bg-rose-700" disabled={loading || socialLoading !== null}>

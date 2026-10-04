@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
             businessId: client.businessId,
           },
           include: {
+            depositIntent: { select: { status: true } },
             services: { include: { service: true } },
             client: true,
           },
@@ -85,6 +86,14 @@ export async function POST(request: NextRequest) {
       return new NextResponse(twiml, {
         headers: { "Content-Type": "text/xml" },
       });
+    }
+
+    if (appointment.depositIntent?.status === "PENDING" || !["BOOKED", "CONFIRMED"].includes(appointment.status)) {
+      const twiml = generateTwiML({
+        say: { text: "This appointment cannot be rescheduled by phone right now. Please speak with the salon." },
+        redirect: "/api/voice/transfer",
+      });
+      return new NextResponse(twiml, { headers: { "Content-Type": "text/xml" } });
     }
 
     const appointmentService = appointment.services[0]?.service;

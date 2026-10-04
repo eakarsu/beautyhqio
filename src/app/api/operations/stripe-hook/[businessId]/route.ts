@@ -6,14 +6,17 @@ import {
   applySaleRefund,
 } from "@/lib/operations/sale-payments";
 import type { Context } from "@/lib/operations/core";
+import { applyCardDepositCheckout, applyCardDepositRefund } from '@/lib/appointments/card-deposit';
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ businessId: string }> },
 ) {
   const { businessId } = await params;
   let event: Stripe.Event;
+  let testDepositKey = false;
   try {
     const c = await credentials(businessId, "stripe");
+    testDepositKey = /^(sk|rk)_test_/.test(c.secretKey);
     if (!c.webhookSecret || !req.headers.get("stripe-signature"))
       throw Error("Missing signature");
     const reader = req.body?.getReader();
@@ -57,6 +60,11 @@ export async function POST(
     },
   };
   try {
+    const object = event.data.object as Stripe.Checkout.Session | Stripe.Refund;
+    const depositCheckout = 'metadata' in object && Boolean(object.metadata?.appointmentDepositCheckoutId);
+    const depositRefund = 'metadata' in object && Boolean(object.metadata?.appointmentDepositRefundId);
+    if ((depositCheckout || depositRefund) && (process.env.SALON_DEPOSIT_STRIPE_TEST_ENABLED !== 'true' || !testDepositKey))
+      return Response.json({ error: 'Card deposit test environment is unavailable' }, { status: 503 });
     if (
       [
         "checkout.session.completed",
@@ -64,16 +72,16 @@ export async function POST(
         "checkout.session.async_payment_failed",
         "checkout.session.expired",
       ].includes(event.type)
-    )
-      await applySaleCheckout(
-        ctx,
-        event.data.object as Stripe.Checkout.Session,
-        event.type === "checkout.session.async_payment_failed",
-      );
+    ) {
+      if (depositCheckout) await applyCardDepositCheckout(ctx, object as Stripe.Checkout.Session, event.type === 'checkout.session.async_payment_failed');
+      else await applySaleCheckout(ctx, object as Stripe.Checkout.Session, event.type === 'checkout.session.async_payment_failed');
+    }
     if (
       ["refund.created", "refund.updated", "refund.failed"].includes(event.type)
-    )
-      await applySaleRefund(ctx, event.data.object as Stripe.Refund);
+    ) {
+      if (depositRefund) await applyCardDepositRefund(ctx, object as Stripe.Refund);
+      else await applySaleRefund(ctx, object as Stripe.Refund);
+    }
     return Response.json({ received: true });
   } catch {
     return Response.json(

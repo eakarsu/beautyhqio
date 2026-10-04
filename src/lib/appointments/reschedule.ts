@@ -2,9 +2,10 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { assertAvailable } from './availability';
 import { audit, fail, type Context } from '@/lib/operations/core';
+import { queueAppointmentEmail } from './notifications';
 export const rescheduleSchema = z.object({ scheduledStart: z.coerce.date(), staffId: z.string().min(1).optional(), version: z.number().int().nonnegative(), reason: z.string().trim().min(3).max(1000) });
 export async function rescheduleAppointment(tx: Prisma.TransactionClient, ctx: Context, id: string, input: z.infer<typeof rescheduleSchema>) {
-  const current = await tx.appointment.findFirst({ where: { id, location: { businessId: ctx.businessId } }, include: { location: true, services: { include: { service: true } }, roomReservation: true } });
+  const current = await tx.appointment.findFirst({ where: { id, location: { businessId: ctx.businessId } }, include: { location: true, client: true, services: { include: { service: true } }, roomReservation: true } });
   if (!current) return fail(404, 'Appointment not found');
   if (ctx.user.role === 'CLIENT' && current.clientId !== ctx.user.clientId) return fail(403, 'Only your own appointments may be rescheduled');
   if (!['BOOKED', 'CONFIRMED'].includes(current.status)) return fail(409, 'Only booked or confirmed appointments can be rescheduled');
@@ -25,5 +26,6 @@ export async function rescheduleAppointment(tx: Prisma.TransactionClient, ctx: C
   if (!changed.count) return fail(409, 'Appointment changed; refresh before rescheduling');
   await audit(tx, ctx, 'APPOINTMENT_RESCHEDULED', 'Appointment', id, { from: current.scheduledStart.toISOString(), to: input.scheduledStart.toISOString(), reason: input.reason, staffId });
   await tx.integrationDelivery.create({ data: { businessId: ctx.businessId, appointmentId: id, kind: 'CALENDAR_UPDATE', provider: 'calendar', dedupeKey: `${id}:CALENDAR_UPDATE:${input.version + 1}`, payload: { appointmentId: id } } });
+  await queueAppointmentEmail(tx, { businessId: ctx.businessId, appointment: { id, clientId: current.clientId, scheduledStart: input.scheduledStart }, client: current.client, kind: 'RESCHEDULE_EMAIL', eventKey: String(input.version + 1), previousStart: current.scheduledStart });
   return tx.appointment.findUniqueOrThrow({ where: { id } });
 }

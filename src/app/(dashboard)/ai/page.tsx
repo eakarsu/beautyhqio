@@ -74,6 +74,15 @@ type MessageType =
 
 const aiFeatures = [
   {
+    id: "scheduling-evidence",
+    title: "Measured Scheduling Patterns",
+    description: "Explain observed gaps and no-shows from authorized salon history",
+    icon: BarChart3,
+    color: "from-blue-500 to-cyan-600",
+    href: "/ai/scheduling-evidence",
+    badge: "Measured",
+  },
+  {
     id: "chat",
     title: "AI Chat Assistant",
     description: "Ask anything about your salon - scheduling, analytics, marketing strategies",

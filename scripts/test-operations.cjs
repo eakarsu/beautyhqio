@@ -3,7 +3,7 @@ const {spawnSync}=require('node:child_process'),{readFileSync}=require('node:fs'
 const base=new URL(process.env.DATABASE_URL||parseEnv(readFileSync('.env','utf8')).DATABASE_URL);
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname))throw Error('Database tests require a local PostgreSQL server');
 const pgEnv={...process.env,PGHOST:base.hostname,PGPORT:base.port||'5432',PGUSER:decodeURIComponent(base.username),PGPASSWORD:decodeURIComponent(base.password),PGDATABASE:decodeURIComponent(base.pathname.slice(1))};
-const files=['src/lib/operations/__tests__/cash-drawer.integration.test.ts','src/lib/operations/__tests__/sales.integration.test.ts','src/lib/operations/__tests__/persistence.integration.test.ts','src/lib/appointments/__tests__/persistence.integration.test.ts'];
+const files=['src/lib/operations/__tests__/cash-drawer.integration.test.ts','src/lib/operations/__tests__/sales.integration.test.ts','src/lib/operations/__tests__/persistence.integration.test.ts','src/lib/appointments/__tests__/persistence.integration.test.ts','src/lib/appointments/__tests__/card-deposit.integration.test.ts','src/lib/appointments/__tests__/notifications.integration.test.ts'];
 const selected=process.argv.slice(2);
 if(selected.some(file=>!files.includes(file)))throw Error('Unknown integration suite');
 for(const [index,file] of (selected.length?selected:files).entries()){

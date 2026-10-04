@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useRef, useState, use } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
@@ -21,6 +21,7 @@ interface Appointment {
   scheduledStart: string;
   scheduledEnd: string;
   status: string;
+  version: number;
   notes: string | null;
   salon: {
     name: string;
@@ -41,6 +42,9 @@ interface Appointment {
     photo: string | null;
   };
   locationId: string;
+  cancellationHours: number;
+  depositPaid: number | null;
+  depositIntent: { amountCents: number; currency: string; status: string; collectionMethod: string | null } | null;
 }
 
 export default function AppointmentDetailPage({
@@ -55,6 +59,10 @@ export default function AppointmentDetailPage({
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [depositBusy, setDepositBusy] = useState(false);
+  const [depositError, setDepositError] = useState("");
+  const depositRequestKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (sessionStatus === "authenticated" && !session?.user?.isClient) {
@@ -86,19 +94,20 @@ export default function AppointmentDetailPage({
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      // Use existing appointments delete endpoint
-      const response = await fetch(`/api/appointments/${id}`, {
-        method: "DELETE",
+      const response = await fetch(`/api/client/appointments/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel", reason: cancelReason.trim() }),
       });
 
       if (response.ok) {
         router.push("/client/appointments");
       } else {
         const data = await response.json();
-        toast({ title: "Error", description: data.error || "Failed to delete appointment", variant: "destructive" });
+        toast({ title: "Error", description: data.message || data.error || "Failed to cancel appointment", variant: "destructive" });
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to delete appointment", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to cancel appointment", variant: "destructive" });
     } finally {
       setDeleting(false);
     }
@@ -108,9 +117,22 @@ export default function AppointmentDetailPage({
     if (!appointment) return;
     // Navigate to booking flow with service IDs
     const serviceIds = appointment.services.map((s) => s.id).join(",");
-    router.push(
-      `/book/${appointment.locationId}/datetime?services=${serviceIds}&reschedule=${id}`
-    );
+    router.push(`/book/${appointment.locationId}/datetime?services=${encodeURIComponent(serviceIds)}&reschedule=${encodeURIComponent(id)}`);
+  };
+
+  const startCardDeposit = async () => {
+    setDepositBusy(true); setDepositError("");
+    try {
+      depositRequestKey.current ||= crypto.randomUUID();
+      const response = await fetch(`/api/appointments/${id}/deposit/card-checkout`, { method: 'POST', headers: { 'Idempotency-Key': depositRequestKey.current } });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || 'Card deposit checkout is unavailable');
+      if (result.url) { window.location.assign(result.url); return; }
+      if (['EXPIRED', 'FAILED', 'expired', 'failed'].includes(result.status)) depositRequestKey.current = null;
+      if (result.status !== 'PAID') setDepositError(['EXPIRED', 'FAILED', 'expired', 'failed'].includes(result.status) ? 'That card checkout closed. You can start a new one.' : 'Another account has this checkout open. Ask the salon to reconcile it before trying again.');
+      await fetchAppointment();
+    } catch (error) { setDepositError(error instanceof Error ? error.message : 'Card deposit checkout is unavailable'); }
+    finally { setDepositBusy(false); }
   };
 
   if (sessionStatus === "loading" || loading) {
@@ -129,7 +151,8 @@ export default function AppointmentDetailPage({
   const isUpcoming = scheduledDate > new Date();
   const isCancelled = appointment.status === "CANCELLED";
   const isCompleted = appointment.status === "COMPLETED";
-  const canModify = isUpcoming && !isCancelled && !isCompleted;
+  const canModify = isUpcoming && ["BOOKED", "CONFIRMED"].includes(appointment.status);
+  const canReschedule = canModify && scheduledDate.getTime() - Date.now() >= appointment.cancellationHours * 3_600_000;
 
   const totalDuration = appointment.services.reduce(
     (sum, s) => sum + s.duration,
@@ -285,8 +308,14 @@ export default function AppointmentDetailPage({
 
         {/* Actions */}
         <div className="border-t p-6 bg-slate-50">
+          {canModify && !canReschedule && <p className="mb-3 text-amber-700">This appointment is inside the salon&apos;s {appointment.cancellationHours}-hour change window. Contact the salon for changes.</p>}
+          {Number(appointment.depositPaid) > 0 && <p className="mb-3 text-sm text-slate-600">Deposit recorded: ${Number(appointment.depositPaid).toFixed(2)}. Any refund is handled separately by the salon.</p>}
+          {appointment.depositIntent?.status === 'PENDING' && <div className="mb-3 space-y-2"><p className="text-sm text-amber-700">Deposit due: {(appointment.depositIntent.amountCents / 100).toLocaleString(undefined, { style: 'currency', currency: appointment.depositIntent.currency })}. Confirmation follows verified capture.</p><button disabled={depositBusy} onClick={() => void startCardDeposit()} className="rounded-lg bg-rose-600 px-4 py-2 font-medium text-white disabled:opacity-50">{depositBusy ? 'Checking deposit…' : 'Pay deposit by card (Stripe test mode)'}</button>{depositError && <p role="alert" className="text-sm text-red-700">{depositError}</p>}</div>}
+          {appointment.depositIntent?.status === 'PAID' && <p className="mb-3 text-sm text-slate-600">{appointment.depositIntent.collectionMethod === 'CARD' ? 'Card deposit captured and recorded. The salon handles refunds separately.' : 'Cash deposit recorded.'}</p>}
+          {appointment.depositIntent?.status === 'WAIVED' && <p className="mb-3 text-sm text-slate-600">The salon waived the deposit requirement.</p>}
+          {appointment.depositIntent?.status === 'REFUNDED' && <p className="mb-3 text-sm text-slate-600">The salon recorded a refund of your deposit.</p>}
           <div className="flex gap-3">
-            {canModify && (
+            {canReschedule && (
               <button
                 onClick={handleReschedule}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium hover:bg-slate-50 transition-colors"
@@ -295,13 +324,13 @@ export default function AppointmentDetailPage({
                 Reschedule
               </button>
             )}
-            <button
+            {canReschedule && <button
               onClick={() => setShowDeleteConfirm(true)}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-600 font-medium hover:bg-red-100 transition-colors"
             >
               <XCircle className="h-4 w-4" />
               Cancel Appointment
-            </button>
+            </button>}
           </div>
         </div>
       </div>
@@ -328,6 +357,10 @@ export default function AppointmentDetailPage({
               })}
               ? This action cannot be undone.
             </p>
+            <label className="block text-sm font-medium text-slate-700 mb-4">
+              Reason for cancellation
+              <textarea className="mt-1 w-full rounded border p-2" maxLength={1000} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} required />
+            </label>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
@@ -339,7 +372,7 @@ export default function AppointmentDetailPage({
               <button
                 onClick={handleDelete}
                 className="flex-1 px-4 py-2 bg-red-500 rounded-lg text-white font-medium hover:bg-red-600 disabled:opacity-50"
-                disabled={deleting}
+                disabled={deleting || cancelReason.trim().length < 3}
               >
                 {deleting ? "Cancelling..." : "Yes, Cancel"}
               </button>

@@ -61,6 +61,35 @@ suite('reviewed POS financial integrity',()=>{
   expect(Number((await db.giftCard.findUniqueOrThrow({where:{id:card.id}})).currentBalance)).toBe(60);
   expect((await db.transaction.findUniqueOrThrow({where:{id:sale.id}})).status).toBe('REFUNDED');
  });
+ test('a collected appointment deposit is credited once and cannot overpay the sale',async()=>{
+  const client=await db.client.create({data:{businessId:ctx.businessId,firstName:'Deposit',lastName:'Client',phone:'5550102200'}});
+  let appointmentNumber=0;
+  const completedAppointment=async(amountCents:number)=>{
+   const day=++appointmentNumber;
+   const appointment=await db.appointment.create({data:{businessId:ctx.businessId,clientId:client.id,locationId,staffId,status:'COMPLETED',scheduledStart:new Date(Date.UTC(2026,0,day,14)),scheduledEnd:new Date(Date.UTC(2026,0,day,14,30))}});
+   const intent=await db.appointmentDepositIntent.create({data:{businessId:ctx.businessId,appointmentId:appointment.id,amountCents,status:'PAID',collectionMethod:'CASH',reference:`${ctx.businessId}:${appointment.id}`,settledById:ctx.user.id,settledAt:new Date('2026-01-01T13:00:00Z')}});
+   await db.appointmentDepositLedgerEntry.create({data:{businessId:ctx.businessId,locationId,depositIntentId:intent.id,kind:'COLLECTED',amountCents,currency:'USD',reference:intent.reference,actorId:ctx.user.id,createdAt:intent.settledAt!}});
+   return {appointment,intent};
+  };
+  const partial=await completedAppointment(2500);
+  const sale=await draft({appointmentId:partial.appointment.id,clientId:client.id});
+  const payment=await db.transactionPayment.findFirstOrThrow({where:{transactionId:sale.id}});
+  expect(payment).toMatchObject({method:'CASH',source:'APPOINTMENT_DEPOSIT',reference:partial.intent.reference,actorId:ctx.user.id});
+  expect(await db.appointmentDepositLedgerEntry.findMany({where:{depositIntentId:partial.intent.id},select:{kind:true,amountCents:true,transactionPaymentId:true},orderBy:{createdAt:'asc'}})).toEqual(expect.arrayContaining([{kind:'COLLECTED',amountCents:2500,transactionPaymentId:null},{kind:'APPLIED',amountCents:-2500,transactionPaymentId:payment.id}]));
+  expect((await db.appointmentDepositIntent.findUniqueOrThrow({where:{id:partial.intent.id}})).status).toBe('APPLIED');
+  expect(Number(payment.amount)).toBe(25);
+  expect((await saleBalance(db,sale.id)).balanceCents).toBe(7500);
+  await review(sale.id);
+  expect((await db.transaction.findUniqueOrThrow({where:{id:sale.id}})).status).toBe('PENDING');
+  const full=await completedAppointment(10000);
+  const fullyPaidSale=await draft({appointmentId:full.appointment.id,clientId:client.id});
+  await review(fullyPaidSale.id);
+  expect((await saleBalance(db,fullyPaidSale.id)).balanceCents).toBe(0);
+  expect((await db.transaction.findUniqueOrThrow({where:{id:fullyPaidSale.id}})).status).toBe('COMPLETED');
+  const excess=await completedAppointment(10001);
+  await expect(draft({appointmentId:excess.appointment.id,clientId:client.id})).rejects.toThrow(/exceeds the sale total/);
+  expect(await db.transaction.count({where:{appointmentId:excess.appointment.id}})).toBe(0);
+ });
  test('unknown Stripe checkout safely reuses request and duplicate receipt never pays twice',async()=>{
   const sale=await draft();await review(sale.id);let session:Stripe.Checkout.Session;let calls=0;const keys:string[]=[];
   const stripe={checkout:{sessions:{create:async(input:any,options:any)=>{keys.push(options.idempotencyKey);calls++;session={id:'cs_pos_retry',status:'open',payment_status:'unpaid',mode:'payment',url:'https://checkout.stripe.com/test',currency:'usd',amount_total:10000,payment_intent:'pi_pos_retry',metadata:input.metadata,client_reference_id:input.client_reference_id} as Stripe.Checkout.Session;if(calls===1)throw Error('Timeout after provider accepted');return session},retrieve:async()=>session}}} as unknown as Stripe;

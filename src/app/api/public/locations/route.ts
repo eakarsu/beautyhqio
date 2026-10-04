@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const locations = await prisma.location.findMany({
       where: {
         isActive: true,
+        allowOnlineBooking: true,
         // Only businesses with a live subscription can take public bookings,
         // matching how the marketplace lists salons.
         business: { subscription: { is: { status: { in: ["ACTIVE", "TRIAL"] } } } },

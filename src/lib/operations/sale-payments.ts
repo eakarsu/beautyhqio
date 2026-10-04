@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { audit, fail, mutation, type Context, idSchema } from "./core";
 import { credentials } from "./connections";
 import { saleFor, saleBalance, noPendingSaleProvider } from "./sales";
+import { salonDepositStripe } from '@/lib/appointments/card-deposit';
 import { z } from "zod";
 type Factory = (businessId: string) => Promise<Stripe>;
 export async function salonStripe(businessId: string) {
@@ -251,10 +252,12 @@ export async function refundSalePayment(
       },
     });
   if (!payment?.verifiedAt) fail(409, "Refund requires a verified payment");
-  if (!["STRIPE", "CASH", "GIFT_CARD"].includes(payment.source || ""))
+  if (!["STRIPE", "CASH", "APPOINTMENT_DEPOSIT", "GIFT_CARD"].includes(payment.source || ""))
     fail(409, "This payment needs separate reconciliation");
-  const stripe =
-    payment.source === "STRIPE" ? await factory(ctx.businessId) : null;
+  if (payment.source === 'APPOINTMENT_DEPOSIT' && payment.method === 'CREDIT_CARD' && !payment.stripePaymentId)
+    fail(409, 'Verified card deposit payment reference is missing');
+  const needsStripe = payment.source === 'STRIPE' || (payment.source === 'APPOINTMENT_DEPOSIT' && payment.method === 'CREDIT_CARD' && Boolean(payment.stripePaymentId));
+  const stripe = needsStripe ? await (payment.source === 'APPOINTMENT_DEPOSIT' && factory === salonStripe ? salonDepositStripe : factory)(ctx.businessId) : null;
   const reserved = await mutation(
     ctx,
     req,
@@ -275,7 +278,7 @@ export async function refundSalePayment(
           .greaterThan(payment.amount)
       )
         fail(409, "Refund exceeds the remaining payment");
-      if (payment.source === "CASH" && !input.cashReturnedConfirmed)
+      if ((payment.source === 'CASH' || (payment.source === 'APPOINTMENT_DEPOSIT' && payment.method === 'CASH')) && !input.cashReturnedConfirmed)
         fail(422, "Confirm that cash was actually returned");
       const row = await tx.paymentRefund.create({
         data: {
@@ -315,7 +318,7 @@ export async function refundSalePayment(
           },
         });
       }
-      if (payment.source !== "STRIPE") {
+      if (!needsStripe) {
         await tx.paymentRefund.update({
           where: { id: row.id },
           data: { status: "SUCCEEDED" },
@@ -334,7 +337,7 @@ export async function refundSalePayment(
   const row = await prisma.paymentRefund.findUniqueOrThrow({
     where: { id: reserved.id },
   });
-  if (row.status === "SUCCEEDED" || payment.source !== "STRIPE") return row;
+  if (row.status === "SUCCEEDED" || !needsStripe) return row;
   if (row.providerRef)
     return applySaleRefund(
       ctx,

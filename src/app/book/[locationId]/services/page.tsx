@@ -32,10 +32,10 @@ export default function SelectServicesPage({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/services?locationId=${locationId}&isActive=true`)
-      .then((res) => res.json())
+    fetch(`/api/booking/catalog?locationId=${encodeURIComponent(locationId)}`)
+      .then(async (res) => { const data = await res.json(); if (!res.ok) throw Error(data.error || 'Services unavailable'); return data; })
       .then((data) => {
-        setServices(data);
+        setServices(Array.isArray(data.services) ? data.services : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));

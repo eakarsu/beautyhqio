@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from 'next-auth/react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,8 @@ interface Appointment {
   notes?: string;
   internalNotes?: string;
   noShowRisk?: number;
+  transaction?: { id: string } | null;
+  depositIntent?: { amountCents: number; currency: string; status: string; collectionMethod?: string | null; reference?: string | null; reason?: string | null; cardCheckouts?: Array<{status:string;providerRef:string|null}>; cardRefunds?: Array<{status:string;providerRef:string|null}> } | null;
   client?: {
     id: string;
     firstName: string;
@@ -83,9 +86,15 @@ const statusColors: Record<string, string> = {
 export default function AppointmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { data: session } = useSession();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [depositReference, setDepositReference] = useState("");
+  const [depositReason, setDepositReason] = useState("");
+  const [depositError, setDepositError] = useState("");
+  const [depositProviderRef, setDepositProviderRef] = useState('');
 
   useEffect(() => {
     fetchAppointment();
@@ -107,18 +116,58 @@ export default function AppointmentDetailPage({ params }: { params: Promise<{ id
 
   const handleAction = async (action: string) => {
     setActionLoading(action);
+    setActionError("");
     try {
       const response = await fetch(`/api/appointments/${id}/${action}`, {
         method: "POST",
       });
       if (response.ok) {
         fetchAppointment();
-      }
+      } else { const result = await response.json().catch(() => ({})); setActionError(result.message || result.error || 'Could not update appointment'); }
     } catch (error) {
       console.error(`Error ${action}:`, error);
+      setActionError('Could not update appointment');
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const settleDeposit = async (action: 'cash-collected' | 'waive' | 'cash-refund') => {
+    setActionLoading(action); setDepositError('');
+    try {
+      const response = await fetch(`/api/appointments/${id}/deposit`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ action, reason: depositReason, ...(action !== 'waive' ? { reference: depositReference } : {}), ...(action === 'cash-refund' ? { cashReturnedConfirmed: true } : {}) }) });
+      const data = await response.json();
+      if (!response.ok) throw Error(data.error || 'Could not settle deposit');
+      await fetchAppointment();
+    } catch (error) { setDepositError(error instanceof Error ? error.message : 'Could not settle deposit'); }
+    finally { setActionLoading(null); }
+  };
+
+  const cardDepositAction = async (action: 'card-checkout' | 'card-refund') => {
+    setActionLoading(action); setDepositError('');
+    try {
+      const response = await fetch(`/api/appointments/${id}/deposit/${action}`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID(), ...(action === 'card-refund' ? { 'Content-Type': 'application/json' } : {}) }, ...(action === 'card-refund' ? { body: JSON.stringify({ reason: depositReason }) } : {}) });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || 'Card deposit action failed');
+      if (result.url) { window.location.assign(result.url); return; }
+      if (action === 'card-checkout' && result.status !== 'PAID') setDepositError('This checkout is already open under another account. Reconcile or expire it before creating another.');
+      await fetchAppointment();
+    } catch (error) { setDepositError(error instanceof Error ? error.message : 'Card deposit action failed'); }
+    finally { setActionLoading(null); }
+  };
+
+  const reconcileCardDeposit = async (expire = false) => {
+    setActionLoading('card-reconcile'); setDepositError('');
+    try {
+      const reference = depositProviderRef.trim();
+      const kind = reference.startsWith('cs_') ? 'checkout' : reference.startsWith('re_') ? 'refund' : null;
+      if (!kind) throw Error('Enter a Stripe checkout (cs_) or refund (re_) receipt');
+      const response = await fetch(`/api/appointments/${id}/deposit/card-reconcile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, reference, expire }) });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || 'Provider receipt could not be reconciled');
+      await fetchAppointment();
+    } catch (error) { setDepositError(error instanceof Error ? error.message : 'Provider receipt could not be reconciled'); }
+    finally { setActionLoading(null); }
   };
 
   const getClientName = () => {
@@ -335,11 +384,40 @@ export default function AppointmentDetailPage({ params }: { params: Promise<{ id
           )}
 
           {/* Actions */}
+          {appointment.depositIntent && <Card>
+            <CardHeader><CardTitle>Deposit obligation</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <p>{(appointment.depositIntent.amountCents / 100).toLocaleString(undefined, { style: 'currency', currency: appointment.depositIntent.currency })} · {appointment.depositIntent.status}</p>
+              {appointment.depositIntent.status === 'PENDING' && <><p className="text-sm text-amber-700">Confirmation and check-in require verified card capture, a recorded cash collection, or an approved waiver.</p>
+                <Button variant="outline" className="w-full" disabled={actionLoading !== null} onClick={() => void cardDepositAction('card-checkout')}>Open card deposit checkout (Stripe test mode)</Button>
+                <label className="block text-sm">Cash receipt reference<input className="mt-1 w-full rounded border p-2" value={depositReference} onChange={event => setDepositReference(event.target.value)} maxLength={120}/></label>
+                <label className="block text-sm">Collection or waiver reason<textarea className="mt-1 w-full rounded border p-2" value={depositReason} onChange={event => setDepositReason(event.target.value)} maxLength={500}/></label>
+                {depositError && <p role="alert" className="text-red-700">{depositError}</p>}
+                <Button className="w-full" disabled={actionLoading !== null || depositReference.trim().length < 4 || depositReason.trim().length < 5} onClick={() => void settleDeposit('cash-collected')}>Record cash collected</Button>
+                <Button variant="outline" className="w-full" disabled={actionLoading !== null || depositReason.trim().length < 5} onClick={() => void settleDeposit('waive')}>Waive with reason</Button>
+              </>}
+              {appointment.depositIntent.status === 'PAID' && <><p className="text-sm">{appointment.depositIntent.collectionMethod === 'CARD' ? 'Verified card capture' : 'Cash receipt'}: {appointment.depositIntent.reference}. This amount remains a deposit liability until applied to the linked sale or returned.</p>
+                {!appointment.transaction && ['OWNER', 'MANAGER'].includes(String(session?.user?.role)) && <>{appointment.depositIntent.collectionMethod === 'CASH' && <label className="block text-sm">Cash refund receipt reference<input className="mt-1 w-full rounded border p-2" value={depositReference} onChange={event => setDepositReference(event.target.value)} maxLength={120}/></label>}
+                  <label className="block text-sm">Deposit refund reason<textarea className="mt-1 w-full rounded border p-2" value={depositReason} onChange={event => setDepositReason(event.target.value)} maxLength={500}/></label>
+                  {depositError && <p role="alert" className="text-red-700">{depositError}</p>}
+                  {appointment.depositIntent.collectionMethod === 'CASH' ? <Button variant="outline" className="w-full" disabled={actionLoading !== null || depositReference.trim().length < 4 || depositReason.trim().length < 5} onClick={() => { if (window.confirm('Confirm that the full cash deposit has been returned to the client?')) void settleDeposit('cash-refund'); }}>Record full cash refund</Button> : <Button variant="outline" className="w-full" disabled={actionLoading !== null || depositReason.trim().length < 5} onClick={() => { if (window.confirm('Request a full refund to the original test card?')) void cardDepositAction('card-refund'); }}>Refund original card deposit</Button>}
+                </>}
+              </>}
+              {appointment.depositIntent.status === 'APPLIED' && <p className="text-sm">Deposit applied once to the linked POS sale. Any refund must use that sale&apos;s original payment credit.</p>}
+              {appointment.depositIntent.status === 'REFUNDED' && <p className="text-sm">Deposit refunded. The return is recorded in the deposit ledger.</p>}
+              {appointment.depositIntent.status === 'WAIVED' && <p className="text-sm">Waiver reason: {appointment.depositIntent.reason}</p>}
+              {appointment.depositIntent.cardCheckouts?.[0] && <p className="text-xs text-muted-foreground">Latest card checkout: {appointment.depositIntent.cardCheckouts[0].status}{appointment.depositIntent.cardCheckouts[0].providerRef ? ` · ${appointment.depositIntent.cardCheckouts[0].providerRef}` : ''}</p>}
+              {appointment.depositIntent.cardRefunds?.[0] && <p className="text-xs text-muted-foreground">Latest card refund: {appointment.depositIntent.cardRefunds[0].status}{appointment.depositIntent.cardRefunds[0].providerRef ? ` · ${appointment.depositIntent.cardRefunds[0].providerRef}` : ''}</p>}
+              {['OWNER', 'MANAGER'].includes(String(session?.user?.role)) && <div className="space-y-2 border-t pt-3"><label className="block text-sm">Stripe test receipt for reconciliation<input className="mt-1 w-full rounded border p-2" placeholder="cs_… or re_…" value={depositProviderRef} onChange={event => setDepositProviderRef(event.target.value)} maxLength={190}/></label><Button variant="outline" className="w-full" disabled={actionLoading !== null || depositProviderRef.trim().length < 7} onClick={() => void reconcileCardDeposit()}>Reconcile provider receipt</Button>{depositProviderRef.trim().startsWith('cs_') && <Button variant="outline" className="w-full" disabled={actionLoading !== null} onClick={() => { if (window.confirm('Expire this open Stripe test checkout?')) void reconcileCardDeposit(true); }}>Expire open checkout</Button>}</div>}
+              {depositError && <p role="alert" className="text-red-700">{depositError}</p>}
+            </CardContent>
+          </Card>}
           <Card>
             <CardHeader>
               <CardTitle>Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              {actionError && <p role="alert" className="text-red-700">{actionError}</p>}
               {/* Checkout button - available for active appointments */}
               {["BOOKED", "CONFIRMED", "CHECKED_IN", "COMPLETED"].includes(appointment.status) && (
                 <Button

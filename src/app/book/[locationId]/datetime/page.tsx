@@ -38,11 +38,13 @@ export default function SelectDateTimePage({
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
-    const dateStr = selectedDate.toISOString().split("T")[0];
-    const serviceId = serviceIds[0]; // Use first service for availability
+    const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
+    setLoading(true);
+    setSelectedTime(null);
+    setSelectedStaff(null);
 
     fetch(
-      `/api/booking/availability?locationId=${locationId}&date=${dateStr}&serviceId=${serviceId}`
+      `/api/booking/availability?locationId=${encodeURIComponent(locationId)}&date=${dateStr}&serviceIds=${encodeURIComponent(serviceIds.join(","))}`
     )
       .then((res) => res.json())
       .then((data) => {
@@ -116,7 +118,7 @@ export default function SelectDateTimePage({
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Select Date & Time
           </h1>
-          <p className="text-gray-600">Choose your preferred appointment time</p>
+          <p className="text-gray-600">Choose your preferred appointment time. The salon confirms availability when you save.</p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-2">

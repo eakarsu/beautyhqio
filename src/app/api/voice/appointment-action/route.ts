@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
             },
           },
           include: {
+            depositIntent: { select: { status: true } },
             services: { include: { service: true } },
           },
           orderBy: {
@@ -85,6 +86,10 @@ export async function POST(request: NextRequest) {
 
     switch (digits) {
       case "1":
+        if (appointment.depositIntent?.status === "PENDING") {
+          twiml = generateTwiML({ say: { text: "A deposit is due before this appointment can be confirmed. Please contact the salon to arrange payment." }, redirect: "/api/voice/transfer" });
+          break;
+        }
         await prisma.appointment.update({
           where: { id: appointment.id },
           data: { status: "CONFIRMED" },
@@ -130,9 +135,9 @@ export async function POST(request: NextRequest) {
       }
 
       case "3": {
-        await prisma.appointment.update({
-          where: { id: appointment.id },
-          data: { status: "CANCELLED" },
+        await prisma.$transaction(async (tx) => {
+          await tx.appointment.update({ where: { id: appointment.id }, data: { status: "CANCELLED", version: { increment: 1 } } });
+          await tx.appointmentDepositIntent.updateMany({ where: { appointmentId: appointment.id, status: "PENDING" }, data: { status: "CANCELLED", version: { increment: 1 } } });
         });
 
         const cancelledServiceName = appointment.services[0]?.service?.name || "appointment";

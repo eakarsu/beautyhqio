@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, use, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import Link from 'next/link';
 import { toast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,9 @@ interface Service {
   name: string;
   price: number;
   duration: number;
+  requireDeposit?: boolean;
+  depositAmount?: number | null;
+  depositPercent?: number | null;
 }
 
 interface Staff {
@@ -40,6 +44,7 @@ interface Location {
   address: string;
   city: string;
   state: string;
+  phone?: string | null;
 }
 
 export default function ConfirmBookingPage({
@@ -65,8 +70,11 @@ export default function ConfirmBookingPage({
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmationNumber, setConfirmationNumber] = useState("");
+  const [depositDueCents, setDepositDueCents] = useState(0);
+  const [rescheduleVersion, setRescheduleVersion] = useState<number | null>(null);
+  const [rescheduleError, setRescheduleError] = useState("");
 
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -89,25 +97,31 @@ export default function ConfirmBookingPage({
   }, [session]);
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/locations/${locationId}`).then((res) => res.json()),
-      fetch(`/api/staff/${staffId}`).then((res) => res.json()),
-      ...serviceIds.map((id) =>
-        fetch(`/api/services/${id}`).then((res) => res.json())
-      ),
-    ])
-      .then(([locationData, staffData, ...servicesData]) => {
-        setLocation(locationData);
-        setStaff(staffData);
-        // Filter out any failed fetches (error responses)
-        const validServices = servicesData.filter(
-          (s) => s && s.id && !s.error
-        );
-        setServices(validServices);
+    fetch(`/api/booking/catalog?locationId=${encodeURIComponent(locationId)}`)
+      .then(async (response) => { const data = await response.json(); if (!response.ok) throw Error(data.error || 'Booking catalog unavailable'); return data; })
+      .then((data) => {
+        setLocation(data.location);
+        setStaff(data.staff.find((person: Staff) => person.id === staffId) || null);
+        setServices(serviceIds.map(id => data.services.find((service: Service) => service.id === id)).filter(Boolean));
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [locationId, staffId, serviceIds]);
+
+  useEffect(() => {
+    if (!rescheduleId) return;
+    fetch(`/api/client/appointments/${encodeURIComponent(rescheduleId)}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || "Appointment unavailable");
+        if (data.appointment.locationId !== locationId || data.appointment.services.length !== serviceIds.length ||
+            serviceIds.some((id) => !data.appointment.services.some((service: Service) => service.id === id))) {
+          throw new Error("Appointment details changed. Return to your appointments and try again.");
+        }
+        setRescheduleVersion(data.appointment.version);
+      })
+      .catch((error) => setRescheduleError(error instanceof Error ? error.message : "Unable to load appointment"));
+  }, [rescheduleId, locationId, serviceIds]);
 
   const bookingAttempt = useRef<{ body: string; key: string } | null>(null);
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,33 +129,28 @@ export default function ConfirmBookingPage({
     setSubmitting(true);
 
     try {
-      const requestBody = JSON.stringify({ locationId, serviceIds, staffId, date, time, ...formData, source: "online", rescheduleId: rescheduleId || undefined });
+      if (rescheduleId && rescheduleVersion === null) throw new Error(rescheduleError || "Appointment is still loading");
+      const requestBody = rescheduleId
+        ? JSON.stringify({ date, time, staffId, version: rescheduleVersion, reason: "Requested by client" })
+        : JSON.stringify({ locationId, serviceIds, staffId, date, time, phone: formData.phone, notes: formData.notes });
       if (bookingAttempt.current?.body !== requestBody) bookingAttempt.current = { body: requestBody, key: crypto.randomUUID() };
-      const response = await fetch("/api/booking", {
+      const response = await fetch(rescheduleId ? `/api/appointments/${encodeURIComponent(rescheduleId)}/reschedule` : "/api/booking", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": bookingAttempt.current.key },
-        body: JSON.stringify({
-          locationId,
-          serviceIds, // All selected services
-          staffId,
-          date,
-          time,
-          ...formData,
-          source: "online",
-          rescheduleId: rescheduleId || undefined,
-        }),
+        body: requestBody,
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setConfirmationNumber(data.confirmationNumber);
+        setConfirmationNumber(rescheduleId || data.confirmationNumber);
+        setDepositDueCents(data.appointment?.depositIntent?.status === 'PENDING' ? data.appointment.depositIntent.amountCents : 0);
         setConfirmed(true);
       } else {
-        toast({ title: "Error", description: data.error || "Failed to book appointment", variant: "destructive" });
+        toast({ title: "Error", description: data.message || data.error || "Failed to save appointment", variant: "destructive" });
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to book appointment", variant: "destructive" });
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to save appointment", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -149,6 +158,8 @@ export default function ConfirmBookingPage({
 
   const totalDuration = services.reduce((sum, s) => sum + (Number(s.duration) || 0), 0);
   const totalPrice = services.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+  const estimatedDeposit = services.reduce((sum, service) => service.requireDeposit ? sum + (Number(service.depositAmount) > 0 ? Number(service.depositAmount) : Math.round(Number(service.price) * Number(service.depositPercent || 0)) / 100) : sum, 0);
+  const returnPath = `/book/${locationId}/confirm?${searchParams.toString()}`;
 
   const formattedDate = date
     ? new Date(date).toLocaleDateString("en-US", {
@@ -174,10 +185,10 @@ export default function ConfirmBookingPage({
           <CardContent className="pt-8 text-center">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Booking Confirmed!
+              {rescheduleId ? "Appointment Rescheduled" : depositDueCents > 0 ? "Booking Saved · Deposit Due" : "Booking Saved"}
             </h1>
             <p className="text-gray-600 mb-6">
-              Your appointment has been successfully booked.
+              {rescheduleId ? "Your new appointment time has been saved." : depositDueCents > 0 ? `Your appointment is awaiting a ${(depositDueCents / 100).toFixed(2)} deposit. Contact the salon to arrange payment before confirmation.` : "Your appointment has been saved."}
             </p>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
@@ -205,7 +216,7 @@ export default function ConfirmBookingPage({
             </div>
 
             <p className="text-sm text-gray-500 mb-6">
-              A confirmation email has been sent to {formData.email}
+              Check your appointment details for the current status. Any message delivery depends on the salon&apos;s notification service.
             </p>
 
             <div className="space-y-3">
@@ -240,9 +251,10 @@ export default function ConfirmBookingPage({
 
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Confirm Your Booking
+            {rescheduleId ? "Review Your New Time" : "Confirm Your Booking"}
           </h1>
-          <p className="text-gray-600">Enter your details to complete booking</p>
+          <p className="text-gray-600">{rescheduleId ? "Your existing appointment and payment history will be preserved." : "Sign in with your client account to complete booking."}</p>
+          {rescheduleError && <p role="alert" className="mt-3 text-red-700">{rescheduleError}</p>}
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -250,49 +262,16 @@ export default function ConfirmBookingPage({
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Your Information</CardTitle>
+                <CardTitle>{rescheduleId ? "Confirm Reschedule" : "Your Information"}</CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name *</Label>
-                      <Input
-                        id="firstName"
-                        required
-                        value={formData.firstName}
-                        onChange={(e) =>
-                          setFormData({ ...formData, firstName: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        value={formData.lastName}
-                        onChange={(e) =>
-                          setFormData({ ...formData, lastName: e.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
-
+                  {!rescheduleId && <>
+                  {sessionStatus === 'unauthenticated' && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">Sign in with a verified client account to save this booking. <Link className="font-semibold underline" href={`/login?callbackUrl=${encodeURIComponent(returnPath)}`}>Sign in and return here</Link></p>}
+                  {sessionStatus === 'authenticated' && !session?.user?.isClient && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">This account is not a client account. Sign in with a client account to book online.</p>}
+                  {session?.user?.isClient && <p className="text-sm text-gray-700">Booking as {session.user.email}. Your verified account name is used for the client record.</p>}
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      required
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
+                    <Label htmlFor="phone">Phone Number (optional)</Label>
                     <Input
                       id="phone"
                       type="tel"
@@ -315,12 +294,13 @@ export default function ConfirmBookingPage({
                     />
                   </div>
 
+                  </>}
                   <Button
                     type="submit"
                     className="w-full bg-pink-600 hover:bg-pink-700"
-                    disabled={submitting}
+                    disabled={submitting || sessionStatus !== 'authenticated' || !session?.user?.isClient || !!rescheduleError || (!!rescheduleId && rescheduleVersion === null) || !location || !staff || services.length !== serviceIds.length}
                   >
-                    {submitting ? "Booking..." : "Confirm Booking"}
+                    {submitting ? "Saving..." : rescheduleId ? "Confirm New Time" : "Confirm Booking"}
                   </Button>
                 </form>
               </CardContent>
@@ -362,6 +342,7 @@ export default function ConfirmBookingPage({
                 </div>
 
                 <hr />
+                {estimatedDeposit > 0 && <p className="text-sm text-amber-700">Estimated deposit due: ${estimatedDeposit.toFixed(2)}. The salon records cash collection or a waiver before confirmation. No card charge is made here.</p>}
 
                 <div className="space-y-2">
                   <p className="font-medium">Services</p>

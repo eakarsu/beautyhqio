@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { createAppointment, transitionAppointment, domainErrorResponse } from "../service";
 import type { AuthenticatedUser } from "@/lib/api-auth";
 import { processIntegrationDeliveries } from "@/lib/integration-deliveries";
+import { AppointmentEmailError, type AppointmentEmailProvider } from '../email-delivery';
 import { issueMobileSession, rotateMobileSession } from "@/lib/mobile-session";
 
 const enabled = process.env.RUN_DATABASE_INTEGRATION === "true";
@@ -13,6 +14,8 @@ const describeDb = enabled ? describe : describe.skip;
 
 describeDb("appointment persistence journey", () => {
   const db = new PrismaClient();
+  const previousEmailSettings = { enabled: process.env.APPOINTMENT_EMAIL_DELIVERY_ENABLED, mode: process.env.APPOINTMENT_EMAIL_MODE, recipient: process.env.APPOINTMENT_EMAIL_TEST_RECIPIENT };
+  const rejectedEmail: AppointmentEmailProvider = { configuration: async () => ({ from: 'Fixture <fixture@example.test>', accountFingerprint: 'fixture' }), send: async () => { throw new AppointmentEmailError('EMAIL_PROVIDER_REJECTED', true); } };
   let owner: AuthenticatedUser;
   let otherOwner: AuthenticatedUser;
   let clientId: string;
@@ -21,6 +24,9 @@ describeDb("appointment persistence journey", () => {
   let serviceId: string;
 
   beforeAll(async () => {
+    process.env.APPOINTMENT_EMAIL_DELIVERY_ENABLED = 'true';
+    process.env.APPOINTMENT_EMAIL_MODE = 'sandbox';
+    process.env.APPOINTMENT_EMAIL_TEST_RECIPIENT = 'sandbox@example.test';
     const business = await db.business.create({ data: { name: "Persistence Salon", type: "HAIR_SALON" } });
     const other = await db.business.create({ data: { name: "Other Salon", type: "SPA" } });
     const user = await db.user.create({ data: { email: "owner@persistence.test", firstName: "Owner", lastName: "One", role: "OWNER", businessId: business.id } });
@@ -35,7 +41,12 @@ describeDb("appointment persistence journey", () => {
     clientId = client.id; staffId = staff.id; locationId = location.id; serviceId = service.id;
   });
 
-  afterAll(async () => db.$disconnect());
+  afterAll(async () => {
+    for (const [key, value] of Object.entries({ APPOINTMENT_EMAIL_DELIVERY_ENABLED: previousEmailSettings.enabled, APPOINTMENT_EMAIL_MODE: previousEmailSettings.mode, APPOINTMENT_EMAIL_TEST_RECIPIENT: previousEmailSettings.recipient })) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+    await db.$disconnect();
+  });
 
   test("persists one idempotent booking, audit, activity and provider outbox", async () => {
     const input = { clientId, staffId, locationId, scheduledStart: "2026-08-10T14:00:00.000Z", serviceIds: [serviceId], source: "PHONE" };
@@ -67,12 +78,13 @@ describeDb("appointment persistence journey", () => {
   });
 
   test("persists a bounded provider failure for retry instead of losing it", async () => {
-    const created = await db.appointment.findFirstOrThrow({ where: { idempotencyKey: "persist-booking-0001" } });
+    // The earlier appointment is completed, so confirmation delivery is now
+    // correctly suppressed. Use an active booking to exercise provider retry.
+    const created = (await createAppointment(db, owner, { clientId, staffId, locationId, scheduledStart: '2031-09-01T14:00:00.000Z', serviceIds: [serviceId], source: 'PHONE' }, 'provider-failure-booking')).appointment;
     const email = await db.integrationDelivery.findFirstOrThrow({
       where: { appointmentId: created.id, kind: "CONFIRMATION_EMAIL" },
     });
     await db.integrationDelivery.updateMany({
-      where: { appointmentId: created.id, id: { not: email.id } },
       data: { nextAttemptAt: new Date("2099-01-01T00:00:00.000Z") },
     });
     await db.integrationDelivery.update({
@@ -80,7 +92,7 @@ describeDb("appointment persistence journey", () => {
       data: { status: "PENDING", attempts: 0, nextAttemptAt: new Date(0) },
     });
 
-    await expect(processIntegrationDeliveries(1)).resolves.toEqual([{ id: email.id, status: "RETRY" }]);
+    await expect(processIntegrationDeliveries(1, rejectedEmail)).resolves.toEqual([{ id: email.id, status: "RETRY" }]);
     await expect(db.integrationDelivery.findUniqueOrThrow({ where: { id: email.id } })).resolves.toMatchObject({
       status: "RETRY",
       attempts: 1,
@@ -119,12 +131,12 @@ describeDb("appointment persistence journey", () => {
 
   test("recovers expired worker leases and terminates an expired fifth attempt", async () => {
     await db.integrationDelivery.updateMany({ data: { nextAttemptAt: new Date("2099-01-01") } });
-    const appointment = await db.appointment.findFirstOrThrow({ where: { idempotencyKey: "persist-booking-0001" } });
+    const appointment = await db.appointment.findFirstOrThrow({ where: { idempotencyKey: "provider-failure-booking" } });
     const data = { businessId: owner.businessId!, appointmentId: appointment.id, kind: "CONFIRMATION_EMAIL", provider: "email", payload: {}, status: "PROCESSING" as const, updatedAt: new Date(0) };
     const retry = await db.integrationDelivery.create({ data: { ...data, attempts: 1, dedupeKey: "lease-retry-test" } });
     const terminal = await db.integrationDelivery.create({ data: { ...data, attempts: 5, dedupeKey: "lease-terminal-test" } });
     const fresh = await db.integrationDelivery.create({ data: { ...data, attempts: 1, updatedAt: new Date(), dedupeKey: "lease-fresh-test" } });
-    expect(await processIntegrationDeliveries(1)).toEqual([{ id: retry.id, status: "RETRY" }]);
+    expect(await processIntegrationDeliveries(1, rejectedEmail)).toEqual([{ id: retry.id, status: "RETRY" }]);
     expect(await db.integrationDelivery.findUnique({ where: { id: retry.id } })).toMatchObject({ attempts: 2, status: "RETRY" });
     expect(await db.integrationDelivery.findUnique({ where: { id: terminal.id } })).toMatchObject({ status: "DEAD_LETTER", lastErrorCode: "WORKER_LEASE_EXPIRED" });
     expect(await db.integrationDelivery.findUnique({ where: { id: fresh.id } })).toMatchObject({ attempts: 1, status: "PROCESSING" });

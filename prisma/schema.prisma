@@ -15,6 +15,8 @@ model Business {
   taxReviewedById String?
   servicesTaxable Boolean @default(false)
   saleCheckouts SalonCheckout[]
+  appointmentDepositCheckouts AppointmentDepositCheckout[]
+  appointmentDepositRefunds AppointmentDepositRefund[]
   billingAttempts BusinessBillingAttempt[]
   id      String       @id @default(cuid())
   name    String
@@ -732,6 +734,8 @@ model Appointment {
   business              Business?             @relation(fields: [businessId], references: [id])
   businessId            String?
   services              AppointmentService[]
+  depositIntent         AppointmentDepositIntent?
+  depositCheckouts      AppointmentDepositCheckout[]
   photos                ClientPhoto[]
   transaction           Transaction?
   marketplaceLead       MarketplaceLead?
@@ -740,6 +744,88 @@ model Appointment {
   @@unique([businessId, idempotencyKey])
   @@index([businessId, scheduledStart])
   @@index([businessId, status])
+}
+
+model AppointmentDepositIntent {
+  id               String   @id @default(cuid())
+  businessId       String
+  appointmentId    String   @unique
+  amountCents      Int
+  currency         String   @default("USD")
+  status           String   @default("PENDING")
+  collectionMethod String?
+  reference        String?  @unique
+  reason           String?
+  settledById      String?
+  settledAt        DateTime?
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  appointment      Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  ledgerEntries    AppointmentDepositLedgerEntry[]
+  cardCheckouts    AppointmentDepositCheckout[]
+  cardRefunds      AppointmentDepositRefund[]
+
+  @@index([businessId, status])
+}
+
+model AppointmentDepositLedgerEntry {
+  id                   String   @id @default(cuid())
+  businessId           String
+  locationId           String
+  depositIntentId      String
+  kind                 String
+  amountCents          Int
+  currency             String   @default("USD")
+  reference            String?
+  transactionPaymentId String?  @unique
+  actorId              String
+  reason               String?
+  createdAt            DateTime @default(now())
+  depositIntent        AppointmentDepositIntent @relation(fields: [depositIntentId], references: [id], onDelete: Restrict)
+
+  @@unique([depositIntentId, kind])
+  @@unique([businessId, reference])
+  @@index([businessId, locationId, createdAt])
+}
+
+model AppointmentDepositCheckout {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  appointmentId String
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  depositIntentId String
+  depositIntent AppointmentDepositIntent @relation(fields: [depositIntentId], references: [id], onDelete: Restrict)
+  clientId String
+  amountCents Int
+  currency String @default("USD")
+  requestKey String
+  status String @default("PENDING")
+  providerRef String? @unique
+  paymentIntentId String? @unique
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([businessId, requestKey])
+  @@index([businessId, depositIntentId, status])
+}
+
+model AppointmentDepositRefund {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  depositIntentId String
+  depositIntent AppointmentDepositIntent @relation(fields: [depositIntentId], references: [id], onDelete: Restrict)
+  amountCents Int
+  currency String @default("USD")
+  status String @default("PENDING")
+  providerRef String? @unique
+  reason String
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([businessId, depositIntentId, status])
 }
 
 enum AppointmentStatus {
@@ -1542,6 +1628,7 @@ model IntegrationDelivery {
   lastErrorAt   DateTime?
   deliveredAt   DateTime?
   providerRef   String?
+  providerAttemptedAt DateTime?
   createdAt     DateTime                  @default(now())
   updatedAt     DateTime                  @updatedAt
 

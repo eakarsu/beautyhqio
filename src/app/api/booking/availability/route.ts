@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { endpoint, fail } from "@/lib/operations/core";
+import { localDateTime } from "@/lib/appointments/availability";
 
 /**
  * PUBLIC ENDPOINT — online booking availability.
@@ -18,34 +19,35 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const locationId = searchParams.get("locationId");
     const serviceId = searchParams.get("serviceId");
+    const serviceIds = (searchParams.get("serviceIds") || serviceId || "").split(",").filter(Boolean);
     const staffId = searchParams.get("staffId");
     const date = searchParams.get("date"); // YYYY-MM-DD
 
     if (!locationId || !date) {
       return fail(400, "locationId and date are required");
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail(422, "Use a valid YYYY-MM-DD date");
 
     const location = await prisma.location.findFirst({
-      where: { id: locationId, isActive: true },
-      select: { businessId: true, operatingHours: true },
+      where: { id: locationId, isActive: true, allowOnlineBooking: true, business: { subscription: { is: { status: { in: ['ACTIVE', 'TRIAL'] } } } } },
+      select: { businessId: true, operatingHours: true, advanceBookingDays: true, business: { select: { timezone: true } } },
     });
     if (!location) return fail(404, "Location not found");
 
     const businessId = location.businessId;
+    const timeZone = location.business.timezone;
 
     // Get service duration (scoped to the same business)
-    let duration = 60; // Default 60 minutes
-    if (serviceId) {
-      const service = await prisma.service.findFirst({
-        where: { id: serviceId, businessId },
-        select: { duration: true },
-      });
-      if (service) duration = service.duration;
+    let duration = 60;
+    if (serviceIds.length) {
+      const services = await prisma.service.findMany({ where: { id: { in: serviceIds }, businessId, isActive: true, allowOnline: true }, select: { id: true, duration: true } });
+      if (services.length !== new Set(serviceIds).size) return fail(422, "One or more services are unavailable for online booking");
+      duration = services.reduce((sum, service) => sum + service.duration, 0);
     }
 
     // Parse date for day of week - use local time parsing
     const [yearForDay, monthForDay, dayForDay] = date.split("-").map(Number);
-    const dateObj = new Date(yearForDay, monthForDay - 1, dayForDay);
+    const dateObj = new Date(Date.UTC(yearForDay, monthForDay - 1, dayForDay, 12));
     const dayOfWeek = dateObj
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
@@ -62,6 +64,7 @@ export async function GET(request: NextRequest) {
     const staffWhere: Record<string, unknown> = {
       isActive: true,
       isBookableOnline: true,
+      locationId,
       user: { businessId },
     };
     if (staffId) staffWhere.id = staffId;
@@ -73,6 +76,7 @@ export async function GET(request: NextRequest) {
         displayName: true,
         photo: true,
         color: true,
+        serviceIds: true,
         user: {
           select: {
             firstName: true,
@@ -83,9 +87,13 @@ export async function GET(request: NextRequest) {
     });
 
     // Get existing appointments for the date across this business
-    const [year, month, day] = date.split("-").map(Number);
-    const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+    if (!Number.isFinite(dateObj.getTime())) return fail(422, "Use a valid date");
+    let startOfDay: Date, endOfDay: Date;
+    try {
+      startOfDay = localDateTime(date, "00:00", timeZone);
+      const nextDate = new Date(dateObj.getTime() + 86_400_000).toISOString().slice(0, 10);
+      endOfDay = localDateTime(nextDate, "00:00", timeZone);
+    } catch { return fail(422, "Use a valid business-local date"); }
 
     const staffIds = availableStaff.map((s) => s.id);
 
@@ -93,8 +101,9 @@ export async function GET(request: NextRequest) {
       where: {
         businessId,
         staffId: { in: staffIds },
-        scheduledStart: { gte: startOfDay, lte: endOfDay },
-        status: { notIn: ["CANCELLED", "NO_SHOW"] },
+        scheduledStart: { lt: endOfDay },
+        scheduledEnd: { gt: startOfDay },
+        status: { notIn: ["CANCELLED", "NO_SHOW", "RESCHEDULED"] },
       },
       select: {
         staffId: true,
@@ -130,11 +139,13 @@ export async function GET(request: NextRequest) {
       const slotMin = time % 60;
       const slotTime = `${String(slotHour).padStart(2, "0")}:${String(slotMin).padStart(2, "0")}`;
 
-      const slotStart = new Date(year, month - 1, day, slotHour, slotMin, 0, 0);
+      let slotStart: Date;
+      try { slotStart = localDateTime(date, slotTime, timeZone); }
+      catch { slots.push({ time: slotTime, available: false, availableStaff: [] }); continue; }
       const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
       // Skip time slots that have already passed
-      if (slotStart <= now) {
+      if (slotStart <= now || slotStart.getTime() > now.getTime() + location.advanceBookingDays * 86_400_000) {
         slots.push({
           time: slotTime,
           available: false,
@@ -146,6 +157,7 @@ export async function GET(request: NextRequest) {
       // Check which staff are available at this time
       const staffAvailable = availableStaff
         .filter((staff) => {
+          if (staff.serviceIds.length && serviceIds.some((id) => !staff.serviceIds.includes(id))) return false;
           const hasConflict = existingAppointments.some((apt) => {
             if (apt.staffId !== staff.id) return false;
             const aptStart = new Date(apt.scheduledStart);

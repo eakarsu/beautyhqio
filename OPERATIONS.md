@@ -12,6 +12,16 @@ The checked-in Prisma migration is a baseline for new installations. For a datab
 
 Schedule authenticated `POST /api/cron/integration-deliveries` calls with `Authorization: Bearer $CRON_SECRET`. Deliveries move through `PENDING → PROCESSING → DELIVERED`, retry with bounded backoff, and become `DEAD_LETTER` after five attempts. Alert on any dead letter, old pending item, auth failure spike, or appointment conflict spike. Provider credentials are optional for core scheduling but required before enabling their delivery types.
 
+### Appointment email delivery
+
+Apply migrations, including `20261004184500_appointment_email_attempt`, before running the worker. Set a 64-character hex `INTEGRATION_ENCRYPTION_KEY` and save each salon's encrypted Resend API key and sender under **Operations → Integrations**. Saving credentials alone does not send mail or verify that Resend accepts the sender. Set `NEXTAUTH_URL` to the app's public origin for appointment links.
+
+Appointment booking, pending deposit, verified deposit collection/refund, reschedule, and cancellation queue tenant-scoped email notices only for active clients with an address and email consent. The worker checks the client, consent, appointment state, event snapshot, and deposit amount/method again before dispatch; stale notices finish with a `suppressed-*` provider reference. Consent withdrawal or changed contact suppresses an unsent notice. Existing global `RESEND_API_KEY` and `EMAIL_FROM` do not configure this tenant-scoped path.
+
+`APPOINTMENT_EMAIL_DELIVERY_ENABLED=false` leaves appointment email rows queued. To evaluate delivery, set `APPOINTMENT_EMAIL_MODE=sandbox` and an authorized `APPOINTMENT_EMAIL_TEST_RECIPIENT`, then enable the flag and run the authenticated worker in a controlled environment. Every salon notice is redirected to that one address, so use a recipient approved to view appointment and deposit details. A notice queued in sandbox mode is suppressed if the worker later switches to live mode. Promotion to `APPOINTMENT_EMAIL_MODE=live` sends newly queued notices to the consenting client address and requires separate sender, privacy, and provider acceptance checks. Do not use live mode on the strength of local tests.
+
+The worker freezes sender, recipient, body, provider account fingerprint, and outbox ID before its first attempt. Resend receives that ID as its idempotency key on retries. Its idempotency window is limited, so an uncertain delivery older than 23 hours becomes `DEAD_LETTER` with `EMAIL_RECONCILIATION_REQUIRED`; check Resend's event log and the row's `providerRef`, `lastErrorCode`, `providerAttemptedAt`, and `deliveredAt` before taking any manual action. Changed sender/account or test recipient requires review rather than replaying a frozen notice. Local mock-provider checks are in `src/lib/appointments/__tests__/email-delivery.test.ts` and `notifications.integration.test.ts`; they do not establish provider sandbox acceptance.
+
 ## Identity and AI
 
 Mobile access tokens expire after 15 minutes. Opaque refresh tokens are stored only as SHA-256 digests, rotate on every use, and are revocable at logout. The removed `/api/auth/mobile` assertion endpoint intentionally returns 410; use verified authorization-code OAuth through NextAuth.

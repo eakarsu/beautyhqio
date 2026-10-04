@@ -12,6 +12,8 @@ import {
 } from "./domain";
 
 import { assertAvailable } from "./availability";
+import { requiredDepositCents } from './deposit';
+import { queueAppointmentEmail } from './notifications';
 
 const MANAGER_ROLES = new Set(["OWNER", "MANAGER", "RECEPTIONIST"]);
 
@@ -51,7 +53,7 @@ export async function createAppointment(
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${location.businessId}, 0))::text`;
     const existing = await tx.appointment.findUnique({
       where: { businessId_idempotencyKey: { businessId: location.businessId, idempotencyKey } },
-      include: { services: { include: { service: true } }, client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true },
+      include: { depositIntent: true, services: { include: { service: true } }, client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true },
     });
     if (existing) {
       if (user.role === "CLIENT" && existing.clientId !== user.clientId) {
@@ -82,6 +84,9 @@ export async function createAppointment(
     }
     if (user.role === "CLIENT" && (!location.allowOnlineBooking || services.some(service => !service.allowOnline))) throw new AppointmentDomainError("ONLINE_BOOKING_DISABLED", 409, "One or more services cannot be booked online");
     if (user.role === "CLIENT" && (input.scheduledStart <= new Date() || input.scheduledStart.getTime() > Date.now() + location.advanceBookingDays * 86400000)) throw new AppointmentDomainError("BOOKING_WINDOW", 422, "Choose a future time within the booking window");
+    let depositDueCents: number;
+    try { depositDueCents = requiredDepositCents(services); }
+    catch { throw new AppointmentDomainError('DEPOSIT_CONFIGURATION', 409, 'This service requires a deposit, but its amount is not configured for online booking'); }
     if (staff.serviceIds.length && requestedServiceIds.some(id => !staff.serviceIds.includes(id))) throw new AppointmentDomainError("STAFF_SERVICE_MISMATCH", 422, "Staff member does not provide all selected services");
     const lineByService = new Map((input.services || []).map((line) => [line.serviceId, line]));
     const totalDuration = services.reduce((sum, service) => sum + (lineByService.get(service.id)?.duration ?? service.duration), 0);
@@ -109,21 +114,22 @@ export async function createAppointment(
           })),
         },
       },
-      include: { services: { include: { service: true } }, client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true },
+      include: { depositIntent: true, services: { include: { service: true } }, client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true },
     });
+    const depositIntent = depositDueCents > 0 ? await tx.appointmentDepositIntent.create({ data: { businessId: location.businessId, appointmentId: appointment.id, amountCents: depositDueCents, currency: 'USD' } }) : null;
     if (client) {
       await tx.activity.create({ data: { clientId: client.id, userId: user.id, type: "APPOINTMENT_BOOKED", title: "Appointment Booked", metadata: { appointmentId: appointment.id } } });
     }
-    await tx.auditLog.create({ data: { userId: user.id, businessId: location.businessId, action: "APPOINTMENT_CREATED", entityType: "Appointment", entityId: appointment.id, changes: { status: "BOOKED", scheduledStart: appointment.scheduledStart.toISOString(), scheduledEnd: appointment.scheduledEnd.toISOString() } } });
+    await tx.auditLog.create({ data: { userId: user.id, businessId: location.businessId, action: "APPOINTMENT_CREATED", entityType: "Appointment", entityId: appointment.id, changes: { status: "BOOKED", scheduledStart: appointment.scheduledStart.toISOString(), scheduledEnd: appointment.scheduledEnd.toISOString(), depositDueCents } } });
     const deliveries = [
-      ["CALENDAR_CREATE", "calendar"],
-      ...(client?.email && client.allowEmail !== false ? [["CONFIRMATION_EMAIL", "email"]] : []),
-      ...(client?.phone && client.allowSms !== false ? [["CONFIRMATION_SMS", "twilio"]] : []),
+      ...(depositDueCents === 0 ? [["CALENDAR_CREATE", "calendar"]] : []),
+      ...(depositDueCents === 0 && client?.phone && client.allowSms !== false ? [["CONFIRMATION_SMS", "twilio"]] : []),
     ];
     await tx.integrationDelivery.createMany({
       data: deliveries.map(([kind, provider]) => ({ businessId: location.businessId, appointmentId: appointment.id, kind, provider, dedupeKey: `${appointment.id}:${kind}`, payload: { appointmentId: appointment.id } })),
     });
-    return { appointment, replayed: false };
+    await queueAppointmentEmail(tx, { businessId: location.businessId, appointment, client, kind: depositDueCents ? 'DEPOSIT_REQUEST_EMAIL' : 'CONFIRMATION_EMAIL', eventKey: 'booking', ...(depositDueCents ? { amountCents: depositDueCents } : {}) });
+    return { appointment: { ...appointment, depositIntent }, replayed: false };
   };
   return transaction ? work(transaction) : db.$transaction(work);
 }
@@ -136,13 +142,14 @@ export async function transitionAppointment(
   reason?: string,
 ) {
   const target = appointmentStatusSchema.parse(targetRaw) as AppointmentStatus;
-  const current = await db.appointment.findUnique({ where: { id }, include: { client: true, staff: { include: { location: true } }, location: true } });
+  const current = await db.appointment.findUnique({ where: { id }, include: { depositIntent: true, client: true, staff: { include: { location: true } }, location: true } });
   if (!current) throw new AppointmentDomainError("NOT_FOUND", 404, "appointment not found");
   const businessId = current.businessId || current.location.businessId;
   await assertBusinessAccess(user, businessId);
   if (user.role === "CLIENT") {
     if (target === "CHECKED_IN" && Math.abs(current.scheduledStart.getTime() - Date.now()) > 2 * 3600000) throw new AppointmentDomainError("CHECK_IN_WINDOW", 409, "Self check-in is available within two hours of the appointment");
     if (!user.clientId || current.clientId !== user.clientId || !["CANCELLED", "CHECKED_IN"].includes(target)) throw new AppointmentDomainError("ROLE_FORBIDDEN", 403, "client cannot perform this transition");
+    if (target === "CANCELLED" && current.scheduledStart.getTime() - Date.now() < current.location.cancellationHours * 3_600_000) throw new AppointmentDomainError("CANCELLATION_WINDOW", 409, "Please contact the salon to cancel inside the cancellation window");
   } else if (user.role === "STAFF" && (current.staffId !== user.staffId || !["CHECKED_IN", "IN_SERVICE", "COMPLETED"].includes(target))) {
     throw new AppointmentDomainError("ROLE_FORBIDDEN", 403, "staff member cannot perform this transition");
   } else if (!user.isPlatformAdmin && !MANAGER_ROLES.has(user.role) && user.role !== "STAFF") {
@@ -150,9 +157,11 @@ export async function transitionAppointment(
   }
   const from = appointmentStatusSchema.parse(current.status) as AppointmentStatus;
   assertTransition(from, target);
+  if (current.depositIntent && !['PAID', 'APPLIED', 'WAIVED'].includes(current.depositIntent.status) && ['CONFIRMED', 'CHECKED_IN', 'IN_SERVICE', 'COMPLETED'].includes(target)) throw new AppointmentDomainError('DEPOSIT_DUE', 409, 'The required deposit must be collected or waived before confirmation or check-in');
   if (target === "CANCELLED" && !reason?.trim()) throw new AppointmentDomainError("REASON_REQUIRED", 422, "cancellation reason is required");
   const now = new Date();
   return db.$transaction(async (tx) => {
+    if (target === 'CANCELLED' && current.depositIntent?.status === 'PENDING') await tx.appointmentDepositIntent.updateMany({ where: { appointmentId: id, status: 'PENDING' }, data: { status: 'CANCELLED', version: { increment: 1 } } });
     const updated = await tx.appointment.updateMany({
       where: { id, version: current.version, status: current.status },
       data: {
@@ -175,6 +184,7 @@ export async function transitionAppointment(
       await tx.activity.create({ data: { clientId: current.clientId, userId: user.id, type: activityType, title: target.replace("_", " "), metadata: { appointmentId: id, reason: reason?.trim() } } });
     }
     await tx.integrationDelivery.create({ data: { businessId, appointmentId: id, kind: "CALENDAR_UPDATE", provider: "calendar", dedupeKey: `${id}:CALENDAR_UPDATE:${current.version + 1}`, payload: { appointmentId: id, target } } });
+    if (target === 'CANCELLED') await queueAppointmentEmail(tx, { businessId, appointment: current, client: current.client, kind: 'CANCELLATION_EMAIL', eventKey: String(current.version + 1) });
     return tx.appointment.findUniqueOrThrow({ where: { id }, include: { client: true, staff: { include: { user: { select: publicUserSelect } } }, location: true, services: { include: { service: true } } } });
   });
 }

@@ -20,14 +20,20 @@ export async function drawerPreview(tx:Prisma.TransactionClient,ctx:Context,id:s
  const payments=await tx.$queryRaw<{id:string;amount:Prisma.Decimal;verifiedAt:Date;transactionNumber:string}[]>`
  SELECT p."id",p."amount",p."verifiedAt",t."transactionNumber" FROM "TransactionPayment" p JOIN "Transaction" t ON t.id=p."transactionId"
  WHERE t."locationId"=${session.locationId} AND t.currency='USD' AND p.method='CASH' AND p.source='CASH' AND p."verifiedAt" IS NOT NULL
+ AND NOT EXISTS(SELECT 1 FROM "AppointmentDepositLedgerEntry" e WHERE e."transactionPaymentId"=p.id AND e.kind='APPLIED')
  AND NOT EXISTS(SELECT 1 FROM "CashDrawerAllocation" a WHERE a."receiptKey"='payment:'||p.id) ORDER BY p.id LIMIT 10001`
  const refunds=await tx.$queryRaw<{id:string;amount:Prisma.Decimal;createdAt:Date;transactionNumber:string}[]>`
  SELECT r.id,r.amount,r."createdAt",t."transactionNumber" FROM "PaymentRefund" r JOIN "TransactionPayment" p ON p.id=r."paymentId" JOIN "Transaction" t ON t.id=p."transactionId"
- WHERE r."businessId"=${ctx.businessId} AND t."locationId"=${session.locationId} AND t.currency='USD' AND p.method='CASH' AND p.source='CASH' AND p."verifiedAt" IS NOT NULL AND r.status='SUCCEEDED'
+ WHERE r."businessId"=${ctx.businessId} AND t."locationId"=${session.locationId} AND t.currency='USD' AND p.method='CASH' AND p.source IN ('CASH','APPOINTMENT_DEPOSIT') AND p."verifiedAt" IS NOT NULL AND r.status='SUCCEEDED'
  AND NOT EXISTS(SELECT 1 FROM "CashDrawerAllocation" a WHERE a."receiptKey"='refund:'||r.id) ORDER BY r.id LIMIT 10001`
- if(payments.length>10000||refunds.length>10000)fail(409,'Too many unallocated cash receipts; reconcile the historical ledger before closeout')
+ const deposits=await tx.$queryRaw<{id:string;kind:string;amountCents:number;reference:string;createdAt:Date}[]>`
+ SELECT e.id,e.kind,e."amountCents",COALESCE(e.reference,e.id) AS reference,e."createdAt" FROM "AppointmentDepositLedgerEntry" e
+ JOIN "AppointmentDepositIntent" i ON i.id=e."depositIntentId" AND i."businessId"=e."businessId"
+ WHERE e."businessId"=${ctx.businessId} AND e."locationId"=${session.locationId} AND e.currency='USD' AND e.kind IN ('COLLECTED','REFUNDED') AND i."collectionMethod"='CASH'
+ AND NOT EXISTS(SELECT 1 FROM "CashDrawerAllocation" a WHERE a."receiptKey"='deposit:'||e.id) ORDER BY e.id LIMIT 10001`
+ if(payments.length>10000||refunds.length>10000||deposits.length>10000)fail(409,'Too many unallocated cash receipts; reconcile the historical ledger before closeout')
  const movements=await tx.cashDrawerMovement.findMany({where:{sessionId:id},orderBy:{id:'asc'}})
- const receipts:Receipt[]=[...payments.map(p=>({key:'payment:'+p.id,amountCents:cents(p.amount),reference:p.transactionNumber,at:p.verifiedAt.toISOString(),kind:'CASH_RECEIPT'})),...refunds.map(r=>({key:'refund:'+r.id,amountCents:-cents(r.amount),reference:r.transactionNumber,at:r.createdAt.toISOString(),kind:'CASH_REFUND'}))]
+ const receipts:Receipt[]=[...payments.map(p=>({key:'payment:'+p.id,amountCents:cents(p.amount),reference:p.transactionNumber,at:p.verifiedAt.toISOString(),kind:'CASH_RECEIPT'})),...refunds.map(r=>({key:'refund:'+r.id,amountCents:-cents(r.amount),reference:r.transactionNumber,at:r.createdAt.toISOString(),kind:'CASH_REFUND'})),...deposits.map(d=>({key:'deposit:'+d.id,amountCents:d.amountCents,reference:d.reference,at:d.createdAt.toISOString(),kind:d.kind==='COLLECTED'?'DEPOSIT_CASH_COLLECTED':'DEPOSIT_CASH_REFUNDED'}))]
  const expectedCents=session.openingCents+receipts.reduce((n,r)=>n+r.amountCents,0)+movements.reduce((n,m)=>n+m.amountCents,0)
  if(!Number.isSafeInteger(expectedCents)||Math.abs(expectedCents)>1000000000)fail(409,'Drawer amount exceeds supported limits')
  const snapshot={openingCents:session.openingCents,expectedCents,receipts,movements:movements.map(m=>({id:m.id,amountCents:m.amountCents,reason:m.reason,actorId:m.actorId,at:m.createdAt.toISOString()}))}
