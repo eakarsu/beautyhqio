@@ -1,10 +1,14 @@
 'use client';
+import FullAIExamples, { useFullAIExamples } from "../../../../components/FullAIExamples";
+
 import { useState } from 'react';
 
 type Day = { weekday: string; finalizedAppointments: number; noShows: number; noShowPercent: number | null; measuredGaps: number; meanBetweenBookingGapMinutes: number | null };
 type Result = { finalizedAppointments: number; noShows: number; overallNoShowPercent: number | null; weekdays: Day[]; observations: string[]; limitations: string[]; historyStart: string; historyEnd: string; timeZone: string; recordsTruncated: boolean };
 
 export default function SchedulingEvidencePage() {
+  const fullAIExamples = useFullAIExamples();
+
   const [acknowledged, setAcknowledged] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState('');
@@ -19,9 +23,9 @@ export default function SchedulingEvidencePage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Analysis unavailable'); }
     finally { setBusy(false); }
   }
-  return <main className="max-w-5xl mx-auto p-6 space-y-5"><h1 className="text-2xl font-semibold">Measured scheduling patterns</h1>
+  return <main className="max-w-5xl mx-auto p-6 space-y-5" data-full-ai-workspace="SchedulingEvidencePage"><FullAIExamples controller={fullAIExamples} disabled={Boolean(busy)} /><h1 className="text-2xl font-semibold">Measured scheduling patterns</h1>
     <p>This analysis uses de-identified appointment timing and final status from your business. It does not score clients or change bookings.</p>
-    <label className="flex gap-2"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)}/> I am authorized to analyze this salon&apos;s historical scheduling records.</label>
+    <label className="flex gap-2"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} data-full-ai-field={fullAIExamples.bind({ current: acknowledged, change: (event) => setAcknowledged(event.target.checked), label: "acknowledged", manual: false, json: false, sample: false }, "p1-1596", undefined)}/> I am authorized to analyze this salon&apos;s historical scheduling records.</label>
     <button className="rounded bg-rose-600 text-white px-4 py-2 disabled:opacity-50" disabled={!acknowledged || busy} onClick={() => void analyze()}>{busy ? 'Analyzing…' : 'Analyze history'}</button>
     {error && <p role="alert" className="text-red-700">{error}</p>}
     {result && <><section className="rounded border p-4 space-y-2"><h2 className="font-semibold">Evidence window</h2><p>{new Date(result.historyStart).toLocaleDateString()} – {new Date(result.historyEnd).toLocaleDateString()} · {result.timeZone}</p>

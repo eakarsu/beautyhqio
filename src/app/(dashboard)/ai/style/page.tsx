@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../../../../components/FullAIExamples";
+
 
 import { useState, useRef } from "react";
 import { FillButtons } from "@/components/ai/FillButtons";
@@ -39,6 +41,8 @@ interface StyleRecommendation {
 }
 
 export default function StyleRecommenderPage() {
+  const fullAIExamples = useFullAIExamples();
+
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -126,7 +130,7 @@ export default function StyleRecommenderPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6" data-full-ai-workspace="StyleRecommenderPage"><FullAIExamples controller={fullAIExamples} />
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push("/ai")}>
@@ -234,7 +238,7 @@ export default function StyleRecommenderPage() {
                 value={preferences.hairLength}
                 onValueChange={(v) => setPreferences({ ...preferences, hairLength: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: preferences.hairLength, change: event => ((v) => setPreferences({ ...preferences, hairLength: v }))(event.target.value), label: "preferences.hairLength", manual: false, json: false, sample: "" }, "p1-8149", undefined)}>
                   <SelectValue placeholder="Select length" />
                 </SelectTrigger>
                 <SelectContent>
@@ -252,7 +256,7 @@ export default function StyleRecommenderPage() {
                 value={preferences.hairType}
                 onValueChange={(v) => setPreferences({ ...preferences, hairType: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: preferences.hairType, change: event => ((v) => setPreferences({ ...preferences, hairType: v }))(event.target.value), label: "preferences.hairType", manual: false, json: false, sample: "" }, "p1-8899", undefined)}>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -270,7 +274,7 @@ export default function StyleRecommenderPage() {
                 value={preferences.lifestyle}
                 onValueChange={(v) => setPreferences({ ...preferences, lifestyle: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: preferences.lifestyle, change: event => ((v) => setPreferences({ ...preferences, lifestyle: v }))(event.target.value), label: "preferences.lifestyle", manual: false, json: false, sample: "" }, "p1-9638", undefined)}>
                   <SelectValue placeholder="Select lifestyle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -288,7 +292,7 @@ export default function StyleRecommenderPage() {
                 value={preferences.maintenance}
                 onValueChange={(v) => setPreferences({ ...preferences, maintenance: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: preferences.maintenance, change: event => ((v) => setPreferences({ ...preferences, maintenance: v }))(event.target.value), label: "preferences.maintenance", manual: false, json: false, sample: "" }, "p1-10448", undefined)}>
                   <SelectValue placeholder="Select maintenance" />
                 </SelectTrigger>
                 <SelectContent>
@@ -305,7 +309,7 @@ export default function StyleRecommenderPage() {
                 value={preferences.notes}
                 onChange={(e) => setPreferences({ ...preferences, notes: e.target.value })}
                 placeholder="Any specific requests or concerns..."
-                rows={3}
+                rows={3} data-full-ai-field={fullAIExamples.bind({ current: preferences.notes, change: (e) => setPreferences({ ...preferences, notes: e.target.value }), label: "preferences.notes", manual: false, json: false, sample: "" }, "p1-11181", undefined)}
               />
             </div>
           </CardContent>

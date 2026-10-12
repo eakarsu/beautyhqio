@@ -22,7 +22,7 @@ const data = JSON.parse(
   fs
     .readFileSync(path.join(project, "src", "components", "ai", "ai-fixture-data.ts"), "utf8")
     .replace(/^[\s\S]*?=\s*/, "")
-    .replace(/;\s*$/, ""),
+    .replace(/,\s*};?\s*$/, "\n}"),
 );
 
 let problems = 0;
@@ -38,7 +38,11 @@ for (const dir of DIRS) {
 
     const fixtureKey = (src.match(/AI_FIXTURES\["([^"]+)"\]/) || [])[1];
     if (!fixtureKey || !data[fixtureKey]) continue;
-    const fields = data[fixtureKey].fields;
+    // No-show's remaining fixture values describe an appointment fetched by the
+    // analysis route; its native form exposes only the client selector.
+    const fields = fixtureKey === "no-show"
+      ? data[fixtureKey].fields.filter((field) => field === "clientName")
+      : data[fixtureKey].fields;
 
     // Collect every field name the handler references.
     const handler = src.slice(src.indexOf("<FillButtons"), src.indexOf("<FillButtons") + 1600);

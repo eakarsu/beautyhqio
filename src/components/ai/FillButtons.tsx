@@ -4,9 +4,8 @@
  * Scenario buttons for AI feature forms.
  *
  * Renders one button per complete scenario. Clicking any button fills EVERY
- * field of the form at once and, when an `onRun` handler is supplied, immediately
- * runs the action with those same values — so one click takes the user from
- * empty form to a rendered result.
+ * field of the form at once. The user reviews the values and then uses the
+ * feature's run button to request a response.
  *
  * Values are deterministic and clearly fictional.
  */
@@ -22,10 +21,7 @@ export interface FillButtonsProps {
   fixture: AIFixture;
   /** Applies a complete set of values to page state. */
   apply: (values: Record<string, string>) => void;
-  /**
-   * Runs the feature's action with the values that were just applied. Receives
-   * the values directly so it does not depend on state having settled yet.
-   */
+  /** @deprecated Prefill buttons do not run requests. Keep the feature's explicit run action. */
   onRun?: (values: Record<string, string>) => void;
   /** Optional: clear the form. */
   onClear?: () => void;
@@ -43,7 +39,6 @@ export interface FillButtonsProps {
 export function FillButtons({
   fixture,
   apply,
-  onRun,
   onClear,
   resolvers = {},
   compact = false,
@@ -67,11 +62,10 @@ export function FillButtons({
                 const values = scenarioValues(fixture, scenario, resolvers);
                 apply(values);
                 setApplied(scenario.label);
-                onRun?.(values);
               }}
               title={
                 scenario.hint ??
-                `Fill every field with "${scenario.label}"${onRun ? " and run it" : ""}`
+                `Fill every field with "${scenario.label}"`
               }
             >
               {running && isApplied ? (
@@ -102,9 +96,7 @@ export function FillButtons({
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        {onRun
-          ? "Each button fills every field with a complete example and runs it."
-          : "Each button fills every field with a complete example scenario."}
+        Each button fills every field with a complete example scenario. Review it before using the run button.
       </p>
     </div>
   );

@@ -1,9 +1,14 @@
 'use client';
+import FullAIExamples, { useFullAIExamples } from "../../../../components/FullAIExamples";
+import { AIResultView } from "@/components/ai/AIResultView";
+
 import { useState } from 'react';
 import { useOperation } from '@/components/operations/use-operation';
 import { Button } from '@/components/ui/button';
 type Result = { id: string; feature: string; model: string; status: string; createdAt: string; output: { title?: string; summary?: string; draftText?: string; error?: string; suggestions?: { text: string; sourceIds: string[] }[]; limitations?: string[] }; input: { sources?: { id: string; type: string; title?: string; name?: string }[] }; tokens: number | null; costUsd: string | null; reviewNotes: string | null };
 export default function AIWorkspacePage() {
+  const fullAIExamples = useFullAIExamples();
+
   const ai = useOperation<{ rows: Result[]; features: { id: string; name: string }[]; clients: { id: string; firstName: string; lastName: string }[]; configured: boolean; canReview: boolean; usage: { _count: number; _sum: { tokens: number | null; costUsd: string | null } } }>('/api/operations/ai');
   const kb = useOperation<{ documents: { id: string; title: string; content: string; sourceUrl: string | null }[]; canEdit: boolean }>('/api/operations/knowledge');
   const [feature, setFeature] = useState('front-desk'); const [instruction, setInstruction] = useState(''); const [clientId, setClientId] = useState('');
@@ -14,17 +19,15 @@ export default function AIWorkspacePage() {
     {ai.data && <>
       <div className="rounded-lg border p-4">Last 30 days: {ai.data.usage._count} requests · {ai.data.usage._sum.tokens ?? 'Unreported'} tokens · {ai.data.usage._sum.costUsd === null ? 'Cost not reported' : `$${Number(ai.data.usage._sum.costUsd).toFixed(4)} reported provider cost`}. Requests without provider usage are excluded from totals.</div>
       {!ai.data.configured && <p>AI needs an enabled provider configuration before drafts can be generated.</p>}
-      <form className="rounded-xl border bg-white p-5 space-y-4" onSubmit={e => { e.preventDefault(); void ai.save({ feature, instruction, ...(clientId ? { clientId } : {}) }); }}>
-        <label className="block">Task<select className="block border p-2 rounded w-full" value={feature} onChange={e => setFeature(e.target.value)}>{ai.data.features.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
-        {['client-summary', 'rebooking'].includes(feature) && <label className="block">Client<select required className="block border rounded p-2 w-full" value={clientId} onChange={e => setClientId(e.target.value)}><option value="">Choose client</option>{ai.data.clients.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}</select></label>}
-        <label className="block">Request<textarea required maxLength={4000} className="block border rounded p-3 w-full min-h-24" value={instruction} onChange={e => setInstruction(e.target.value)} placeholder="For example: explain which products need restocking and cite the current stock records."/></label>
+      <form className="rounded-xl border bg-white p-5 space-y-4" onSubmit={e => { e.preventDefault(); void ai.save({ feature, instruction, ...(clientId ? { clientId } : {}) }); }} data-full-ai-workspace="AIWorkspacePage"><FullAIExamples controller={fullAIExamples} />
+        <label className="block">Task<select className="block border p-2 rounded w-full" value={feature} onChange={e => setFeature(e.target.value)} data-full-ai-field={fullAIExamples.bind({ current: feature, change: e => setFeature(e.target.value), label: "feature", manual: false, reference: true, json: false, sample: 'front-desk' }, "p1-2704", undefined)}>{ai.data.features.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
+        {['client-summary', 'rebooking'].includes(feature) && <label className="block">Client<select required className="block border rounded p-2 w-full" value={clientId} onChange={e => setClientId(e.target.value)} data-full-ai-field={fullAIExamples.bind({ current: clientId, change: e => setClientId(e.target.value), label: "clientId", manual: false, json: false, sample: '' }, "p1-3004", undefined)}><option value="">Choose client</option>{ai.data.clients.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}</select></label>}
+        <label className="block">Request<textarea required maxLength={4000} className="block border rounded p-3 w-full min-h-24" value={instruction} onChange={e => setInstruction(e.target.value)} placeholder="For example: explain which products need restocking and cite the current stock records." data-full-ai-field={fullAIExamples.bind({ current: instruction, change: e => setInstruction(e.target.value), label: "instruction", manual: false, json: false, sample: '' }, "p1-3319", undefined)}/></label>
         <Button disabled={ai.busy || !ai.data.configured}>Generate draft</Button>
       </form>
       <section className="space-y-4"><h2 className="text-xl font-semibold">Drafts and review history</h2>{!ai.data.rows.length && <p>No AI requests yet.</p>}{ai.data.rows.map(row => <article className="border rounded-xl p-5 space-y-3 bg-white" key={row.id}><div className="flex justify-between gap-3"><h3 className="font-semibold">{row.output.title || row.feature}</h3><span>{row.status}</span></div><p className="text-sm text-slate-600">{new Date(row.createdAt).toLocaleString()} · {row.model} · {row.tokens ?? 'Unreported'} tokens · {row.costUsd === null ? 'Cost unreported' : `$${row.costUsd}`}</p>
-        {row.output.error && <p role="alert" className="text-red-700">{row.output.error}</p>}{row.output.summary && <p>{row.output.summary}</p>}{row.output.draftText && <pre className="whitespace-pre-wrap bg-slate-50 p-3 rounded font-sans">{row.output.draftText}</pre>}
-        {row.output.suggestions?.map((s, i) => <div key={i}><p>{s.text}</p><p className="text-xs text-slate-500">Sources: {s.sourceIds.length ? s.sourceIds.map(id => row.input.sources?.find(src => src.id === id)?.title || row.input.sources?.find(src => src.id === id)?.name || id).join(', ') : 'User request only'}</p></div>)}
-        {!!row.output.limitations?.length && <p className="text-sm text-slate-600">Limitations: {row.output.limitations.join(' ')}</p>}
-        {row.input.sources?.length ? <details><summary className="cursor-pointer underline">Inspect source records</summary><pre className="whitespace-pre-wrap text-xs overflow-auto max-h-80">{JSON.stringify(row.input.sources, null, 2)}</pre></details> : null}
+        <AIResultView data={row.output} title="Saved AI draft" />
+        {row.input.sources?.length ? <details><summary className="cursor-pointer underline">Inspect source records</summary><AIResultView data={row.input.sources} title="Source records" /></details> : null}
         {row.status === 'DRAFT' && ai.data?.canReview && <div className="space-y-2"><label className="block">Review notes<textarea className="block border p-2 rounded w-full" value={notes[row.id] || ''} maxLength={2000} onChange={e => setNotes({ ...notes, [row.id]: e.target.value })}/></label><div className="flex gap-2"><Button disabled={ai.busy} onClick={() => ai.save({ action: 'review', id: row.id, status: 'APPROVED', notes: notes[row.id] || '' })}>Approve draft</Button><Button variant="outline" disabled={ai.busy} onClick={() => ai.save({ action: 'review', id: row.id, status: 'REJECTED', notes: notes[row.id] || '' })}>Reject</Button></div></div>}{row.reviewNotes && <p>Review: {row.reviewNotes}</p>}
       </article>)}</section>
     </>}

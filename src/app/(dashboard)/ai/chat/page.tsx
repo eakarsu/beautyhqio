@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../../../../components/FullAIExamples";
+
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -54,6 +56,8 @@ const quickPrompts = [
 ];
 
 export default function AIChatPage() {
+  const fullAIExamples = useFullAIExamples();
+
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -248,7 +252,7 @@ export default function AIChatPage() {
 
         {/* Input */}
         <div className="p-4 border-t">
-          <form onSubmit={handleSubmit} className="flex gap-2">
+          <form onSubmit={handleSubmit} className="flex gap-2" data-full-ai-workspace="AIChatPage"><FullAIExamples controller={fullAIExamples} disabled={Boolean(loading)} />
       <FillButtons
         fixture={AI_FIXTURES["chat"]}
         apply={(values) => {
@@ -268,7 +272,7 @@ export default function AIChatPage() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about scheduling, clients, marketing, or analytics..."
               className="flex-1"
-              disabled={loading}
+              disabled={loading} data-full-ai-field={fullAIExamples.bind({ current: input, change: (e) => setInput(e.target.value), label: "input", manual: false, json: false, sample: "" }, "p1-8681", undefined)}
             />
             <Button type="submit" disabled={!input.trim() || loading}>
               <Send className="h-4 w-4" />

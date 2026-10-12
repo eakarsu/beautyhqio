@@ -1,10 +1,12 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../FullAIExamples";
+
 
 /**
  * Shared shell for AI feature pages.
  *
  * Gives every AI tool the same structure — heading, description, scenario
- * buttons that fill EVERY field and immediately run, a form, and a rendered
+ * buttons that fill EVERY field for review, one explicit run action, and a rendered
  * result. Adding a feature is a small declaration rather than a 400-line page.
  *
  * Results are rendered by <AIResultView/>, which turns whatever the endpoint
@@ -193,6 +195,8 @@ export function AIToolPage({
   endpoint,
   method = "POST",
 }: AIToolPageProps) {
+  const fullAIExamples = useFullAIExamples();
+
   const router = useRouter();
   const fixture: AIFixture = AI_FIXTURES[fixtureKey];
 
@@ -260,7 +264,7 @@ export function AIToolPage({
   };
 
   // A scenario clicked on the AI hub arrives as ?values=<json>; fill the form
-  // and run it once the runtime-id options (if any) have loaded.
+  // after the runtime-id options (if any) have loaded. The run remains explicit.
   const scenarioApplied = React.useRef(false);
   React.useEffect(() => {
     if (!fixture || scenarioApplied.current) return;
@@ -287,13 +291,12 @@ export function AIToolPage({
 
     scenarioApplied.current = true;
     setValues((v) => ({ ...v, ...withDefaults(parsed) }));
-    void run(parsed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options]);
 
   if (!fixture) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-6" data-full-ai-workspace="AIToolPage"><FullAIExamples controller={fullAIExamples} disabled={Boolean(loading)} />
         <p className="text-sm text-muted-foreground">Unknown fixture: {fixtureKey}</p>
       </div>
     );
@@ -318,7 +321,7 @@ export function AIToolPage({
   );
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="container mx-auto p-6 max-w-4xl space-y-6" data-full-ai-workspace="AIToolPage"><FullAIExamples controller={fullAIExamples} disabled={Boolean(loading)} />
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.push("/ai")} aria-label="Back to AI tools">
           <ArrowLeft className="h-5 w-5" />
@@ -336,14 +339,13 @@ export function AIToolPage({
         <CardHeader>
           <CardTitle className="text-lg">Try an example</CardTitle>
           <CardDescription>
-            Pick an example to fill every field and run it, or enter your own values below.
+            Pick an example to fill every field, review the values, and use Run analysis to request a response.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <FillButtons
             fixture={fixture}
             apply={(next) => setValues((v) => ({ ...v, ...withDefaults(next) }))}
-            onRun={(next) => void run(next)}
             onClear={() => setValues({})}
             resolvers={resolverValues}
             running={loading}
@@ -356,7 +358,7 @@ export function AIToolPage({
                 <div key={field} className="space-y-2">
                   <Label htmlFor={field}>{fieldLabel(field)}</Label>
                   <Select value={values[field] ?? ""} onValueChange={(v) => setField(field, v)}>
-                    <SelectTrigger id={field}>
+                    <SelectTrigger id={field} data-full-ai-field={fullAIExamples.bind({ current: values[field] ?? "", change: event => ((v) => setField(field, v))(event.target.value), label: "values[field]", manual: false, json: false }, "p1-12142", [(typeof field === 'object' ? (field as any)?.key ?? (field as any)?.name ?? (field as any)?.id ?? '' : field),field].join(":"))}>
                       <SelectValue placeholder={`Select ${fieldLabel(field).toLowerCase()}`} />
                     </SelectTrigger>
                     <SelectContent>
@@ -379,13 +381,13 @@ export function AIToolPage({
                     id={field}
                     rows={3}
                     value={values[field] ?? ""}
-                    onChange={(e) => setField(field, e.target.value)}
+                    onChange={(e) => setField(field, e.target.value)} data-full-ai-field={fullAIExamples.bind({ current: values[field] ?? "", change: (e) => setField(field, e.target.value), label: "values[field]", manual: false, json: false }, "p1-12988", [(typeof field === 'object' ? (field as any)?.key ?? (field as any)?.name ?? (field as any)?.id ?? '' : field),field].join(":"))}
                   />
                 ) : (
                   <Input
                     id={field}
                     value={values[field] ?? ""}
-                    onChange={(e) => setField(field, e.target.value)}
+                    onChange={(e) => setField(field, e.target.value)} data-full-ai-field={fullAIExamples.bind({ current: values[field] ?? "", change: (e) => setField(field, e.target.value), label: "values[field]", manual: false, json: false }, "p1-13237", [(typeof field === 'object' ? (field as any)?.key ?? (field as any)?.name ?? (field as any)?.id ?? '' : field),field].join(":"))}
                   />
                 )}
               </div>

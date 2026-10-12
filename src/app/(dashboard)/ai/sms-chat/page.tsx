@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../../../../components/FullAIExamples";
+
 
 import { useState, useRef, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -55,6 +57,8 @@ const quickPrompts = [
 ];
 
 export default function TwilioSMSChatPage() {
+  const fullAIExamples = useFullAIExamples();
+
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -223,7 +227,7 @@ export default function TwilioSMSChatPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-140px)] flex flex-col">
+    <div className="h-[calc(100vh-140px)] flex flex-col" data-full-ai-workspace="TwilioSMSChatPage"><FullAIExamples controller={fullAIExamples} disabled={Boolean(loading)} />
       {/* Header */}
       <div className="flex items-center gap-4 mb-4">
         <Button variant="ghost" size="icon" onClick={() => router.push("/ai/voice")}>
@@ -261,7 +265,7 @@ export default function TwilioSMSChatPage() {
                 value={userPhone}
                 onChange={(e) => setUserPhone(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && startChat()}
-                className="flex-1"
+                className="flex-1" data-full-ai-field={fullAIExamples.bind({ current: userPhone, change: (e) => setUserPhone(e.target.value), label: "userPhone", manual: false, json: false, sample: "" }, "p1-7965", undefined)}
               />
               <Button onClick={startChat} className="bg-blue-600 hover:bg-blue-700">
                 Start Chat
@@ -379,13 +383,13 @@ export default function TwilioSMSChatPage() {
             running={loading}
             compact
           />
-          <form onSubmit={handleSubmit} className="flex gap-2">
+          <form onSubmit={handleSubmit} className="flex gap-2" data-full-ai-workspace="TwilioSMSChatPage"><FullAIExamples controller={fullAIExamples} disabled={Boolean(loading)} />
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type your message..."
               className="flex-1"
-              disabled={loading}
+              disabled={loading} data-full-ai-field={fullAIExamples.bind({ current: input, change: (e) => setInput(e.target.value), label: "input", manual: false, json: false, sample: "" }, "p1-12796", undefined)}
             />
             <Button
               type="submit"

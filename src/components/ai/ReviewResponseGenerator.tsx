@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../FullAIExamples";
+
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -46,6 +48,8 @@ const RESPONSE_TONES = [
 ];
 
 export function ReviewResponseGenerator({ review, onGenerate }: ReviewResponseGeneratorProps) {
+  const fullAIExamples = useFullAIExamples();
+
   const [reviewText, setReviewText] = useState(review?.text || "");
   const [rating, setRating] = useState(review?.rating || 5);
   const [tone, setTone] = useState("warm");
@@ -135,7 +139,7 @@ export function ReviewResponseGenerator({ review, onGenerate }: ReviewResponseGe
   const SentimentIcon = sentiment.icon;
 
   return (
-    <Card>
+    <Card><div data-full-ai-workspace="ReviewResponseGenerator"><FullAIExamples controller={fullAIExamples} disabled={Boolean(isGenerating)} />
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5" />
@@ -159,7 +163,7 @@ export function ReviewResponseGenerator({ review, onGenerate }: ReviewResponseGe
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
             placeholder="Paste the customer review here..."
-            rows={4}
+            rows={4} data-full-ai-field={fullAIExamples.bind({ current: reviewText, change: (e) => setReviewText(e.target.value), label: "reviewText", manual: false, json: false, sample: review?.text || "" }, "p1-5575", undefined)}
           />
         </div>
 
@@ -173,7 +177,7 @@ export function ReviewResponseGenerator({ review, onGenerate }: ReviewResponseGe
           <div className="space-y-1">
             <Label>Response Tone</Label>
             <Select value={tone} onValueChange={setTone}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px]" data-full-ai-field={fullAIExamples.bind({ current: tone, change: event => (setTone)(event.target.value), label: "tone", manual: false, json: false, sample: "warm" }, "p1-6088", undefined)}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -232,7 +236,7 @@ export function ReviewResponseGenerator({ review, onGenerate }: ReviewResponseGe
               value={generatedResponse}
               onChange={(e) => setGeneratedResponse(e.target.value)}
               rows={6}
-              className="font-mono"
+              className="font-mono" data-full-ai-field={fullAIExamples.bind({ current: generatedResponse, change: (e) => setGeneratedResponse(e.target.value), label: "generatedResponse", manual: false, json: false, sample: "" }, "p1-8153", undefined)}
             />
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleCopy}>
@@ -263,6 +267,6 @@ export function ReviewResponseGenerator({ review, onGenerate }: ReviewResponseGe
           </ul>
         </div>
       </CardContent>
-    </Card>
+    </div></Card>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
-
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -89,6 +88,9 @@ function AppleIcon() {
 }
 
 export default function LoginPage() {
+  const nativeDemoAuthRequestLock = useRef(false);
+  const demoCredentialRequestLock = useRef(false);
+
   const router = useRouter();
   const bookingReturn = () => {
     const requested = new URLSearchParams(window.location.search).get('callbackUrl');
@@ -121,16 +123,12 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (nativeDemoAuthRequestLock.current) return;
+    nativeDemoAuthRequestLock.current = true;
     setError("");
     setLoading(true);
-
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
-
+      const result = await signIn("credentials", { email, password, redirect: false });
       if (result?.error) {
         setError("Invalid email or password");
       } else {
@@ -141,6 +139,7 @@ export default function LoginPage() {
       setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);
+      nativeDemoAuthRequestLock.current = false;
     }
   };
 
@@ -156,24 +155,23 @@ export default function LoginPage() {
   };
 
   const fillDemoCredentials = async (accountKey: DemoAccount["key"] = "owner") => {
+    if (demoCredentialRequestLock.current || loading) return;
+    demoCredentialRequestLock.current = true;
     setError("");
     setDemoLoading(true);
     try {
       const loaded = await loadDemoAccounts();
       const account = loaded.accounts.find(({ key }) => key === accountKey);
-      if (!account?.password && !loaded.password) throw new Error('Local autofill is unavailable.');
-      const demoEmail = account?.email || loaded.email;
-      const demoPassword = account?.password || loaded.password;
-      setEmail(demoEmail);
-      setPassword(demoPassword);
-      const result = await signIn("credentials", { email: demoEmail, password: demoPassword, redirect: false });
-      if (result?.error) throw new Error("Demo sign-in failed.");
-      router.push("/");
-      router.refresh();
+      if (!loaded.accounts.length || !account?.email || !account.password) {
+        throw new Error("Configured demo credentials are unavailable.");
+      }
+      setEmail(account.email);
+      setPassword(account.password);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Demo credentials are unavailable");
+      setError(reason instanceof Error ? reason.message : "Demo credentials are unavailable.");
     } finally {
       setDemoLoading(false);
+      demoCredentialRequestLock.current = false;
     }
   };
 
@@ -300,8 +298,8 @@ export default function LoginPage() {
               />
             </div>
 
-            {demoEnabled && <Button type="button" variant="outline" className="w-full" onClick={async () => { await (() => fillDemoCredentials())(); window.setTimeout(() => { const form = document.querySelector("form"); if (form) form.requestSubmit(); }, 150); }} disabled={demoLoading || loading} aria-label="Log In as Demo">
-              {demoLoading ? 'Filling credentials…' : 'Log In as Demo'}
+            {demoEnabled && <Button type="button" variant="outline" className="w-full" onClick={() => void fillDemoCredentials()} disabled={demoLoading || loading} aria-label="Fill demo credentials">
+              {demoLoading ? "Loading demo credentials…" : "Fill demo credentials"}
             </Button>}
 
             <Button type="submit" className="w-full bg-rose-600 hover:bg-rose-700" disabled={loading || socialLoading !== null}>

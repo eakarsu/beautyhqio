@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../../../components/FullAIExamples";
+
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -392,6 +394,8 @@ const aiFeatures = [
 ];
 
 export default function AIDashboardPage() {
+  const fullAIExamples = useFullAIExamples();
+
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>("features");
   const [responses, setResponses] = useState<Record<string, AIResponse>>({});
@@ -711,7 +715,7 @@ export default function AIDashboardPage() {
                 <div>
                   <Label>Message Type</Label>
                   <Select value={messageType} onValueChange={(v) => setMessageType(v as MessageType)}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1" data-full-ai-field={fullAIExamples.bind({ current: messageType, change: event => ((v) => setMessageType(v as MessageType))(event.target.value), label: "messageType", manual: false, json: false, sample: "appointment_reminder" }, "p1-24491", undefined)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -728,7 +732,7 @@ export default function AIDashboardPage() {
                 <div>
                   <Label>Tone</Label>
                   <Select value={messageTone} onValueChange={setMessageTone}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1" data-full-ai-field={fullAIExamples.bind({ current: messageTone, change: event => (setMessageTone)(event.target.value), label: "messageTone", manual: false, json: false, sample: "friendly" }, "p1-25384", undefined)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -754,7 +758,13 @@ export default function AIDashboardPage() {
                         }
                       }}
                     >
-                      <SelectTrigger className="mt-1">
+                      <SelectTrigger className="mt-1" data-full-ai-field={fullAIExamples.bind({ current: selectedClientId, change: event => ((id) => {
+                        setSelectedClientId(id);
+                        const client = clients.find(c => c.id === id);
+                        if (client) {
+                          setClientName(`${client.firstName} ${client.lastName}`);
+                        }
+                      })(event.target.value), label: "selectedClientId", manual: false, json: false, sample: "" }, "p1-26125", undefined)}>
                         <SelectValue placeholder="Select a client" />
                       </SelectTrigger>
                       <SelectContent>
@@ -770,7 +780,7 @@ export default function AIDashboardPage() {
                       value={clientName}
                       onChange={(e) => setClientName(e.target.value)}
                       placeholder="Enter client name"
-                      className="mt-1"
+                      className="mt-1" data-full-ai-field={fullAIExamples.bind({ current: clientName, change: (e) => setClientName(e.target.value), label: "clientName", manual: false, json: false, sample: "" }, "p1-27113", undefined)}
                     />
                   )}
                 </div>
@@ -778,7 +788,7 @@ export default function AIDashboardPage() {
                 <div>
                   <Label>Language</Label>
                   <Select value={messageLanguage} onValueChange={setMessageLanguage}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1" data-full-ai-field={fullAIExamples.bind({ current: messageLanguage, change: event => (setMessageLanguage)(event.target.value), label: "messageLanguage", manual: false, json: false, sample: "English" }, "p1-27474", undefined)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -914,7 +924,13 @@ export default function AIDashboardPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1" data-full-ai-field={fullAIExamples.bind({ current: selectedReviewClientId, change: event => ((id) => {
+                      setSelectedReviewClientId(id);
+                      const client = clients.find(c => c.id === id);
+                      if (client) {
+                        setReviewClientName(`${client.firstName} ${client.lastName}`);
+                      }
+                    })(event.target.value), label: "selectedReviewClientId", manual: false, json: false, sample: "" }, "p1-32687", undefined)}>
                       <SelectValue placeholder="Select a customer" />
                     </SelectTrigger>
                     <SelectContent>
@@ -930,7 +946,7 @@ export default function AIDashboardPage() {
                     value={reviewClientName}
                     onChange={(e) => setReviewClientName(e.target.value)}
                     placeholder="Enter customer name"
-                    className="mt-1"
+                    className="mt-1" data-full-ai-field={fullAIExamples.bind({ current: reviewClientName, change: (e) => setReviewClientName(e.target.value), label: "reviewClientName", manual: false, json: false, sample: "" }, "p1-33651", undefined)}
                   />
                 )}
               </div>
@@ -960,7 +976,7 @@ export default function AIDashboardPage() {
                   onChange={(e) => setReviewText(e.target.value)}
                   placeholder="Paste the customer review here..."
                   rows={5}
-                  className="mt-1 w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent resize-none"
+                  className="mt-1 w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent resize-none" data-full-ai-field={fullAIExamples.bind({ current: reviewText, change: (e) => setReviewText(e.target.value), label: "reviewText", manual: false, json: false, sample: "" }, "p1-34733", undefined)}
                 />
               </div>
 
@@ -1074,7 +1090,7 @@ export default function AIDashboardPage() {
               <div>
                 <Label>Target Language</Label>
                 <Select value={targetLanguage} onValueChange={setTargetLanguage}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1" data-full-ai-field={fullAIExamples.bind({ current: targetLanguage, change: event => (setTargetLanguage)(event.target.value), label: "targetLanguage", manual: false, json: false, sample: "Spanish" }, "p1-39674", undefined)}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1120,7 +1136,7 @@ export default function AIDashboardPage() {
                   onChange={(e) => setTranslateText(e.target.value)}
                   placeholder="Enter text to translate..."
                   rows={6}
-                  className="mt-1 w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent resize-none"
+                  className="mt-1 w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent resize-none" data-full-ai-field={fullAIExamples.bind({ current: translateText, change: (e) => setTranslateText(e.target.value), label: "translateText", manual: false, json: false, sample: "" }, "p1-42444", undefined)}
                 />
               </div>
 
@@ -1183,7 +1199,7 @@ export default function AIDashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-full-ai-workspace="AIDashboardPage"><FullAIExamples controller={fullAIExamples} />
       {/* Header */}
       <div className="flex items-center gap-4">
         <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl">

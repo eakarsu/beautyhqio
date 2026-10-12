@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../../../../components/FullAIExamples";
+
 
 import { useEffect, useState } from "react";
 import { FillButtons } from "@/components/ai/FillButtons";
@@ -74,6 +76,8 @@ interface StaffOpt {
 }
 
 export default function SmartSchedulingPage() {
+  const fullAIExamples = useFullAIExamples();
+
   const router = useRouter();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -209,7 +213,7 @@ export default function SmartSchedulingPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-full-ai-workspace="SmartSchedulingPage"><FullAIExamples controller={fullAIExamples} disabled={Boolean(loading)} />
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.push("/ai")}>
@@ -275,7 +279,7 @@ export default function SmartSchedulingPage() {
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleService(service.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                        className="h-4 w-4 rounded border-slate-300 text-rose-500 focus:ring-rose-500" data-full-ai-field={fullAIExamples.bind({ current: isSelected, change: () => toggleService(service.id), label: "isSelected", manual: false, json: false }, "p1-8815", [(typeof service === 'object' ? (service as any)?.key ?? (service as any)?.name ?? (service as any)?.id ?? '' : service)].join(":"))}
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium">{service.name}</p>
@@ -291,7 +295,7 @@ export default function SmartSchedulingPage() {
             <div className="space-y-2">
               <Label>Preferred Staff (Optional)</Label>
               <Select value={preferredStaff} onValueChange={setPreferredStaff}>
-                <SelectTrigger>
+                <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: preferredStaff, change: event => (setPreferredStaff)(event.target.value), label: "preferredStaff", manual: false, json: false, sample: "" }, "p1-9602", undefined)}>
                   <SelectValue placeholder="Any available" />
                 </SelectTrigger>
                 <SelectContent>
@@ -327,7 +331,7 @@ export default function SmartSchedulingPage() {
             <div className="space-y-2">
               <Label>Preferred Time (Optional)</Label>
               <Select value={preferredTime} onValueChange={setPreferredTime}>
-                <SelectTrigger>
+                <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: preferredTime, change: event => (setPreferredTime)(event.target.value), label: "preferredTime", manual: false, json: false, sample: "" }, "p1-11202", undefined)}>
                   <SelectValue placeholder="Flexible" />
                 </SelectTrigger>
                 <SelectContent>
@@ -346,7 +350,7 @@ export default function SmartSchedulingPage() {
               <Input
                 placeholder="e.g., Need to be done by 3 PM, wheelchair accessible..."
                 value={constraints}
-                onChange={(e) => setConstraints(e.target.value)}
+                onChange={(e) => setConstraints(e.target.value)} data-full-ai-field={fullAIExamples.bind({ current: constraints, change: (e) => setConstraints(e.target.value), label: "constraints", manual: false, json: false, sample: "" }, "p1-12028", undefined)}
               />
             </div>
 

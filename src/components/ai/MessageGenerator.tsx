@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../FullAIExamples";
+
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,8 @@ const CHANNELS = [
 ];
 
 export function MessageGenerator({ clientName, context, onUse }: MessageGeneratorProps) {
+  const fullAIExamples = useFullAIExamples();
+
   const [messageType, setMessageType] = useState("appointment_reminder");
   const [tone, setTone] = useState("friendly");
   const [channel, setChannel] = useState("sms");
@@ -134,7 +138,7 @@ export function MessageGenerator({ clientName, context, onUse }: MessageGenerato
   const selectedChannel = CHANNELS.find((c) => c.value === channel);
 
   return (
-    <Card>
+    <Card><div data-full-ai-workspace="MessageGenerator"><FullAIExamples controller={fullAIExamples} disabled={Boolean(isGenerating)} />
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5" />
@@ -150,7 +154,7 @@ export function MessageGenerator({ clientName, context, onUse }: MessageGenerato
           <div className="space-y-2">
             <Label>Message Type</Label>
             <Select value={messageType} onValueChange={setMessageType}>
-              <SelectTrigger>
+              <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: messageType, change: event => (setMessageType)(event.target.value), label: "messageType", manual: false, json: false, sample: "appointment_reminder" }, "p1-6330", undefined)}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -166,7 +170,7 @@ export function MessageGenerator({ clientName, context, onUse }: MessageGenerato
           <div className="space-y-2">
             <Label>Tone</Label>
             <Select value={tone} onValueChange={setTone}>
-              <SelectTrigger>
+              <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: tone, change: event => (setTone)(event.target.value), label: "tone", manual: false, json: false, sample: "friendly" }, "p1-6865", undefined)}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -182,7 +186,7 @@ export function MessageGenerator({ clientName, context, onUse }: MessageGenerato
           <div className="space-y-2">
             <Label>Channel</Label>
             <Select value={channel} onValueChange={setChannel}>
-              <SelectTrigger>
+              <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: channel, change: event => (setChannel)(event.target.value), label: "channel", manual: false, json: false, sample: "sms" }, "p1-7369", undefined)}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -211,7 +215,7 @@ export function MessageGenerator({ clientName, context, onUse }: MessageGenerato
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
               placeholder="Describe the message you want to generate..."
-              rows={2}
+              rows={2} data-full-ai-field={fullAIExamples.bind({ current: customPrompt, change: (e) => setCustomPrompt(e.target.value), label: "customPrompt", manual: false, json: false, sample: "" }, "p1-8290", undefined)}
             />
           </div>
         )}
@@ -249,7 +253,7 @@ export function MessageGenerator({ clientName, context, onUse }: MessageGenerato
                 value={generatedMessage}
                 onChange={(e) => setGeneratedMessage(e.target.value)}
                 rows={channel === "email" ? 8 : 4}
-                className="font-mono"
+                className="font-mono" data-full-ai-field={fullAIExamples.bind({ current: generatedMessage, change: (e) => setGeneratedMessage(e.target.value), label: "generatedMessage", manual: false, json: false, sample: "" }, "p1-9492", undefined)}
               />
             </div>
 
@@ -295,6 +299,6 @@ export function MessageGenerator({ clientName, context, onUse }: MessageGenerato
           </div>
         )}
       </CardContent>
-    </Card>
+    </div></Card>
   );
 }

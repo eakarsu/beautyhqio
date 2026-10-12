@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "../../../../../components/FullAIExamples";
+
 
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -15,6 +17,8 @@ import { FillButtons } from "@/components/ai/FillButtons";
 import { AI_FIXTURES } from "@/components/ai/AIFixtures";
 
 export default function VoiceReceptionistSettingsPage() {
+  const fullAIExamples = useFullAIExamples();
+
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -45,7 +49,7 @@ export default function VoiceReceptionistSettingsPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-4xl mx-auto" data-full-ai-workspace="VoiceReceptionistSettingsPage"><FullAIExamples controller={fullAIExamples} />
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="icon" onClick={() => router.push("/ai/voice")}>
           <ArrowLeft className="h-5 w-5" />
@@ -85,7 +89,7 @@ export default function VoiceReceptionistSettingsPage() {
               </div>
               <Switch
                 checked={settings.isEnabled}
-                onCheckedChange={(v) => setSettings({...settings, isEnabled: v})}
+                onCheckedChange={(v) => setSettings({...settings, isEnabled: v})} data-full-ai-field={fullAIExamples.bind({ current: settings.isEnabled, change: event => ((v) => setSettings({...settings, isEnabled: v}))(event.target.checked), label: "settings.isEnabled", manual: false, json: false, sample: true }, "p1-3433", undefined)}
               />
             </div>
 
@@ -96,7 +100,7 @@ export default function VoiceReceptionistSettingsPage() {
               </div>
               <Switch
                 checked={settings.businessHoursOnly}
-                onCheckedChange={(v) => setSettings({...settings, businessHoursOnly: v})}
+                onCheckedChange={(v) => setSettings({...settings, businessHoursOnly: v})} data-full-ai-field={fullAIExamples.bind({ current: settings.businessHoursOnly, change: event => ((v) => setSettings({...settings, businessHoursOnly: v}))(event.target.checked), label: "settings.businessHoursOnly", manual: false, json: false, sample: true }, "p1-3880", undefined)}
               />
             </div>
 
@@ -107,7 +111,7 @@ export default function VoiceReceptionistSettingsPage() {
               </div>
               <Switch
                 checked={settings.allowVoicemail}
-                onCheckedChange={(v) => setSettings({...settings, allowVoicemail: v})}
+                onCheckedChange={(v) => setSettings({...settings, allowVoicemail: v})} data-full-ai-field={fullAIExamples.bind({ current: settings.allowVoicemail, change: event => ((v) => setSettings({...settings, allowVoicemail: v}))(event.target.checked), label: "settings.allowVoicemail", manual: false, json: false, sample: true }, "p1-4329", undefined)}
               />
             </div>
 
@@ -118,7 +122,7 @@ export default function VoiceReceptionistSettingsPage() {
               </div>
               <Switch
                 checked={settings.transferToHuman}
-                onCheckedChange={(v) => setSettings({...settings, transferToHuman: v})}
+                onCheckedChange={(v) => setSettings({...settings, transferToHuman: v})} data-full-ai-field={fullAIExamples.bind({ current: settings.transferToHuman, change: event => ((v) => setSettings({...settings, transferToHuman: v}))(event.target.checked), label: "settings.transferToHuman", manual: false, json: false, sample: true }, "p1-4784", undefined)}
               />
             </div>
 
@@ -129,7 +133,7 @@ export default function VoiceReceptionistSettingsPage() {
               </div>
               <Switch
                 checked={settings.autoConfirmBookings}
-                onCheckedChange={(v) => setSettings({...settings, autoConfirmBookings: v})}
+                onCheckedChange={(v) => setSettings({...settings, autoConfirmBookings: v})} data-full-ai-field={fullAIExamples.bind({ current: settings.autoConfirmBookings, change: event => ((v) => setSettings({...settings, autoConfirmBookings: v}))(event.target.checked), label: "settings.autoConfirmBookings", manual: false, json: false, sample: false }, "p1-5261", undefined)}
               />
             </div>
 
@@ -139,7 +143,7 @@ export default function VoiceReceptionistSettingsPage() {
                 <Input
                   placeholder="+1 (555) 123-4567"
                   value={settings.transferNumber}
-                  onChange={(e) => setSettings({...settings, transferNumber: e.target.value})}
+                  onChange={(e) => setSettings({...settings, transferNumber: e.target.value})} data-full-ai-field={fullAIExamples.bind({ current: settings.transferNumber, change: (e) => setSettings({...settings, transferNumber: e.target.value}), label: "settings.transferNumber", manual: false, json: false, sample: "" }, "p1-5607", undefined)}
                 />
                 <p className="text-sm text-muted-foreground">Number to transfer calls to when human is requested</p>
               </div>
@@ -164,7 +168,7 @@ export default function VoiceReceptionistSettingsPage() {
                   value={settings.defaultLanguage}
                   onValueChange={(v) => setSettings({...settings, defaultLanguage: v})}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: settings.defaultLanguage, change: event => ((v) => setSettings({...settings, defaultLanguage: v}))(event.target.value), label: "settings.defaultLanguage", manual: false, json: false, sample: "en" }, "p1-6583", undefined)}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -184,7 +188,7 @@ export default function VoiceReceptionistSettingsPage() {
                   value={settings.voiceType}
                   onValueChange={(v) => setSettings({...settings, voiceType: v})}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: settings.voiceType, change: event => ((v) => setSettings({...settings, voiceType: v}))(event.target.value), label: "settings.voiceType", manual: false, json: false, sample: "female" }, "p1-7466", undefined)}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -202,7 +206,7 @@ export default function VoiceReceptionistSettingsPage() {
                   value={settings.greetingStyle}
                   onValueChange={(v) => setSettings({...settings, greetingStyle: v})}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: settings.greetingStyle, change: event => ((v) => setSettings({...settings, greetingStyle: v}))(event.target.value), label: "settings.greetingStyle", manual: false, json: false, sample: "professional" }, "p1-8241", undefined)}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -219,7 +223,7 @@ export default function VoiceReceptionistSettingsPage() {
                   value={settings.maxCallDuration}
                   onValueChange={(v) => setSettings({...settings, maxCallDuration: v})}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger data-full-ai-field={fullAIExamples.bind({ current: settings.maxCallDuration, change: event => ((v) => setSettings({...settings, maxCallDuration: v}))(event.target.value), label: "settings.maxCallDuration", manual: false, json: false, sample: "5" }, "p1-8948", undefined)}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -250,7 +254,7 @@ export default function VoiceReceptionistSettingsPage() {
                 <Input
                   placeholder="Your Salon Name"
                   value={settings.businessName}
-                  onChange={(e) => setSettings({...settings, businessName: e.target.value})}
+                  onChange={(e) => setSettings({...settings, businessName: e.target.value})} data-full-ai-field={fullAIExamples.bind({ current: settings.businessName, change: (e) => setSettings({...settings, businessName: e.target.value}), label: "settings.businessName", manual: false, json: false, sample: "Serenity Salon and Spa" }, "p1-10223", undefined)}
                 />
               </div>
 
@@ -259,7 +263,7 @@ export default function VoiceReceptionistSettingsPage() {
                 <Input
                   placeholder="Sarah"
                   value={settings.receptionistName}
-                  onChange={(e) => setSettings({...settings, receptionistName: e.target.value})}
+                  onChange={(e) => setSettings({...settings, receptionistName: e.target.value})} data-full-ai-field={fullAIExamples.bind({ current: settings.receptionistName, change: (e) => setSettings({...settings, receptionistName: e.target.value}), label: "settings.receptionistName", manual: false, json: false, sample: "Sarah" }, "p1-10567", undefined)}
                 />
               </div>
             </div>
@@ -270,7 +274,7 @@ export default function VoiceReceptionistSettingsPage() {
                 placeholder="Leave blank to use default greeting. Example: Thank you for calling [Business Name], this is [Name], how may I help you today?"
                 value={settings.customGreeting}
                 onChange={(e) => setSettings({...settings, customGreeting: e.target.value})}
-                rows={3}
+                rows={3} data-full-ai-field={fullAIExamples.bind({ current: settings.customGreeting, change: (e) => setSettings({...settings, customGreeting: e.target.value}), label: "settings.customGreeting", manual: false, json: false, sample: "" }, "p1-10931", undefined)}
               />
               <p className="text-sm text-muted-foreground">Use [Business Name] and [Name] as placeholders</p>
             </div>
@@ -281,7 +285,7 @@ export default function VoiceReceptionistSettingsPage() {
                 placeholder="Message to play when calling outside business hours"
                 value={settings.afterHoursMessage}
                 onChange={(e) => setSettings({...settings, afterHoursMessage: e.target.value})}
-                rows={3}
+                rows={3} data-full-ai-field={fullAIExamples.bind({ current: settings.afterHoursMessage, change: (e) => setSettings({...settings, afterHoursMessage: e.target.value}), label: "settings.afterHoursMessage", manual: false, json: false, sample: "Thank you for calling. We're currently closed. Our business hours are Monday through Saturday, 9 AM to 7 PM. Please call back during business hours or leave a message." }, "p1-11514", undefined)}
               />
             </div>
           </CardContent>

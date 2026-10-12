@@ -142,9 +142,10 @@ const TONE_CLASS: Record<ReturnType<typeof toneFor>, string> = {
 };
 
 function ScalarValue({ label, value }: { label: string; value: unknown }) {
-  if (value === null || value === undefined || value === "") {
-    return <span className="text-muted-foreground">—</span>;
+  if (value === null || value === undefined) {
+    return <span className="text-muted-foreground">Not supplied</span>;
   }
+  if (value === "") return <span className="text-muted-foreground">Empty string</span>;
 
   if (typeof value === "boolean") {
     return value ? (
@@ -244,7 +245,7 @@ function ItemCard({ item }: { item: Dict }) {
             <div key={k} className="flex items-start justify-between gap-4 text-sm">
               <dt className="text-muted-foreground">{humanize(k)}</dt>
               <dd className="max-w-[65%] text-right font-medium text-slate-800">
-                <ScalarValue label={k} value={v} />
+                {isDict(v) || Array.isArray(v) ? <ValueBlock label={k} value={v} /> : <ScalarValue label={k} value={v} />}
               </dd>
             </div>
           ))}
@@ -422,7 +423,7 @@ export function AIResultView({ data, title = "Result", className }: AIResultView
                   {humanize(k)}
                 </p>
                 <div className="font-medium text-slate-900">
-                  <ScalarValue label={k} value={v} />
+                  {isDict(v) || Array.isArray(v) ? <ValueBlock label={k} value={v} /> : <ScalarValue label={k} value={v} />}
                 </div>
               </div>
             ))}

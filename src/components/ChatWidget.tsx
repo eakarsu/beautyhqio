@@ -1,4 +1,6 @@
 "use client";
+import FullAIExamples, { useFullAIExamples } from "./FullAIExamples";
+
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +15,8 @@ interface Message {
 const DEFAULT_OFFSET = { right: 24, bottom: 24 };
 
 export default function ChatWidget() {
+  const fullAIExamples = useFullAIExamples();
+
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -189,14 +193,14 @@ export default function ChatWidget() {
           e.preventDefault();
           send();
         }}
-        className="p-3 border-t border-slate-200 bg-white flex gap-2"
-      >
+        className="p-3 border-t border-slate-200 bg-white flex gap-2" data-full-ai-workspace="ChatWidget"
+      ><FullAIExamples controller={fullAIExamples} disabled={Boolean(loading)} />
         <Input
           placeholder="Type a message…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={loading}
-          autoFocus
+          autoFocus data-full-ai-field={fullAIExamples.bind({ current: input, change: (e) => setInput(e.target.value), label: "input", manual: false, json: false, sample: "" }, "p1-6188", undefined)}
         />
         <Button
           type="submit"
