@@ -41,6 +41,7 @@ interface BookingData {
 
 interface BookingWidgetProps {
   businessId?: string;
+  locationId?: string;
   onComplete?: (booking: BookingData) => void;
   allowAnyProvider?: boolean;
 }
@@ -49,6 +50,7 @@ type BookingStep = "services" | "provider" | "datetime" | "confirm";
 
 export function BookingWidget({
   businessId,
+  locationId,
   onComplete,
   allowAnyProvider = true,
 }: BookingWidgetProps) {
@@ -227,6 +229,8 @@ export function BookingWidget({
               date={selectedDate}
               duration={totalDuration}
               staffId={booking.provider?.id}
+              serviceIds={booking.services.map((s) => s.id)}
+              locationId={locationId}
               onSelect={handleTimeSelect}
               selectedTime={booking.time}
             />

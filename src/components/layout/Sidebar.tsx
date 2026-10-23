@@ -26,6 +26,7 @@ import {
   TrendingUp,
   Building2,
   DollarSign,
+  ClipboardList,
   LucideIcon,
 } from "lucide-react";
 
@@ -44,6 +45,7 @@ const navigation: NavigationItem[] = [
   { name: "Purchasing", href: "/purchasing", icon: Package, roles: ["OWNER", "MANAGER"] },
   { name: "Provider Connections", href: "/operations/integrations", icon: Settings, roles: ["OWNER", "MANAGER"] },
   { name: "Timesheets", href: "/timesheets", icon: Clock, roles: ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] },
+  { name: "Tasks", href: "/tasks", icon: ClipboardList, roles: ["OWNER", "MANAGER", "RECEPTIONIST", "STAFF"] },
   { name: "AI Review & Knowledge", href: "/ai/workspace", icon: Bot, roles: ["OWNER", "MANAGER", "RECEPTIONIST"] },
   // Platform Admin Only
   {

@@ -65,6 +65,7 @@ model Business {
   giftCards             GiftCard[]
   campaigns             Campaign[]
   automations           Automation[]
+  staffTasks            StaffTask[]
   savedFilters          SavedFilter[]
   appointments          Appointment[]
   integrationDeliveries IntegrationDelivery[]
@@ -169,6 +170,8 @@ model User {
   resetTokenExpiry DateTime?
 
   auditLogs      AuditLog[]
+  createdTasks   StaffTask[] @relation("StaffTaskCreator")
+  assignedTasks  StaffTask[] @relation("StaffTaskAssignee")
   savedFilters   SavedFilter[]
   accounts       Account[]
   mobileSessions MobileSession[]
@@ -1582,6 +1585,46 @@ model Automation {
 
   business   Business @relation(fields: [businessId], references: [id])
   businessId String
+}
+
+enum StaffTaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+enum StaffTaskPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+// Durable follow-up work created manually or by automations (create_task).
+model StaffTask {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  status      StaffTaskStatus   @default(OPEN)
+  priority    StaffTaskPriority @default(NORMAL)
+  dueAt       DateTime?
+  completedAt DateTime?
+
+  clientId      String?
+  appointmentId String?
+  automationId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business    Business @relation(fields: [businessId], references: [id])
+  businessId  String
+  createdBy   User     @relation("StaffTaskCreator", fields: [createdById], references: [id])
+  createdById String
+  assignee    User?    @relation("StaffTaskAssignee", fields: [assigneeId], references: [id])
+  assigneeId  String?
+
+  @@index([businessId, status, dueAt])
+  @@index([assigneeId, status])
 }
 
 // ============ AUDIT & SEARCH ============

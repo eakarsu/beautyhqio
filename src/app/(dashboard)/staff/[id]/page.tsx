@@ -64,6 +64,7 @@ export default function StaffProfilePage({ params }: { params: Promise<{ id: str
   const router = useRouter();
   const [staff, setStaff] = useState<Staff | null>(null);
   const [stats, setStats] = useState<StaffStats | null>(null);
+  const [weekSchedule, setWeekSchedule] = useState<Array<{ day: string; isWorking: boolean; startTime: string; endTime: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -72,10 +73,20 @@ export default function StaffProfilePage({ params }: { params: Promise<{ id: str
 
   const fetchStaff = async () => {
     try {
-      const [staffRes, statsRes] = await Promise.all([
+      const [staffRes, statsRes, scheduleRes] = await Promise.all([
         fetch(`/api/staff/${id}`),
         fetch(`/api/reports/staff-performance?staffId=${id}`),
+        fetch(`/api/staff/${id}/schedule`),
       ]);
+
+      if (scheduleRes.ok) {
+        const rows = await scheduleRes.json();
+        const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        setWeekSchedule(days.map((day, index) => {
+          const row = Array.isArray(rows) ? rows.find((r: { dayOfWeek: number }) => r.dayOfWeek === (index + 1) % 7) : null;
+          return { day, isWorking: Boolean(row?.isWorking), startTime: row?.startTime || "09:00", endTime: row?.endTime || "17:00" };
+        }));
+      }
 
       if (staffRes.ok) {
         const staffData = await staffRes.json();
@@ -321,16 +332,24 @@ export default function StaffProfilePage({ params }: { params: Promise<{ id: str
               </TabsContent>
 
               <TabsContent value="schedule">
-                <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Schedule editor coming soon</p>
-                  <Button
-                    className="mt-4"
-                    variant="outline"
-                    onClick={() => router.push(`/staff/${id}/schedule`)}
-                  >
-                    Manage Schedule
-                  </Button>
+                <div className="space-y-2 py-2">
+                  {weekSchedule.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Schedule could not be loaded. Use Manage Schedule to retry.</p>
+                  ) : weekSchedule.map((row) => (
+                    <div key={row.day} className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="font-medium">{row.day}</span>
+                      {row.isWorking ? (
+                        <span className="text-sm text-muted-foreground">{row.startTime} - {row.endTime}</span>
+                      ) : (
+                        <Badge variant="secondary">Day off</Badge>
+                      )}
+                    </div>
+                  ))}
+                  <div className="pt-2 text-center">
+                    <Button variant="outline" onClick={() => router.push(`/staff/${id}/schedule`)}>
+                      Manage Schedule
+                    </Button>
+                  </div>
                 </div>
               </TabsContent>
 

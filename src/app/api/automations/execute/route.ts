@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRoles } from "@/lib/api-auth";
 import { sendEmail } from "@/lib/email";
 import { sendSMS } from "@/lib/twilio";
+import { parseDueAt, parseTaskPriority, pickClientAutomationUpdate } from "@/lib/tasks";
 
 async function findTenantClient(businessId: string, clientId: unknown) {
   if (typeof clientId !== "string" || !clientId) return null;
@@ -117,26 +118,107 @@ export async function POST(request: NextRequest) {
               break;
             }
 
-            case "create_task":
-              // No task store exists, so nothing is created; say so instead of
-              // reporting a simulated task.
-              actionResults.push({
-                type: "task",
-                title: action.title ?? null,
-                status: "failed",
-                error: "create_task is not implemented; no task was created",
+            case "create_task": {
+              const title = typeof action.title === "string" ? action.title.trim() : "";
+              if (!title) {
+                actionResults.push({
+                  type: "task",
+                  title: action.title ?? null,
+                  status: "failed",
+                  error: "create_task requires a title",
+                });
+                break;
+              }
+              let assigneeId: string | null = null;
+              if (typeof action.assigneeId === "string" && action.assigneeId) {
+                const assignee = await prisma.user.findFirst({
+                  where: { id: action.assigneeId, businessId, isActive: true },
+                  select: { id: true },
+                });
+                if (!assignee) {
+                  actionResults.push({
+                    type: "task",
+                    title,
+                    status: "failed",
+                    error: "Assignee not found in this business",
+                  });
+                  break;
+                }
+                assigneeId = assignee.id;
+              }
+              const taskClient =
+                typeof data.clientId === "string"
+                  ? await findTenantClient(businessId, data.clientId)
+                  : null;
+              const task = await prisma.staffTask.create({
+                data: {
+                  businessId,
+                  createdById: auth.id,
+                  assigneeId,
+                  title: title.slice(0, 200),
+                  description:
+                    typeof action.description === "string"
+                      ? action.description.slice(0, 2000)
+                      : null,
+                  priority: parseTaskPriority(action.priority),
+                  dueAt: parseDueAt(action.dueAt),
+                  clientId: taskClient?.id ?? null,
+                  automationId: automation.id,
+                },
               });
+              actionResults.push({ type: "task", id: task.id, title: task.title, status: "created" });
               break;
+            }
 
-            case "update_record":
+            case "update_record": {
+              const model = typeof action.model === "string" ? action.model : "client";
+              const recordId = action.recordId ?? data.clientId ?? data.id ?? null;
+              if (model !== "client") {
+                actionResults.push({
+                  type: "update",
+                  model,
+                  id: recordId,
+                  status: "failed",
+                  error: "update_record only supports model client",
+                });
+                break;
+              }
+              const fields =
+                action.fields && typeof action.fields === "object"
+                  ? (action.fields as Record<string, unknown>)
+                  : {};
+              const picked = pickClientAutomationUpdate(fields);
+              if (!picked.ok) {
+                actionResults.push({
+                  type: "update",
+                  model,
+                  id: recordId,
+                  status: "failed",
+                  error: picked.error,
+                });
+                break;
+              }
+              const target = await findTenantClient(businessId, recordId);
+              if (!target) {
+                actionResults.push({
+                  type: "update",
+                  model,
+                  id: recordId,
+                  status: "failed",
+                  error: "Client not found in this business",
+                });
+                break;
+              }
+              await prisma.client.update({ where: { id: target.id }, data: picked.data });
               actionResults.push({
                 type: "update",
-                model: action.model ?? null,
-                id: action.recordId ?? data.id ?? null,
-                status: "failed",
-                error: "update_record is not implemented; no record was changed",
+                model,
+                id: target.id,
+                status: "updated",
+                fields: Object.keys(picked.data),
               });
               break;
+            }
 
             case "add_tag": {
               const client = await findTenantClient(businessId, data.clientId);

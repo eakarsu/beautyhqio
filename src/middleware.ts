@@ -8,13 +8,9 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || (process.env.NODE_ENV === "
   .filter(Boolean);
 
 function applyCors(res: NextResponse, origin: string | null) {
-  const allow =
-    ALLOWED_ORIGINS.includes("*") ||
-    (origin && ALLOWED_ORIGINS.includes(origin));
+  const allow = Boolean(origin && ALLOWED_ORIGINS.includes(origin));
   if (allow && origin) {
     res.headers.set("Access-Control-Allow-Origin", origin);
-  } else if (ALLOWED_ORIGINS.includes("*")) {
-    res.headers.set("Access-Control-Allow-Origin", "*");
   }
   res.headers.set(
     "Access-Control-Allow-Methods",

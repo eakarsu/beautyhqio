@@ -53,6 +53,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
+<script src="/feature-pack/feature-pack.js" defer />
         <Providers>{children}</Providers>
       </body>
     </html>
